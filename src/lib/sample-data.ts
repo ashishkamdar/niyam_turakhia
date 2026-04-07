@@ -25,7 +25,8 @@ export function seedSampleData(): void {
   const count = (db.prepare("SELECT COUNT(*) as c FROM deals").get() as { c: number }).c;
   if (count > 0) return;
 
-  const insDeal = db.prepare("INSERT INTO deals (id,metal,purity,is_pure,quantity_grams,pure_equivalent_grams,price_per_oz,direction,location,status,date,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,'simulator')");
+  const REFINING_COSTS: Record<Metal, number> = { gold: 1.50, silver: 0.15, platinum: 3.00, palladium: 2.50 };
+  const insDeal = db.prepare("INSERT INTO deals (id,metal,purity,is_pure,quantity_grams,pure_equivalent_grams,price_per_oz,refining_cost_per_gram,total_cost_usd,direction,location,status,date,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'simulator')");
   const insPay = db.prepare("INSERT INTO payments (id,amount,currency,direction,mode,from_location,to_location,linked_deal_id,date) VALUES (?,?,?,?,?,?,?,?,?)");
 
   db.transaction(() => {
@@ -49,9 +50,13 @@ export function seedSampleData(): void {
         const statuses = isPure ? ["locked", "in_transit", "in_hk"] : ["locked", "in_refinery", "in_transit", "in_hk"];
         const status = pick(statuses);
         const date = randomDate(daysAgo);
+        const refCostPerGram = isPure ? 0 : REFINING_COSTS[metal];
+        const purchaseCostUsd = (pureEquiv / 31.1035) * price;
+        const refiningTotalUsd = isPure ? 0 : qty * refCostPerGram;
+        const totalCostUsd = purchaseCostUsd + refiningTotalUsd;
         const dealId = uuid();
-        insDeal.run(dealId, metal, purity, isPure ? 1 : 0, qty, pureEquiv, price, "buy", "uae", status, date);
-        const costUsd = (pureEquiv / 31.1035) * price;
+        insDeal.run(dealId, metal, purity, isPure ? 1 : 0, qty, pureEquiv, price, refCostPerGram, totalCostUsd, "buy", "uae", status, date);
+        const costUsd = totalCostUsd;
         const curr = pick(["AED", "USD"] as const);
         const amt = curr === "AED" ? costUsd * 3.6725 : costUsd;
         insPay.run(uuid(), parseFloat(amt.toFixed(2)), curr, "sent", "bank", "hong_kong", "uae", dealId, date);
@@ -66,7 +71,7 @@ export function seedSampleData(): void {
         const price = parseFloat((dayPrices[metal] * (1 + premium)).toFixed(4));
         const date = randomDate(daysAgo);
         const dealId = uuid();
-        insDeal.run(dealId, metal, "24K", 1, qty, qty, price, "sell", "hong_kong", "sold", date);
+        insDeal.run(dealId, metal, "24K", 1, qty, qty, price, 0, 0, "sell", "hong_kong", "sold", date);
         const revUsd = (qty / 31.1035) * price;
         const curr = pick(["USD", "HKD", "USDT"] as const);
         const amt = curr === "HKD" ? revUsd * 7.82 : revUsd;
