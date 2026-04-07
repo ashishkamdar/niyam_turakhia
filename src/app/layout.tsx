@@ -8,6 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "NT Precious Metals - MIS Dashboard",
   description: "Real-time profitability dashboard for precious metals trading",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

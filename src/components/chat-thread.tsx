@@ -76,19 +76,19 @@ export function ChatThread({
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-white/10 px-3 py-2">
-        <div className="flex items-center gap-2">
+      <div className="shrink-0 border-t border-white/10 px-2 py-2">
+        <div className="flex items-center gap-1.5">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Type a message..."
-            className="min-w-0 flex-1 rounded-full bg-gray-800 px-4 py-2 text-sm text-white placeholder:text-gray-500 outline-none focus:outline-1 focus:outline-amber-500"
+            className="min-w-0 flex-1 rounded-full bg-gray-800 px-3 py-2 text-base text-white placeholder:text-gray-500 outline-none"
           />
           <button
             onClick={handleSend}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-500"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white active:bg-emerald-500"
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="size-4">
               <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
