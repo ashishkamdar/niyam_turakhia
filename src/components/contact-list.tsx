@@ -10,42 +10,50 @@ const AVATAR_COLORS: Record<string, string> = {
   "Patel Exports": "bg-rose-600",
 };
 
+function LockIcons({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-0.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <svg key={i} viewBox="0 0 24 24" fill="currentColor" className="size-3 text-amber-400">
+          <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
 function ContactRow({
   c,
   isActive,
   onSelect,
+  dimmed,
 }: {
   c: WhatsAppContact;
   isActive: boolean;
   onSelect: (name: string) => void;
+  dimmed?: boolean;
 }) {
   const initial = c.contact_name.charAt(0).toUpperCase();
   const color = AVATAR_COLORS[c.contact_name] ?? "bg-gray-600";
-  const isLocked = c.has_lock > 0;
 
   return (
     <button
       onClick={() => onSelect(c.contact_name)}
       className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition ${
         isActive ? "bg-white/10" : "hover:bg-white/5"
-      }`}
+      } ${dimmed ? "opacity-60" : ""}`}
     >
-      <div className="relative shrink-0">
-        <div className={`flex size-10 items-center justify-center rounded-full ${isLocked ? "bg-amber-600/30" : color} text-sm font-bold text-white`}>
-          {initial}
-        </div>
-        {isLocked && (
-          <div className="absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-amber-500">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="size-2.5 text-white">
-              <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
-            </svg>
-          </div>
-        )}
+      <div className={`flex size-10 shrink-0 items-center justify-center rounded-full ${color} text-sm font-bold text-white`}>
+        {initial}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between">
-          <span className={`truncate text-sm font-medium ${isLocked ? "text-amber-200" : "text-white"}`}>{c.contact_name}</span>
-          {c.unread > 0 && !isLocked && (
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-white">{c.contact_name}</span>
+            <LockIcons count={c.lock_count} />
+          </div>
+          {c.unread > 0 && (
             <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
               {c.unread}
             </span>
@@ -66,16 +74,19 @@ export function ContactList({
   selected: string | null;
   onSelect: (name: string) => void;
 }) {
-  const active = contacts.filter((c) => !c.has_lock || c.has_lock === 0);
-  const locked = contacts.filter((c) => c.has_lock > 0);
+  // Active: no locks at all, OR has new messages after last lock (last_msg_is_lock === 0)
+  const active = contacts.filter((c) => c.lock_count === 0 || c.last_msg_is_lock === 0);
+  // Settled: conversation ended on a lock (last message is a lock, no new activity)
+  const settled = contacts.filter((c) => c.lock_count > 0 && c.last_msg_is_lock === 1);
 
   return (
     <div>
-      {/* Active negotiations */}
       {active.length > 0 && (
         <div>
           <div className="px-3 pb-1 pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Active</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+              Active {active.length > 0 && `(${active.length})`}
+            </p>
           </div>
           <div className="space-y-0.5">
             {active.map((c) => (
@@ -85,15 +96,16 @@ export function ContactList({
         </div>
       )}
 
-      {/* Locked deals */}
-      {locked.length > 0 && (
+      {settled.length > 0 && (
         <div>
           <div className="px-3 pb-1 pt-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">Locked Deals</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+              Locked Deals ({settled.length})
+            </p>
           </div>
-          <div className="space-y-0.5 opacity-75">
-            {locked.map((c) => (
-              <ContactRow key={c.contact_name} c={c} isActive={selected === c.contact_name} onSelect={onSelect} />
+          <div className="space-y-0.5">
+            {settled.map((c) => (
+              <ContactRow key={c.contact_name} c={c} isActive={selected === c.contact_name} onSelect={onSelect} dimmed />
             ))}
           </div>
         </div>
