@@ -26,7 +26,7 @@ export function seedSampleData(): void {
   if (count > 0) return;
 
   const REFINING_COSTS: Record<Metal, number> = { gold: 1.50, silver: 0.15, platinum: 3.00, palladium: 2.50 };
-  const insDeal = db.prepare("INSERT INTO deals (id,metal,purity,is_pure,quantity_grams,pure_equivalent_grams,price_per_oz,refining_cost_per_gram,total_cost_usd,direction,location,status,date,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'simulator')");
+  const insDeal = db.prepare("INSERT INTO deals (id,metal,purity,is_pure,quantity_grams,pure_equivalent_grams,price_per_oz,refining_cost_per_gram,total_cost_usd,direction,location,status,date,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'simulator')");
   const insPay = db.prepare("INSERT INTO payments (id,amount,currency,direction,mode,from_location,to_location,linked_deal_id,date) VALUES (?,?,?,?,?,?,?,?,?)");
 
   db.transaction(() => {
