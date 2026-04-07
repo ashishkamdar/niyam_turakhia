@@ -38,9 +38,14 @@ export function ContactList({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-white">{c.contact_name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-white">{c.contact_name}</span>
+                  {c.has_lock > 0 && (
+                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">LOCKED</span>
+                  )}
+                </div>
                 {c.unread > 0 && (
-                  <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
                     {c.unread}
                   </span>
                 )}

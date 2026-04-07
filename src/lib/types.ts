@@ -95,4 +95,5 @@ export interface WhatsAppContact {
   lastMessage: string;
   lastTimestamp: string;
   unread: number;
+  has_lock: number;
 }

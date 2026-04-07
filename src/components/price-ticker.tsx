@@ -52,19 +52,19 @@ export function PriceTicker() {
         {prices.map((p) => {
           const isUp = p.change >= 0;
           return (
-            <div key={p.metal} className="bg-gray-900 px-3 py-2 sm:px-4 sm:py-3">
-              <div className="flex items-baseline justify-between gap-x-2">
-                <span className="text-xs font-medium text-gray-400">
+            <div key={p.metal} className="overflow-hidden bg-gray-900 px-2 py-2 sm:px-4 sm:py-3">
+              <div className="flex items-baseline justify-between gap-x-1">
+                <span className="text-[10px] font-medium text-gray-400 sm:text-xs">
                   {METAL_LABELS[p.metal] ?? p.metal}
                 </span>
-                <span className={`text-xs font-medium ${isUp ? "text-emerald-400" : "text-rose-400"}`}>
+                <span className={`text-[10px] font-medium sm:text-xs ${isUp ? "text-emerald-400" : "text-rose-400"}`}>
                   {isUp ? "+" : ""}{p.change_pct.toFixed(2)}%
                 </span>
               </div>
-              <p className="mt-0.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
+              <p className="mt-0.5 text-base font-semibold tracking-tight text-white sm:text-xl">
                 ${p.price_usd.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
               </p>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[9px] text-gray-500 sm:text-[10px]">
                 {p.source === "demo" ? "Demo" : "Live LBMA"} USD/oz
               </p>
             </div>
