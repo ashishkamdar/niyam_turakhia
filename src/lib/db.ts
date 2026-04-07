@@ -59,5 +59,22 @@ function initSchema(db: Database.Database) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS whatsapp_messages (
+      id TEXT PRIMARY KEY,
+      contact_name TEXT NOT NULL,
+      contact_location TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      message TEXT NOT NULL,
+      is_lock INTEGER NOT NULL DEFAULT 0,
+      linked_deal_id TEXT,
+      timestamp TEXT NOT NULL
+    );
   `);
+
+  // Add contact_name to deals if not exists
+  const cols = db.prepare("PRAGMA table_info(deals)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "contact_name")) {
+    db.prepare("ALTER TABLE deals ADD COLUMN contact_name TEXT DEFAULT ''").run();
+  }
 }

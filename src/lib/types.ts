@@ -21,7 +21,7 @@ export interface Deal {
   location: Location;
   status: DealStatus;
   date: string;
-  created_by: "simulator" | "manual";
+  created_by: "simulator" | "manual" | "whatsapp";
 }
 
 export interface Payment {
@@ -77,3 +77,22 @@ export const METAL_SYMBOLS: Record<Metal, MetalSymbol> = {
 };
 
 export const GRAMS_PER_TROY_OZ = 31.1035;
+
+export interface WhatsAppMessage {
+  id: string;
+  contact_name: string;
+  contact_location: string;
+  direction: "incoming" | "outgoing";
+  message: string;
+  is_lock: boolean;
+  linked_deal_id: string | null;
+  timestamp: string;
+}
+
+export interface WhatsAppContact {
+  name: string;
+  location: string;
+  lastMessage: string;
+  lastTimestamp: string;
+  unread: number;
+}
