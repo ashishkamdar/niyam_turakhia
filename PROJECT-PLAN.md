@@ -1,4 +1,4 @@
-# Niyam Turakhia — Precious Metals Profitability Dashboard
+# Niyam Turakhia — Precious Metals MIS Dashboard
 
 ## Client
 - **Name:** Niyam Turakhia (Kutchi businessman, Matunga Gymkhana)
@@ -7,21 +7,21 @@
 
 ## Business Context
 
-Niyam's precious metals business works like this:
-
 ### The Full Operation
 
-1. **Procurement:** Buys scrap precious metals (e.g. 18K gold) from local sellers in **Dubai/UAE**
-2. **Refining:** Ships to **Hong Kong factory** where scrap is refined
-   - Example: 100gm of 18K gold → 80gm of 24K pure gold (refining with small profit margin)
+1. **Procurement:** Buys scrap precious metals (e.g. 18K gold) or pure metals from local sellers in **Dubai/UAE**
+2. **Refining:** Ships impure metal to **Hong Kong factory** where scrap is refined
+   - Example: 100gm of 18K gold → 75gm of 24K pure gold (refining with small profit margin)
    - 12KG bricks are cut into 12 x 1KG bars for resale
    - Similar process for all precious metals (silver, platinum, palladium)
-3. **Selling:** Sells refined metals primarily in **Hong Kong** market
+   - Pure purchases (24K, 999, 995) skip refining → ship directly
+3. **Selling:** Sells refined metals (always in pure form) primarily in **Hong Kong** market
 4. **Pricing:** Based on London Fix prices (LBMA):
-   - **AM Fix:** 10:30 AM London time
+   - **AM Fix:** 10:30 AM London time (GMT winter, BST summer)
    - **PM Fix:** 15:30 PM London time
-   - Deals are done at **premium or discount** to the London Fix
-   - Prices quoted in USD per troy ounce (oscillate between AM/PM fixings)
+   - Gold & Silver: LBMA; Platinum & Palladium: LPPM
+   - Deals done at **premium or discount** to the London Fix
+   - Prices quoted in USD per troy ounce (31.1035 grams)
 5. **Money Flow:** Complex multi-currency settlement:
    - Sells in HK → receives HKD or USD
    - Converts via: **Banks (USD)** ↔ **Local dealers (HKD)** ↔ **Exchanges (USD/USDT crypto)**
@@ -29,264 +29,134 @@ Niyam's precious metals business works like this:
    - Settlement currencies: **USD, HKD, AED (Dirhams), USDT (crypto)**
 6. **Deal Execution (WhatsApp-based):**
    - Clients send buy/sell orders on WhatsApp
-   - Orders specify: metal, quantity (kg), purity (e.g. 24k), rate (USD to 4 decimals), direction (buy/sell)
+   - Orders specify: metal, quantity (kg), purity, rate (USD to 4 decimals), direction (buy/sell)
    - The word **"lock"** confirms the deal
-   - Example: `12 Kg 24k Gold at USD 2341.5678 buy — lock`
+   - Example: `10 Kg 24K Gold at USD 2338.7500 buy — lock`
 7. **Logging:** After lock, staff enters the transaction into existing special software (Dubai server)
-8. **That software** produces accountability reports and trial balance
-9. **Profitability reports** are compiled weekly by staff — this is the pain point
 
-### Staff Daily Work
-- Enter **purchases and sales** of metals
-- Enter **money sent and received** in various modes:
-  - USDT (crypto via exchanges)
-  - USD (via banks)
-  - HKD (via local HK dealers)
-  - AED/Dirhams (UAE local payments)
-- Track which payments correspond to which deals
+### Key Business Rules
+- **All sales are pure** — regardless of what is bought (18K, 20K, 22K, 24K), selling is always in pure form (24K/999/995)
+- **Yield table:** 18K→75%, 20K→83.3%, 22K→91.7%, 24K/999/995→100%
+- **Purity types:** 18K, 20K, 22K, 24K, 995, 999
 
-## The Problem
+---
 
-Niyam currently sees profitability **once a week** when staff presents a manual report. He wants to see it **in real-time, on the go**, as transactions are entered.
+## What We Built: Real-Time MIS Dashboard
 
-## What We're Really Selling: Real-Time MIS
+**Live at: https://nt.areakpi.in**
 
-This is a **Management Information System (MIS)** — not a trading tool, not an accounting system. Niyam already has software for deal entry and trial balance. What he **doesn't have** is a real-time executive overview.
+A **Management Information System (MIS)** — a real-time executive overview layer. The demo uses realistic dummy transaction data combined with hardcoded precious metal prices (with a toggle for live API when ready).
 
-**The pitch is simple:** Real figures. Real time. That's it.
+### What's Deployed (Phase 1 — Complete)
 
-- His staff enter deals and payments into the existing system throughout the day
-- Instead of waiting for Friday's manual report, he opens a dashboard and sees **everything — right now**
-- P&L by metal, open positions, money flow across currencies, settlement status
-- All powered by **live London Fix prices** so unrealized P&L is always current
+#### Authentication
+- **PIN pad lock screen** with 6-digit numeric keypad
+- **PIN: `639263`**
+- Cookie-based session, stays logged in for **365 days**
+- Logout icon in price ticker header (visible on all screens including mobile)
 
-## The Constraint & Demo Strategy
+#### Pages Built
 
-Niyam is **not keen on giving direct access** to the Dubai server. The data access problem is a **Phase 2 problem** — we solve it after the contract is signed.
+| Page | Route | Description |
+|------|-------|-------------|
+| **Dashboard** | `/` | Today's P&L cards (Buys, Sales, Stock Value, Unrealized P&L), WhatsApp Locked Deals section, recent activity feed |
+| **Stock In Hand** | `/stock` | Per-metal summary cards (total grams, avg cost, market value, unrealized P&L, location badges). Tap any metal → drill-down to individual lots with purchase date, purity, qty, status |
+| **Deals** | `/deals` | Deal entry form + transaction list. WhatsApp Locked Deals section at top. Mobile: stacked cards. Desktop: full table |
+| **WhatsApp** | `/whatsapp` | Simulated WhatsApp chat interface with 5 pre-built contacts. Contact list with last message preview. Chat thread with message bubbles. "Start Chats" toggle to simulate negotiations. Lock detection highlights deals in amber. LOCKED badge on contacts |
+| **Money Flow** | `/money-flow` | Multi-currency settlement overview. Total sent/received. Per-currency breakdown (USD/HKD/AED/USDT) with net position. Recent payments list |
+| **Reports** | `/reports` | Period selector (Daily/Weekly/Quarterly/Yearly). Total bought/sold/realized P&L. Per-metal breakdown |
+| **Settings** | `/settings` | Price feed toggle (Demo/Live LBMA with API key input). Reset All Data button |
 
-**For the demo:** We use **realistic dummy transaction data** combined with **real live precious metal prices**. This lets him see exactly what his daily MIS view will look like — the numbers are illustrative but the prices ticking in the header are real. That's what makes the demo convincing.
+#### API Routes
 
-### Mobile-First Design (CRITICAL)
-This dashboard will be viewed **primarily on mobile**. Every screen must be designed mobile-first:
-- Cards stack vertically on mobile, grid on desktop
-- Tables become stacked card lists on mobile (no horizontal scroll)
-- Price ticker is compact on mobile (scrolling marquee or condensed)
-- Touch-friendly: large tap targets, no hover-dependent interactions
-- Bottom navigation on mobile (thumb-reachable), sidebar on desktop
-- Numbers and P&L figures must be **large and readable** at a glance on phone
+| Route | Methods | Purpose |
+|-------|---------|---------|
+| `/api/auth` | GET, POST | PIN verification, session cookie, logout |
+| `/api/prices` | GET | Returns metal prices (demo or live). Auto-seeds demo data on first call |
+| `/api/deals` | GET, POST | Deal CRUD with filtering (direction, metal, status, limit). Auto-calculates pure equivalent on create |
+| `/api/payments` | GET, POST | Payment/settlement CRUD |
+| `/api/whatsapp` | GET, POST | WhatsApp messages. GET returns contacts summary or messages for a contact. POST stores message + auto-creates deal if "lock" detected |
+| `/api/simulator` | POST | Reset all data and re-seed |
 
-### UI Framework
-Using **Catalyst Tailwind CSS UI Blocks** (634 production-ready components) — located at `/Users/ashishkamdar/Downloads/Catalyst-tailwind-css-UI-Blocks-634/react/ui-blocks/`
+#### Components Built
 
-Key blocks to use:
-- **Sidebar navigation** — main app shell (application-ui/navigation/sidebar-navigation/)
-- **Stats with trending** — KPI cards for P&L (application-ui/data-display/stats/)
-- **Tables** — transaction lists, position summary (application-ui/lists/tables/)
-- **Form layouts** — deal entry, payment entry (application-ui/forms/)
-- **Cards** — section containers (application-ui/layout/cards/)
-- **Page headings** — section headers with actions (application-ui/headings/)
-- **Badges** — status indicators (application-ui/elements/badges/)
-- **Alerts** — notifications (application-ui/feedback/alerts/)
-- **Description lists** — deal details (application-ui/data-display/description-lists/)
+| Component | File | Description |
+|-----------|------|-------------|
+| Price Ticker | `price-ticker.tsx` | Sticky header, 2x2 mobile / 4-col desktop, 4 decimal prices, logout icon, Demo/Live label |
+| Sidebar Nav | `sidebar-nav.tsx` | Desktop left sidebar (hidden on mobile), 6 nav items + Settings + Logout |
+| Bottom Nav | `bottom-nav.tsx` | Mobile bottom tab bar (hidden on desktop), 5 tabs: Home, Stock, Deals, WhatsApp, Money |
+| Auth Gate | `auth-gate.tsx` | Wraps entire app, checks session cookie, shows PIN pad if locked |
+| PIN Pad | `pin-pad.tsx` | 6-digit numeric keypad with dot indicators, error feedback |
+| Stat Card | `stat-card.tsx` | Reusable KPI card (Catalyst stats-with-trending pattern) |
+| Deal Form | `deal-form.tsx` | Buy/sell entry form with dropdowns and number inputs |
+| Stock Detail | `stock-detail.tsx` | Drill-down lot list with status badges (UAE/Refinery/Transit/HK) |
+| Contact List | `contact-list.tsx` | WhatsApp contact list with avatar, last message, unread count, LOCKED badge |
+| Chat Thread | `chat-thread.tsx` | Chat bubbles with lock keyword highlighting, manual message input |
+| Locked Deals | `locked-deals.tsx` | Auto-refreshing card showing WhatsApp-captured deals (used on Dashboard + Deals pages) |
 
-### Demo Scope
+#### Library Modules
 
-#### 0. Live Price Ticker (Header Bar)
-- **Real-time precious metal prices** fetched from London Fix / public APIs
-- Metals: Gold (XAU), Silver (XAG), Platinum (XPT), Palladium (XPD)
-- Prices in **USD per troy ounce**
-- Updates twice daily (AM Fix 10:30, PM Fix 15:30 London time)
-- Show: current price, daily change, change %
-- Sticky header — always visible as user scrolls
+| Module | File | Purpose |
+|--------|------|---------|
+| Types | `types.ts` | All TypeScript interfaces: Deal, Payment, Price, WhatsAppMessage, WhatsAppContact, StockSummary. Constants: YIELD_TABLE, METAL_SYMBOLS, GRAMS_PER_TROY_OZ, PURE_PURITIES |
+| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. Tables: deals, payments, prices, settings, whatsapp_messages. Auto-migration for contact_name column |
+| Prices | `prices.ts` | Demo prices (Gold $2,341.5678, Silver $30.2450, Platinum $982.3400, Palladium $1,024.7800). Live fetch via goldapi.io (toggle) |
+| Calculations | `calculations.ts` | Stock summary, weighted avg cost, daily P&L, avg buy cost per metal |
+| Sample Data | `sample-data.ts` | Seeds 3 days of realistic transactions: 10-15 buys/day + 5-8 sells/day with corresponding payments |
+| Chat Scripts | `chat-scripts.ts` | 5 pre-built negotiation scripts (Mr. Chang, Karim & Co., Shah Brothers, Li Wei Trading, Patel Exports) |
 
-#### 1. Deal Entry Form
-- Metal type (Gold, Silver, Platinum, Palladium)
-- Purity (24k, 22k, 999, 995, etc.)
-- Quantity (kg, with decimals)
-- Rate (USD per troy ounce, 4 decimal places)
-- Direction: Buy / Sell
-- Location: Dubai / Hong Kong / Other
-- Timestamp (auto)
-- Status: Locked / Pending
+#### WhatsApp Chat Simulator
 
-#### 2. Payment/Settlement Tracker
-- Amount
-- Currency: USD / HKD / AED / USDT
-- Direction: Sent / Received
-- Mode: Bank transfer / Local dealer / Crypto exchange
-- From/To location: Dubai / Hong Kong
-- Linked deal (optional)
-- Timestamp
+Pre-built negotiation scripts with realistic multi-message flows:
 
-#### 3. Live P&L Dashboard
-- **Running profit/loss** for the day — updates as deals are entered
-- Per-metal breakdown (gold P&L, silver P&L, etc.)
-- Buy vs sell volume summary
-- Average buy rate vs average sell rate per metal
-- **Unrealized P&L** based on live London Fix prices
-- Currency-wise settlement summary (how much in USD, HKD, AED, USDT)
+| Contact | Location | Metal | Qty | Result |
+|---------|----------|-------|-----|--------|
+| Mr. Chang | Hong Kong | Gold 24K | 10kg | Locks at $2,338.75/oz after price negotiation |
+| Karim & Co. | UAE | Silver 999 | 50kg | Locks at $29.985/oz after haggling |
+| Shah Brothers | UAE | Platinum 999 | 2kg | Quick lock at $979.25/oz |
+| Li Wei Trading | Hong Kong | Gold 24K | 5kg | **Walks away** — no lock (realistic) |
+| Patel Exports | UAE | Palladium 999 | 1kg | Urgent fast lock at $1,021.50/oz |
 
-#### 4. Stock In Hand (MOST IMPORTANT VIEW)
-This is Niyam's primary view — what he owns right now and what it's worth.
+Messages arrive every 3-8 seconds (random). Multiple conversations interleave. Lock detection uses `/\block\b/i` regex. When lock is detected, deal is auto-created with `created_by: "whatsapp"` and contact name.
 
-**Summary Level:**
-- Per metal: total grams/kg in hand, weighted average cost, current market value (live Fix), unrealized P&L
-- Location breakdown: stock in UAE (pre-ship), in refinery, in transit, in HK (ready to sell)
-- Period filters: Daily / Weekly / Quarterly / Yearly
-- Total bought vs total sold per period
-- Net stock movement per period
+---
 
-**Drill-Down (tap on any metal row):**
-Opens detail view showing every individual lot that makes up the current stock:
-- Purchase date
-- Grams / kg
-- Metal type
-- Purity at purchase (18K, 22K, 24K etc.)
-- Pure equivalent (after refining yield)
-- Purchase price (per gram, per ounce, total)
-- Current status: In UAE → In Refinery → In Transit → In HK → Sold
-- Cost breakdown: purchase + refining + shipping + cutting = total cost per gram
+## Tech Stack (What's Actually Running)
 
-Each row is tappable for full deal details (counterparty, currency paid, linked payments).
+| Layer | Technology | Details |
+|-------|-----------|---------|
+| **Framework** | Next.js 16.2.2 | App Router, TypeScript, Turbopack |
+| **UI Components** | Catalyst Tailwind CSS UI Blocks | 634 React components, dark theme. Used: stats-with-trending (KPI cards), sidebar-navigation (nav), tables (deal lists), form-layouts (deal entry), badges (status indicators) |
+| **Styling** | Tailwind CSS v4 | Dark theme (`bg-gray-950`), amber accent (`text-amber-400`), emerald for positive, rose for negative |
+| **Database** | SQLite via better-sqlite3 | WAL mode, 5 tables (deals, payments, prices, settings, whatsapp_messages). File: `data.db` |
+| **Charts** | Recharts | Installed but charts not yet implemented in demo |
+| **Auth** | Cookie-based PIN | `nt_session` cookie, httpOnly, secure, 365-day expiry |
+| **IDs** | uuid v4 | All primary keys are UUIDs |
 
-#### 5. Money Flow View
-- Total money sent to Dubai (by currency)
-- Total money received from HK sales (by currency)
-- Net settlement position per currency
-- Pending settlements
+## Deployment Details
 
-#### 6. Reports View
-- Daily P&L summary
-- Weekly P&L summary (what his staff currently does manually)
-- Filterable by date range, metal type, currency
-- Export to PDF/Excel (nice to have for demo)
+| Item | Value |
+|------|-------|
+| **Server** | Nuremberg (`ssh nuremberg`, root access) |
+| **Domain** | https://nt.areakpi.in |
+| **SSL** | Let's Encrypt via certbot (auto-renew, expires 2026-07-06) |
+| **Reverse Proxy** | nginx (`/etc/nginx/sites-enabled/nt.areakpi.in`) |
+| **Process Manager** | PM2 (process name: `nt-metals`, id: 29) |
+| **Port** | 3020 (internal, proxied by nginx) |
+| **App Directory** | `/var/www/nt-metals` |
+| **Database File** | `/var/www/nt-metals/data.db` |
+| **Git Repo** | https://github.com/ashishkamdar/niyam_turakhia |
+| **Node.js** | Server's installed version |
+| **PM2 Instances** | 1 (fork mode) |
 
-### Transaction Simulator (Demo Engine)
-
-A background module that **continuously generates realistic transactions** mimicking Niyam's full business cycle. This makes the dashboard feel alive — as if his staff is actively working.
-
-#### The Full Business Cycle It Simulates
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 1: BUY (UAE)                                                  │
-│  Staff buys metal from local sellers in Dubai/UAE                   │
-│  - Metal: Gold, Silver, Platinum, Palladium                         │
-│  - Purity: IMPURE (18K, 20K, 22K) or PURE (24K, 999)              │
-│  - Quantity: 0.5kg - 50kg per deal                                  │
-│  - Price: at discount to London Fix (buy cheap)                     │
-│  - Currency: AED (Dirhams) or USD                                   │
-│  - Pure buys skip refining → go straight to shipping                │
-└──────────────────────┬──────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 2: REFINE (impure only — pure skips to Step 3)                │
-│  Impure metal sent to refinery                                      │
-│  - Input: e.g. 100gm of 18K gold                                   │
-│  - Output: e.g. 75gm of 24K gold (yield depends on input purity)  │
-│  - COST: Refining charge per gram (configurable)                    │
-│  - Time: 1-3 days turnaround                                        │
-│  - Pure purchases (24K/999) skip straight to Step 3                 │
-└──────────────────────┬──────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 3: SHIP TO HONG KONG                                          │
-│  Pure metal shipped from UAE to HK                                  │
-│  - COST: Shipping/logistics/insurance per kg (configurable)         │
-│  - Format: typically 12KG bricks or smaller bars                    │
-│  - Time: 1-2 days                                                   │
-└──────────────────────┬──────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 4: BRICK CUTTING (if needed)                                  │
-│  Large bricks cut into smaller bars at HK factory                   │
-│  - Input: 12KG brick                                                │
-│  - Output: 12 x 1KG bars                                           │
-│  - COST: Cutting/fabrication charge per kg (configurable)           │
-│  - Some buyers want 12KG bricks as-is (skip this step)             │
-└──────────────────────┬──────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 5: SELL (Hong Kong)                                           │
-│  Metal sold to HK buyers                                            │
-│  - Buyer types: Banks (USD), Local dealers (HKD),                   │
-│    Crypto exchanges (USDT)                                          │
-│  - Price: at premium to London Fix (sell higher)                    │
-│  - Payment received in: USD / HKD / USDT                           │
-└──────────────────────┬──────────────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  STEP 6: SETTLE (Money back to UAE)                                 │
-│  Money transferred from HK back to Dubai to pay sellers             │
-│  - Via banks (USD), local dealers (HKD→AED), exchanges (USDT)      │
-│  - Net profit = Sell price - Buy price - Refining - Shipping        │
-│                 - Brick cutting - FX conversion costs                │
-└─────────────────────────────────────────────────────────────────────┘
+### Deploy Command (for updates)
+```bash
+ssh nuremberg "cd /var/www/nt-metals && git pull && npm run build && pm2 restart nt-metals"
 ```
 
-#### Configurable Cost Inputs (Settings Page in Demo)
+---
 
-| Cost Item | Default | Unit | Notes |
-|-----------|---------|------|-------|
-| Refining charge (gold) | $1.50 | per gram | Varies by refinery |
-| Refining charge (silver) | $0.15 | per gram | Lower for silver |
-| Refining charge (platinum) | $3.00 | per gram | Premium metals |
-| Shipping UAE→HK | $2.00 | per gram | Insurance included |
-| Brick cutting (12KG→1KG) | $0.50 | per gram | HK factory fee |
-| Buy discount to Fix | 0.5-1.5% | percentage | How cheap he buys |
-| Sell premium to Fix | 0.3-0.8% | percentage | How much he marks up |
-
-#### Yield Table (Refining)
-
-| Input Purity | Output Purity | Yield | Example |
-|-------------|--------------|-------|---------|
-| 18K (75%) | 24K (99.9%) | ~75% | 100gm in → 75gm out |
-| 20K (83.3%) | 24K (99.9%) | ~83% | 100gm in → 83gm out |
-| 22K (91.7%) | 24K (99.9%) | ~92% | 100gm in → 92gm out |
-| 999 (Silver) | 999 | 100% | Already pure |
-
-#### Key Rule: ALL SALES ARE PURE
-- Regardless of what is bought (18K, 20K, 22K, or 24K), **selling is always in pure form** (24K / 999)
-- Pure buys → ship directly to HK → sell
-- Impure buys → refine first → then ship to HK → sell
-- The buy mix (pure vs impure) affects margin: impure is cheaper to buy but has refining cost + yield loss
-
-#### Simulator Behavior
-- Generates **5-10 buy transactions per day** (mix of metals, purities — some pure, some impure)
-- Triggers refining jobs for impure purchases (with realistic delay)
-- Ships refined metal to HK (with delay)
-- Generates **sell transactions** as HK inventory arrives
-- Creates corresponding **payment entries** in appropriate currencies
-- Runs on a **compressed timeline** for demo: 1 real minute = ~2 business hours
-  - So in 4 minutes of demo, Niyam sees a full day of activity
-- All prices anchored to **real London Fix** with realistic spreads
-
-### Demo Data (Pre-loaded)
-In addition to the live simulator, pre-load with 2-3 days of historical transactions:
-- Gold: ~10-15 trades/day, rates around USD 2300-2400/oz range (4 decimals)
-- Silver: ~5-8 trades/day, rates around USD 28-32/oz range
-- Mix of buys (Dubai) and sells (HK) with small spreads
-- Corresponding payment entries in USD, HKD, AED, USDT
-- Refining entries: 18K scrap → 24K refined (with yield loss)
-
-## Tech Stack
-
-- **Framework:** Next.js (App Router, TypeScript)
-- **UI Components:** Catalyst Tailwind CSS UI Blocks (React)
-- **Styling:** Tailwind CSS — dark theme, clean financial dashboard look
-- **Database:** SQLite (for demo simplicity) or PostgreSQL (if planning to reuse on server)
-- **Charts:** Recharts or lightweight alternative
-- **Price Feed:** Hardcoded realistic prices for demo (toggle to switch to live API when ready — goldapi.io)
-- **Deployment:** Self-hosted on Nuremberg server (`ssh nuremberg`), nginx reverse proxy, PM2 process manager
-- **Domain:** nt.areakpi.in (subdomain already created)
-- **Auth:** PIN-based number pad lock screen. PIN: `639263`. Cookie-based session, stays logged in for 365 days. Logout icon in sidebar.
-
-## Data Access Solutions (Post-Demo, For Implementation)
+## Data Access Solutions (Post-Demo)
 
 Present these options to Niyam after demo impresses him:
 
@@ -296,34 +166,109 @@ Present these options to Niyam after demo impresses him:
 | **B. Read-only DB view** | Read-only user on specific tables/views | Yes | Minimal — read-only, no risk |
 | **C. Software API** | If his software has REST/SOAP API | Yes | No — API credentials only |
 | **D. Parallel entry** | Staff enters deals in dashboard too | Yes | No |
-| **E. WhatsApp chatbot** | Parse "lock" messages automatically, read & extract | Yes | No — WhatsApp Business API |
+| **E. WhatsApp Business Bot** | Parse "lock" messages automatically from real WhatsApp | Yes | No — WhatsApp Business API |
 
-**Recommendation:** Start with Option A or D for quick win, pitch Option E (WhatsApp chatbot — he specifically mentioned this) as upgrade.
+**Recommendation:** Start with Option A or D for quick win, pitch Option E (WhatsApp bot — he specifically mentioned this and we've demo'd it) as the killer upgrade.
+
+---
 
 ## Phases
 
-### Phase 1: Demo (WIN THE CONTRACT)
-- Build MIS dashboard with realistic demo data + real live prices
-- Live price ticker in header
-- **Mobile-first** — this is the primary viewing device
-- Show him: "This is what your daily view looks like — instead of waiting for Friday's report"
-- Timeline: 3-5 days
+### Phase 1: Demo (COMPLETE)
+- MIS dashboard with realistic demo data + hardcoded prices
+- Live price ticker in header (4 metals, 4 decimal places)
+- Mobile-first design with bottom nav
+- PIN lock screen
+- WhatsApp chat simulator with lock detection
+- Locked deals auto-capture and display
+- Deployed at https://nt.areakpi.in
 
-### Phase 2: MVP (After contract signed)
-- Connect to real data (whichever access method he agrees to)
-- Staff entry interface (deals + payments)
-- Real P&L calculations with actual rates
-- Multi-currency settlement tracking
-- Basic user auth
+### Phase 2: Real WhatsApp Integration (NEXT)
+Connect the demo to real WhatsApp messages:
 
-### Phase 3: Full Product
-- WhatsApp chatbot — read & extract "lock" messages automatically
+1. **WhatsApp Business API** via a BSP (Business Solution Provider):
+   - **Recommended: WATI** (popular in India/Dubai, good pricing) or **Twilio**
+   - Register a WhatsApp Business number
+   - Webhook fires on every incoming message → hits our `/api/whatsapp` endpoint
+   - Our lock detection logic is already built — works identically with real messages
+   - Cost: ~$0.005-0.05 per conversation/day
+
+2. **Alternative: WhatsApp Business Cloud API** (direct from Meta):
+   - Free tier: 1,000 conversations/month
+   - More setup work but zero recurring cost for low volume
+
+3. **What needs to change in our code:**
+   - Add webhook verification endpoint (`GET /api/whatsapp/webhook` for Meta's challenge)
+   - Add webhook receiver (`POST /api/whatsapp/webhook` to receive real messages)
+   - Map WhatsApp phone numbers to contact names
+   - Everything else (lock detection, deal creation, dashboard display) works as-is
+
+### Phase 3: AI Negotiation Bot (FUTURE)
+An AI-powered sales agent that negotiates precious metal deals automatically on WhatsApp:
+
+#### How It Works
+```
+Buyer messages on WhatsApp: "What's your price for 1kg 24K gold?"
+        │
+  WhatsApp Business API webhook
+        │
+  Our server → AI Agent (Claude/GPT) checks:
+  ├── Inventory: Do we have 1kg gold? Yes
+  ├── Floor price: $2,338/oz (London Fix + minimum margin)
+  ├── Opening offer: $2,345/oz (markup for negotiation room)
+        │
+Bot replies: "1kg 24K gold available at $2,345.00/oz"
+        │
+Buyer: "Too high. I can do $2,335."
+        │
+  AI Agent: $2,335 is BELOW floor → counter above floor
+        │
+Bot: "Best I can do is $2,340.50/oz for 1kg."
+        │
+Buyer: "Deal. Lock it."
+        │
+  AI detects "lock" → creates deal → updates inventory
+        │
+Bot: "Locked. 1 Kg 24K Gold at USD 2340.5000."
+```
+
+#### Configuration (Settings Page)
+| Setting | Example |
+|---------|---------|
+| Available inventory | Gold: 2kg, Silver: 7kg, Platinum: 500g |
+| Floor price per metal | London Fix + minimum margin % |
+| Opening markup | 0.3% above floor (negotiation room) |
+| Negotiation style | Aggressive / Moderate / Flexible |
+| Max rounds before "final offer" | 3 counter-offers |
+| Auto-lock or human approval | Auto for small deals, ping Niyam for large |
+| Deal size limit | Above X kg → "let me check with my team" |
+| Languages | English, Hindi, Arabic |
+
+#### Safeguards
+- **Hard floor price** — bot cannot agree below it, ever
+- **Inventory lock** — once negotiating, quantity is reserved (no double-selling)
+- **Human override** — Niyam or staff can take over any conversation
+- **Deal size limits** — large deals escalate to human
+- **Full audit trail** — every message and price quote logged (already built)
+
+#### Tech
+- **Claude API** or GPT-4 as negotiation brain (system prompt with inventory, prices, rules)
+- **WhatsApp Business API** for communication (Phase 2 prerequisite)
+- **Our existing dashboard** for inventory, deal capture, monitoring
+- Cost: ~$0.01-0.05 per negotiation conversation in API calls
+
+### Phase 4: Full Product
+- Connect to Niyam's real data (whichever access method he agrees to)
 - Multi-user (Niyam + staff roles)
 - Refining tracker (scrap in → pure out, yield tracking)
-- Historical analytics and trends
-- Alerts (e.g. daily loss exceeds threshold, large settlement pending)
 - HK factory inventory tracking (12KG brick → 1KG bars)
+- Historical analytics and trends
+- Alerts (daily loss exceeds threshold, large settlement pending)
+- Live London Fix prices (goldapi.io integration — toggle already built)
+- Export to PDF/Excel
 - Mobile app or PWA
+
+---
 
 ## Pricing Guidance
 
@@ -332,65 +277,75 @@ Present these options to Niyam after demo impresses him:
 - Niyam is Kutchi — value-conscious but pays for clear ROI
 - **Don't quote in the demo meeting.** Show the demo, then send a phased proposal.
 - Anchor around Rs 3-5L for Phase 1+2, with Phase 3 as ongoing maintenance
+- Phase 3 (AI bot) is premium — additional Rs 2-3L or monthly fee
 
 ## Key Selling Points
 
-1. **MIS in real-time:** "You see what your staff sees — but summarized, live, on your phone." Weekly → real-time. That's the entire pitch.
-2. **Real prices, real positions:** London Fix ticking in the header + his open positions = he knows his exposure at a glance.
-3. **Multi-currency treasury view:** USD, HKD, AED, USDT — all money flows in one place, not scattered across WhatsApp messages and Excel sheets.
-4. **Nothing changes for his staff:** They keep using the same software. This is a **view layer on top** — zero disruption.
-5. **SEBI credential:** "I built surveillance systems for SEBI India" — financial domain trust.
-6. **Proximity:** You're at Gymkhana daily. Support is a conversation away.
-7. **Privacy:** Data stays on HIS infrastructure. We're building the MIS view, not touching his core system.
-8. **WhatsApp chatbot (future):** Deals captured automatically from chat — staff workload reduced.
+1. **MIS in real-time:** "You see what your staff sees — but summarized, live, on your phone." Weekly → real-time.
+2. **WhatsApp integration:** Deals captured automatically the moment "lock" is typed — zero manual entry, zero delay.
+3. **AI negotiation bot (future):** A tireless salesman who knows your exact margins, never makes a mistake, and handles all buyer negotiations automatically.
+4. **Real prices, real positions:** London Fix ticking in the header + open positions = exposure at a glance.
+5. **Multi-currency treasury view:** USD, HKD, AED, USDT — all money flows in one place.
+6. **Nothing changes for staff:** They keep using the same software. This is a view layer on top — zero disruption.
+7. **SEBI credential:** "I built surveillance systems for SEBI India" — financial domain trust.
+8. **Proximity:** You're at Gymkhana daily. Support is a conversation away.
+9. **Privacy:** Data stays on HIS infrastructure. We're building the MIS view, not touching his core system.
 
-## Files to Create
+---
+
+## Actual File Structure (as built)
 
 ```
 niyam turakhia gold/
-├── PROJECT-PLAN.md              ← this file
-├── src/
-│   ├── app/
-│   │   ├── page.tsx             ← dashboard home (P&L overview)
-│   │   ├── layout.tsx           ← app shell with sidebar + price ticker header
-│   │   ├── globals.css          ← styles
-│   │   ├── deals/
-│   │   │   └── page.tsx         ← deal entry + transaction list
-│   │   ├── payments/
-│   │   │   └── page.tsx         ← payment/settlement tracker
-│   │   ├── positions/
-│   │   │   └── page.tsx         ← open positions + unrealized P&L
-│   │   ├── money-flow/
-│   │   │   └── page.tsx         ← multi-currency money flow view
-│   │   ├── reports/
-│   │   │   └── page.tsx         ← daily/weekly P&L reports
-│   │   ├── settings/
-│   │   │   └── page.tsx         ← configurable costs (refining, shipping, cutting, spreads)
-│   │   └── api/
-│   │       ├── prices/
-│   │       │   └── route.ts     ← fetch live London Fix prices
-│   │       └── simulator/
-│   │           └── route.ts     ← trigger/control the transaction simulator
-│   ├── components/
-│   │   ├── price-ticker.tsx     ← live precious metal prices header
-│   │   ├── sidebar-nav.tsx      ← main navigation (Catalyst sidebar)
-│   │   ├── bottom-nav.tsx       ← mobile bottom navigation
-│   │   ├── deal-form.tsx        ← buy/sell entry form
-│   │   ├── payment-form.tsx     ← payment/settlement entry
-│   │   ├── pnl-card.tsx         ← live P&L display cards
-│   │   ├── position-table.tsx   ← open positions table
-│   │   ├── money-flow-summary.tsx ← currency-wise flow
-│   │   ├── pipeline-tracker.tsx ← visual: buy→refine→ship→cut→sell pipeline
-│   │   └── chart.tsx            ← P&L chart
-│   └── lib/
-│       ├── simulator.ts         ← transaction simulator engine (full business cycle)
-│       ├── sample-data.ts       ← pre-loaded 2-3 days of historical transactions
-│       ├── calculations.ts      ← P&L, weighted avg, position math, currency conversion
-│       ├── costs.ts             ← configurable cost defaults (refining, shipping, cutting)
-│       ├── prices.ts            ← fetch live precious metal prices
-│       └── types.ts             ← TypeScript interfaces
-├── package.json
-├── tailwind.config.ts
+├── PROJECT-PLAN.md
+├── package.json                    (nt-precious-metals-mis)
 ├── tsconfig.json
-└── next.config.ts
+├── next.config.ts
+├── postcss.config.mjs
+├── data.db                         (SQLite — gitignored)
+├── docs/
+│   └── superpowers/
+│       ├── specs/
+│       │   ├── 2026-04-07-precious-metals-mis-dashboard-design.md
+│       │   └── 2026-04-07-whatsapp-bot-design.md
+│       └── plans/
+│           ├── 2026-04-07-precious-metals-mis.md
+│           └── 2026-04-07-whatsapp-bot.md
+└── src/
+    ├── app/
+    │   ├── layout.tsx              (root layout: AuthGate → SidebarNav + PriceTicker + BottomNav)
+    │   ├── page.tsx                (dashboard: P&L cards + LockedDeals + recent activity)
+    │   ├── globals.css             (Tailwind v4, dark theme, overflow-x:hidden)
+    │   ├── stock/page.tsx          (stock in hand: metal cards → drill-down lots)
+    │   ├── deals/page.tsx          (deal form + list + LockedDeals)
+    │   ├── whatsapp/page.tsx       (chat simulator: contacts + thread + Start/Stop toggle)
+    │   ├── money-flow/page.tsx     (multi-currency settlements)
+    │   ├── reports/page.tsx        (period P&L: daily/weekly/quarterly/yearly)
+    │   ├── settings/page.tsx       (price toggle + data reset)
+    │   └── api/
+    │       ├── auth/route.ts       (PIN verify + session cookie + logout)
+    │       ├── prices/route.ts     (GET prices + auto-seed)
+    │       ├── deals/route.ts      (GET/POST deals with filtering)
+    │       ├── payments/route.ts   (GET/POST payments)
+    │       ├── whatsapp/route.ts   (GET/POST messages + lock detection + deal creation)
+    │       └── simulator/route.ts  (POST reset)
+    ├── components/
+    │   ├── auth-gate.tsx           (session check → PIN pad or app)
+    │   ├── pin-pad.tsx             (6-digit numeric keypad)
+    │   ├── price-ticker.tsx        (sticky header: 4 metals + logout)
+    │   ├── sidebar-nav.tsx         (desktop nav: 6 items + settings + logout)
+    │   ├── bottom-nav.tsx          (mobile nav: 5 tabs)
+    │   ├── stat-card.tsx           (reusable KPI card)
+    │   ├── deal-form.tsx           (buy/sell entry form)
+    │   ├── stock-detail.tsx        (lot drill-down with status badges)
+    │   ├── contact-list.tsx        (WhatsApp contacts with LOCKED badge)
+    │   ├── chat-thread.tsx         (chat bubbles + lock highlighting + input)
+    │   └── locked-deals.tsx        (auto-refreshing WhatsApp deal cards)
+    └── lib/
+        ├── types.ts                (Deal, Payment, Price, WhatsAppMessage, WhatsAppContact, constants)
+        ├── db.ts                   (SQLite singleton, schema init, migrations)
+        ├── prices.ts               (demo prices + goldapi.io live fetch)
+        ├── calculations.ts         (stock summary, P&L, weighted avg cost)
+        ├── sample-data.ts          (3-day seeder: deals + payments)
+        └── chat-scripts.ts         (5 negotiation scripts for WhatsApp simulator)
 ```
