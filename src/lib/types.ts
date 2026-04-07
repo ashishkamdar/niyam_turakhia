@@ -90,8 +90,8 @@ export interface WhatsAppMessage {
 }
 
 export interface WhatsAppContact {
-  name: string;
-  location: string;
+  contact_name: string;
+  contact_location: string;
   lastMessage: string;
   lastTimestamp: string;
   unread: number;

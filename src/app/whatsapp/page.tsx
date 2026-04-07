@@ -120,14 +120,14 @@ export default function WhatsAppPage() {
 
   async function handleSendMessage(text: string) {
     if (!selected) return;
-    const contact = contacts.find((c) => c.name === selected);
+    const contact = contacts.find((c) => c.contact_name === selected);
     try {
       await fetch("/api/whatsapp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contact_name: selected,
-          contact_location: contact?.location ?? "uae",
+          contact_location: contact?.contact_location ?? "uae",
           direction: "outgoing",
           message: text,
         }),

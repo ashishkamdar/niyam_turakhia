@@ -22,13 +22,13 @@ export function ContactList({
   return (
     <div className="space-y-0.5">
       {contacts.map((c) => {
-        const initial = c.name.charAt(0).toUpperCase();
-        const color = AVATAR_COLORS[c.name] ?? "bg-gray-600";
-        const isActive = selected === c.name;
+        const initial = c.contact_name.charAt(0).toUpperCase();
+        const color = AVATAR_COLORS[c.contact_name] ?? "bg-gray-600";
+        const isActive = selected === c.contact_name;
         return (
           <button
-            key={c.name}
-            onClick={() => onSelect(c.name)}
+            key={c.contact_name}
+            onClick={() => onSelect(c.contact_name)}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition ${
               isActive ? "bg-white/10" : "hover:bg-white/5"
             }`}
@@ -38,7 +38,7 @@ export function ContactList({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-white">{c.name}</span>
+                <span className="text-sm font-medium text-white">{c.contact_name}</span>
                 {c.unread > 0 && (
                   <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
                     {c.unread}
