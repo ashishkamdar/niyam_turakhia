@@ -28,6 +28,20 @@ export default function DashboardPage() {
   for (const d of todayBuys) totalBuyValue += (d.pure_equivalent_grams / GRAMS_PER_OZ) * d.price_per_oz;
   for (const d of todaySells) totalSellRevenue += (d.pure_equivalent_grams / GRAMS_PER_OZ) * d.price_per_oz;
 
+  // Realized P&L: for each sell, profit = sell price - avg buy price for that metal
+  const allBuys = deals.filter((d) => d.direction === "buy");
+  let realizedPnl = 0;
+  for (const sell of todaySells) {
+    const metalBuys = allBuys.filter((b) => b.metal === sell.metal);
+    const totalBuyGramsForMetal = metalBuys.reduce((s, b) => s + b.pure_equivalent_grams, 0);
+    const totalBuyCostForMetal = metalBuys.reduce((s, b) => s + (b.pure_equivalent_grams / GRAMS_PER_OZ) * b.price_per_oz, 0);
+    const avgBuyCostPerOz = totalBuyGramsForMetal > 0 ? totalBuyCostForMetal / (totalBuyGramsForMetal / GRAMS_PER_OZ) : sell.price_per_oz;
+    const sellRevenue = (sell.pure_equivalent_grams / GRAMS_PER_OZ) * sell.price_per_oz;
+    const sellCost = (sell.pure_equivalent_grams / GRAMS_PER_OZ) * avgBuyCostPerOz;
+    realizedPnl += sellRevenue - sellCost;
+  }
+
+  // Unrealized P&L: unsold stock at market price vs cost
   const unsold = deals.filter((d) => d.direction === "buy" && d.status !== "sold");
   let stockValue = 0, stockCost = 0;
   for (const d of unsold) {
@@ -42,7 +56,7 @@ export default function DashboardPage() {
   const fmt = (n: number) => "$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtG = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 }) + "g";
 
-  const todayProfit = totalSellRevenue - totalBuyValue + unrealizedPnl;
+  const todayProfit = realizedPnl + unrealizedPnl;
   const whatsappDeals = deals.filter((d) => d.created_by === "whatsapp");
   const todayWhatsapp = whatsappDeals.filter((d) => d.date.startsWith(today));
 
