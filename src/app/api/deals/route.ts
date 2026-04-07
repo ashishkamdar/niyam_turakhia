@@ -32,10 +32,15 @@ export async function POST(req: NextRequest) {
   const pureEquiv = body.quantity_grams * yieldFactor;
   const id = uuid();
 
+  const refCostPerGram = body.refining_cost_per_gram ?? 0;
+  const purchaseCostUsd = (pureEquiv / 31.1035) * body.price_per_oz;
+  const refiningTotalUsd = !isPure ? body.quantity_grams * refCostPerGram : 0;
+  const totalCostUsd = body.total_cost_usd ?? (purchaseCostUsd + refiningTotalUsd);
+
   db.prepare(`
-    INSERT INTO deals (id, metal, purity, is_pure, quantity_grams, pure_equivalent_grams, price_per_oz, direction, location, status, date, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, body.metal, purity, isPure ? 1 : 0, body.quantity_grams, pureEquiv, body.price_per_oz, body.direction, body.location, body.status ?? "locked", body.date ?? new Date().toISOString(), body.created_by ?? "manual");
+    INSERT INTO deals (id, metal, purity, is_pure, quantity_grams, pure_equivalent_grams, price_per_oz, refining_cost_per_gram, total_cost_usd, direction, location, status, date, created_by, contact_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, body.metal, purity, isPure ? 1 : 0, body.quantity_grams, pureEquiv, body.price_per_oz, refCostPerGram, totalCostUsd, body.direction, body.location, body.status ?? "locked", body.date ?? new Date().toISOString(), body.created_by ?? "manual", body.contact_name ?? "");
 
   return NextResponse.json({ id }, { status: 201 });
 }

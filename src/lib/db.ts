@@ -72,9 +72,15 @@ function initSchema(db: Database.Database) {
     );
   `);
 
-  // Add contact_name to deals if not exists
+  // Migrations — add columns if not exists
   const cols = db.prepare("PRAGMA table_info(deals)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "contact_name")) {
     db.prepare("ALTER TABLE deals ADD COLUMN contact_name TEXT DEFAULT ''").run();
+  }
+  if (!cols.some((c) => c.name === "refining_cost_per_gram")) {
+    db.prepare("ALTER TABLE deals ADD COLUMN refining_cost_per_gram REAL DEFAULT 0").run();
+  }
+  if (!cols.some((c) => c.name === "total_cost_usd")) {
+    db.prepare("ALTER TABLE deals ADD COLUMN total_cost_usd REAL DEFAULT 0").run();
   }
 }

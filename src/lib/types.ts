@@ -17,11 +17,14 @@ export interface Deal {
   quantity_grams: number;
   pure_equivalent_grams: number;
   price_per_oz: number;
+  refining_cost_per_gram: number;
+  total_cost_usd: number;
   direction: DealDirection;
   location: Location;
   status: DealStatus;
   date: string;
   created_by: "simulator" | "manual" | "whatsapp";
+  contact_name: string;
 }
 
 export interface Payment {
