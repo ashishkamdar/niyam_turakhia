@@ -3,6 +3,7 @@ import { AuthGate } from "@/components/auth-gate";
 import { PriceTicker } from "@/components/price-ticker";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { BottomNav } from "@/components/bottom-nav";
+import { DealToast } from "@/components/deal-toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <body>
         <AuthGate>
+          <DealToast />
           <SidebarNav />
           <div className="overflow-x-hidden lg:pl-60">
             <PriceTicker />
