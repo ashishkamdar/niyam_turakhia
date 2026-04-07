@@ -53,7 +53,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 - **PIN pad lock screen** with 6-digit numeric keypad
 - **PIN: `639263`**
 - Cookie-based session, stays logged in for **365 days**
-- Logout icon in price ticker header (visible on all screens including mobile)
+- Header bar (top-right): Settings gear icon + Logout icon (with gap between them), visible on all screens
 
 #### Pages Built
 
@@ -65,7 +65,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | **WhatsApp** | `/whatsapp` | Simulated WhatsApp chat interface with 5 pre-built contacts. Contact list with last message preview. Chat thread with message bubbles. "Start Chats" toggle to simulate negotiations. Lock detection highlights deals in amber. LOCKED badge on contacts |
 | **Money Flow** | `/money-flow` | Multi-currency settlement overview. Total sent/received. Per-currency breakdown (USD/HKD/AED/USDT) with net position. Recent payments list |
 | **Reports** | `/reports` | Period selector (Daily/Weekly/Quarterly/Yearly). Total bought/sold/realized P&L. Per-metal breakdown |
-| **Settings** | `/settings` | Price feed toggle (Demo/Live LBMA with API key input). Reset All Data button |
+| **Settings** | `/settings` | **Data Source selector** (4 options with pros/cons: Excel Upload, Live Data Bridge, Scheduled Auto-Export, Secure VPN Access — each with advantages, considerations, frequency, and setup effort). Price feed toggle (Demo/Live LBMA). Reset All Data button. Accessible via gear icon in header. |
 
 #### API Routes
 
@@ -82,7 +82,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Component | File | Description |
 |-----------|------|-------------|
-| Price Ticker | `price-ticker.tsx` | Sticky header, 2x2 mobile / 4-col desktop, 4 decimal prices, logout icon, Demo/Live label |
+| Price Ticker | `price-ticker.tsx` | Sticky header, 2x2 mobile / 4-col desktop, 4 decimal prices, Demo/Live label. Top bar with NT Metals branding (mobile) / Live Prices label (desktop), settings gear icon + logout icon (with spacing) |
 | Sidebar Nav | `sidebar-nav.tsx` | Desktop left sidebar (hidden on mobile), 6 nav items + Settings + Logout |
 | Bottom Nav | `bottom-nav.tsx` | Mobile bottom tab bar (hidden on desktop), 5 tabs: Home, Stock, Deals, WhatsApp, Money |
 | Auth Gate | `auth-gate.tsx` | Wraps entire app, checks session cookie, shows PIN pad if locked |
