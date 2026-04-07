@@ -277,6 +277,55 @@ Bot: "Locked. 1 Kg 24K Gold at USD 2340.5000."
 
 ---
 
+## Demo Strategy & Timing
+
+### Timeline
+- **2026-04-07 (Monday):** Met Niyam 10:00-11:30 AM at Gymkhana. Demo built same day.
+- **2026-04-07 evening:** Sent WhatsApp: "Niyam bhai, great meeting today. I understood your business well. My team and I will work on something and get back to you in a few days."
+- **2026-04-09 or 2026-04-10 (Wed/Thu):** SHOW THE DEMO. Don't show earlier — he'll think it was too easy and undervalue the work.
+- **Day after demo:** Send phased proposal (don't quote in the demo meeting).
+
+### Why Wait 2-3 Days
+- "Too fast = too cheap" — if he knows it took half a day, he'll negotiate the price down hard
+- "My team and I" sets the perception of serious effort
+- He needs time to sit with his pain (weekly reports, no visibility) before seeing the solution
+- Anticipation makes the demo more impressive
+
+### Demo Flow (5-7 minutes, then STOP)
+
+1. **PIN pad** → "This is secured, only you can access it"
+2. **Dashboard** → "This is your daily MIS — live, right now"
+3. **Price ticker** → "London Fix prices, real-time. Gold, Silver, Platinum, Palladium"
+4. **Stock In Hand** → "Your entire inventory across UAE and HK. Tap gold to see every lot"
+5. **WhatsApp tab** → Start Chats → "Watch — your staff is negotiating deals on WhatsApp"
+6. **Lock happens** → "See? Mr. Chang just locked 10kg gold. Deal captured automatically. Zero manual entry."
+7. **Back to Dashboard** → "The locked deal is already here on your main screen"
+8. **Money Flow** → "All your currencies — USD, Dirham, HKD, USDT — one view"
+9. **STOP.** Don't oversell. Let him ask questions.
+
+### What NOT To Do In The Demo
+- Don't explain the technology (Next.js, SQLite, etc.) — he doesn't care
+- Don't show Settings page — that's internal
+- Don't quote a price — say "I'll send you a proposal with phases"
+- Don't show it on desktop — show on YOUR phone (that's how he'll use it)
+- Don't demo for more than 7 minutes — leave him wanting more
+
+### After The Demo
+- Say: "This is Phase 1 — the view layer. Phase 2 connects to your real data. Phase 3 adds the AI bot that negotiates deals automatically."
+- Don't quote a price. Say: "I'll send you a detailed proposal tomorrow."
+- Send proposal next day with Phase 1+2 at Rs 3-5L
+
+### Before The Demo (Polish Checklist)
+- [ ] Test every screen on mobile (your phone)
+- [ ] Reset data fresh (Settings → Reset All Data)
+- [ ] Start chat simulator, let it run through all scripts, verify locked deals appear correctly
+- [ ] Practice the 5-7 minute flow above at least twice
+- [ ] Make sure PIN works (639263)
+- [ ] Check that price ticker shows all 4 metals properly
+- [ ] Verify Stock In Hand drill-down works (tap metal → see lots → back)
+
+---
+
 ## Pricing Guidance
 
 - This is specialized financial software for a precious metals business
