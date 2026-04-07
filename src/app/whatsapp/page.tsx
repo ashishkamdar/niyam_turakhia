@@ -11,17 +11,19 @@ export default function WhatsAppPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [simRunning, setSimRunning] = useState(false);
-  const simRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const simActiveRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scriptProgress = useRef<Map<string, number>>(new Map());
 
   const loadContacts = useCallback(() => {
-    fetch("/api/whatsapp").then((r) => r.json()).then(setContacts);
+    fetch("/api/whatsapp").then((r) => r.json()).then(setContacts).catch(() => {});
   }, []);
 
   const loadMessages = useCallback((contact: string) => {
     fetch(`/api/whatsapp?contact=${encodeURIComponent(contact)}`)
       .then((r) => r.json())
-      .then(setMessages);
+      .then(setMessages)
+      .catch(() => {});
   }, []);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
@@ -38,79 +40,109 @@ export default function WhatsAppPage() {
     return () => clearInterval(poll);
   }, [selected, loadContacts, loadMessages]);
 
-  // Simulator
-  function startSimulator() {
-    setSimRunning(true);
-    scriptProgress.current = new Map();
-    CHAT_SCRIPTS.forEach((s) => scriptProgress.current.set(s.contact_name, 0));
+  // Simulator using setTimeout chain for random delays
+  function scheduleNextMessage() {
+    if (!simActiveRef.current) return;
 
-    simRef.current = setInterval(() => {
-      // Pick a random script that hasn't finished
-      const active = CHAT_SCRIPTS.filter((s) => {
-        const progress = scriptProgress.current.get(s.contact_name) ?? 0;
-        return progress < s.messages.length;
-      });
-      if (active.length === 0) {
-        stopSimulator();
-        return;
-      }
+    const active = CHAT_SCRIPTS.filter((s) => {
+      const progress = scriptProgress.current.get(s.contact_name) ?? 0;
+      return progress < s.messages.length;
+    });
+
+    if (active.length === 0) {
+      simActiveRef.current = false;
+      setSimRunning(false);
+      return;
+    }
+
+    const delay = Math.floor(Math.random() * 5000) + 3000;
+    timeoutRef.current = setTimeout(async () => {
+      if (!simActiveRef.current) return;
+
       const script = active[Math.floor(Math.random() * active.length)];
       const idx = scriptProgress.current.get(script.contact_name) ?? 0;
       const msg = script.messages[idx];
       const isLockMessage = /\block\b/i.test(msg.text);
 
-      fetch("/api/whatsapp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contact_name: script.contact_name,
-          contact_location: script.contact_location,
-          direction: msg.direction,
-          message: msg.text,
-          ...(isLockMessage && script.locks
-            ? {
-                metal: script.metal,
-                purity: script.purity,
-                quantity_grams: script.quantity_grams,
-                price_per_oz: script.price_per_oz,
-                deal_direction: script.contact_location === "hong_kong" ? "sell" : "buy",
-              }
-            : {}),
-        }),
-      });
+      try {
+        await fetch("/api/whatsapp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact_name: script.contact_name,
+            contact_location: script.contact_location,
+            direction: msg.direction,
+            message: msg.text,
+            ...(isLockMessage && script.locks
+              ? {
+                  metal: script.metal,
+                  purity: script.purity,
+                  quantity_grams: script.quantity_grams,
+                  price_per_oz: script.price_per_oz,
+                  deal_direction: script.contact_location === "hong_kong" ? "sell" : "buy",
+                }
+              : {}),
+          }),
+        });
+        scriptProgress.current.set(script.contact_name, idx + 1);
+      } catch {
+        // ignore fetch errors, keep going
+      }
 
-      scriptProgress.current.set(script.contact_name, idx + 1);
-    }, Math.random() * 5000 + 3000); // 3-8 seconds
+      scheduleNextMessage();
+    }, delay);
+  }
+
+  function startSimulator() {
+    simActiveRef.current = true;
+    setSimRunning(true);
+    scriptProgress.current = new Map();
+    CHAT_SCRIPTS.forEach((s) => scriptProgress.current.set(s.contact_name, 0));
+    scheduleNextMessage();
   }
 
   function stopSimulator() {
+    simActiveRef.current = false;
     setSimRunning(false);
-    if (simRef.current) clearInterval(simRef.current);
-    simRef.current = null;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      simActiveRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   async function handleSendMessage(text: string) {
     if (!selected) return;
     const contact = contacts.find((c) => c.name === selected);
-    await fetch("/api/whatsapp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contact_name: selected,
-        contact_location: contact?.location ?? "uae",
-        direction: "outgoing",
-        message: text,
-      }),
-    });
-    loadMessages(selected);
-    loadContacts();
+    try {
+      await fetch("/api/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact_name: selected,
+          contact_location: contact?.location ?? "uae",
+          direction: "outgoing",
+          message: text,
+        }),
+      });
+      loadMessages(selected);
+      loadContacts();
+    } catch {
+      // ignore
+    }
   }
 
-  // Mobile: show chat thread full screen when selected
   const showThread = selected !== null;
 
   return (
-    <div className="flex h-[calc(100vh-theme(spacing.32))] flex-col">
+    <div className="flex flex-col" style={{ height: "calc(100vh - 10rem)" }}>
       {/* Header with simulator toggle */}
       <div className="flex items-center justify-between pb-4">
         <div>
@@ -132,12 +164,9 @@ export default function WhatsAppPage() {
 
       {/* Desktop: two panel, Mobile: list or thread */}
       <div className="flex flex-1 overflow-hidden rounded-lg outline outline-1 outline-white/10">
-        {/* Contact list — hidden on mobile when thread is open */}
         <div className={`w-full shrink-0 overflow-y-auto border-r border-white/10 bg-gray-900 lg:block lg:w-80 ${showThread ? "hidden" : "block"}`}>
           <ContactList contacts={contacts} selected={selected} onSelect={setSelected} />
         </div>
-
-        {/* Chat thread */}
         <div className={`flex-1 bg-gray-950 ${showThread ? "block" : "hidden lg:block"}`}>
           {selected ? (
             <ChatThread
