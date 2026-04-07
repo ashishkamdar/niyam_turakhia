@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { StatCard } from "@/components/stat-card";
 import { LockedDeals } from "@/components/locked-deals";
-import type { Deal, Price, MetalSymbol } from "@/lib/types";
+import type { Deal, Price, MetalSymbol, Delivery, Settlement } from "@/lib/types";
 
 const GRAMS_PER_OZ = 31.1035;
 const METAL_MAP: Record<string, MetalSymbol> = { gold: "XAU", silver: "XAG", platinum: "XPT", palladium: "XPD" };
@@ -13,9 +13,14 @@ export default function DashboardPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [prices, setPrices] = useState<Price[]>([]);
 
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+
   useEffect(() => {
     fetch("/api/deals?limit=500").then((r) => r.json()).then(setDeals);
     fetch("/api/prices").then((r) => r.json()).then(setPrices);
+    fetch("/api/deliveries?limit=100").then((r) => r.json()).then(setDeliveries).catch(() => {});
+    fetch("/api/settlements?limit=100").then((r) => r.json()).then(setSettlements).catch(() => {});
   }, []);
 
   const today = new Date().toISOString().split("T")[0];
@@ -60,6 +65,11 @@ export default function DashboardPage() {
   const whatsappDeals = deals.filter((d) => d.created_by === "whatsapp");
   const todayWhatsapp = whatsappDeals.filter((d) => d.date.startsWith(today));
 
+  const inTransit = deliveries.filter((d) => d.status === "in_transit").length;
+  const preparing = deliveries.filter((d) => d.status === "preparing").length;
+  const pendingSettlements = settlements.filter((s) => s.status === "pending").length;
+  const unsettledAmount = settlements.filter((s) => s.status === "pending").reduce((s, d) => s + d.amount_received, 0);
+
   return (
     <div className="space-y-5">
       {/* Hero profit card */}
@@ -95,6 +105,33 @@ export default function DashboardPage() {
       </div>
 
       <LockedDeals />
+
+      {/* Delivery & Settlement pipeline */}
+      {(inTransit > 0 || preparing > 0 || pendingSettlements > 0) && (
+        <div className="rounded-lg bg-gray-900 p-3 outline outline-1 outline-white/10">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            {preparing > 0 && (
+              <span className="flex items-center gap-1.5 text-gray-400">
+                <span className="size-1.5 rounded-full bg-gray-400" />
+                {preparing} preparing
+              </span>
+            )}
+            {inTransit > 0 && (
+              <span className="flex items-center gap-1.5 text-yellow-400">
+                <span className="size-1.5 animate-pulse rounded-full bg-yellow-400" />
+                {inTransit} in transit to HK
+              </span>
+            )}
+            {pendingSettlements > 0 && (
+              <span className="flex items-center gap-1.5 text-blue-400">
+                <span className="size-1.5 rounded-full bg-blue-400" />
+                {pendingSettlements} pending settlements
+                {unsettledAmount > 0 && <span className="text-white font-medium">(${unsettledAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })})</span>}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Recent activity with metal colors */}
       <div>

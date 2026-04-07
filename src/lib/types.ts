@@ -81,6 +81,38 @@ export const METAL_SYMBOLS: Record<Metal, MetalSymbol> = {
 
 export const GRAMS_PER_TROY_OZ = 31.1035;
 
+export type BuyerType = "individual" | "firm" | "bank" | "crypto_exchange";
+export type DeliveryStatus = "preparing" | "in_transit" | "delivered";
+export type SettlementStatus = "pending" | "partial" | "settled";
+
+export interface Delivery {
+  id: string;
+  linked_deal_id: string;
+  buyer_type: BuyerType;
+  buyer_name: string;
+  metal: Metal;
+  weight_grams: number;
+  shipping_cost_usd: number;
+  destination: string;
+  status: DeliveryStatus;
+  date: string;
+}
+
+export interface Settlement {
+  id: string;
+  linked_delivery_id: string;
+  amount_received: number;
+  currency_received: Currency;
+  payment_method: string;
+  amount_sent_to_dubai: number;
+  currency_sent: Currency;
+  channel: string;
+  seller_paid: string;
+  seller_amount: number;
+  status: SettlementStatus;
+  date: string;
+}
+
 export interface WhatsAppMessage {
   id: string;
   contact_name: string;

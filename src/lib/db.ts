@@ -80,6 +80,34 @@ function initSchema(db: Database.Database) {
       timestamp TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS deliveries (
+      id TEXT PRIMARY KEY,
+      linked_deal_id TEXT,
+      buyer_type TEXT NOT NULL DEFAULT 'firm',
+      buyer_name TEXT NOT NULL DEFAULT '',
+      metal TEXT NOT NULL,
+      weight_grams REAL NOT NULL,
+      shipping_cost_usd REAL NOT NULL DEFAULT 0,
+      destination TEXT NOT NULL DEFAULT 'hong_kong',
+      status TEXT NOT NULL DEFAULT 'preparing',
+      date TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS settlements (
+      id TEXT PRIMARY KEY,
+      linked_delivery_id TEXT,
+      amount_received REAL NOT NULL DEFAULT 0,
+      currency_received TEXT NOT NULL DEFAULT 'USD',
+      payment_method TEXT NOT NULL DEFAULT '',
+      amount_sent_to_dubai REAL NOT NULL DEFAULT 0,
+      currency_sent TEXT NOT NULL DEFAULT 'AED',
+      channel TEXT NOT NULL DEFAULT '',
+      seller_paid TEXT NOT NULL DEFAULT '',
+      seller_amount REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      date TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY
     );
@@ -112,14 +140,15 @@ function runMigrations(db: Database.Database) {
         addColumnIfNotExists(db, "deals", "total_cost_usd", "REAL DEFAULT 0");
       },
     },
-    // Future migrations go here:
-    // {
-    //   version: 3,
-    //   description: "Add shipping_cost to deals",
-    //   up: () => {
-    //     addColumnIfNotExists(db, "deals", "shipping_cost", "REAL DEFAULT 0");
-    //   },
-    // },
+    {
+      version: 3,
+      description: "Add deliveries and settlements tables",
+      up: () => {
+        // Tables are created by CREATE TABLE IF NOT EXISTS above.
+        // This migration exists so existing DBs get the version bumped.
+        // No ALTER needed — these are new tables.
+      },
+    },
   ];
 
   for (const migration of migrations) {
