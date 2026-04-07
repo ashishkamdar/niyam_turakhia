@@ -59,11 +59,11 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Page | Route | Description |
 |------|-------|-------------|
-| **Dashboard** | `/` | Today's P&L cards (Buys, Sales, Stock Value, Unrealized P&L), WhatsApp Locked Deals section, recent activity feed |
+| **Dashboard** | `/` | Hero profit card (big green/red number), 4 stat cards (Buys, Sales, Stock Value, Unrealized P&L), delivery pipeline summary (preparing/in transit/pending settlements), WhatsApp Locked Deals, recent activity with metal color coding (gold=amber, silver=gray, platinum=blue, palladium=purple) |
 | **Stock In Hand** | `/stock` | Per-metal summary cards (total grams, avg cost, market value, unrealized P&L, location badges). Tap any metal → drill-down to individual lots with purchase date, purity, qty, status |
-| **Deals** | `/deals` | Deal entry form + transaction list. WhatsApp Locked Deals section at top. Mobile: stacked cards. Desktop: full table |
+| **Purchase & Sales** | `/deals` | Two tabs: **Purchase** (metal, purity, qty, rate + refining section auto-shows for impure metals with yield%, wastage, refining cost, effective cost per oz/gram) and **Sale** (always 24K, buyer name, warns if selling at/below avg cost with red confirmation). WhatsApp Locked Deals at top. Recent Purchases (with REFINED badge) and Recent Sales below. |
 | **WhatsApp** | `/whatsapp` | Simulated WhatsApp chat interface with 5 pre-built contacts. Contact list with last message preview. Chat thread with message bubbles. "Start Chats" toggle to simulate negotiations. Lock detection highlights deals in amber. LOCKED badge on contacts |
-| **Money Flow** | `/money-flow` | Multi-currency settlement overview. Total sent/received. Per-currency breakdown (USD/HKD/AED/USDT) with net position. Recent payments list |
+| **Delivery & Payment** | `/money-flow` | Full 3-tab module covering the complete post-sale cycle. **Deliveries tab:** create shipments to HK (buyer type: Individual/Firm/Bank/Crypto Exchange, weight, shipping cost, auto-shows expected payment currency), status tracking (Preparing→In Transit→Delivered). **Received tab:** record payments from HK buyers in HKD/USD/USDT. **Settlement tab:** full HK→Dubai flow — amount received in HK, transfer channel (Wire/Crypto/Local Dealer/Cash/Hawala), amount sent to Dubai, seller payment in AED. Summary cards: preparing, in transit, pending settlements, total shipping cost. |
 | **Reports** | `/reports` | Period selector (Daily/Weekly/Quarterly/Yearly). Total bought/sold/realized P&L. Per-metal breakdown |
 | **Settings** | `/settings` | **Data Source selector** (4 options with pros/cons: Excel Upload, Live Data Bridge, Scheduled Auto-Export, Secure VPN Access — each with advantages, considerations, frequency, and setup effort). Price feed toggle (Demo/Live LBMA). Reset All Data button. Accessible via gear icon in header. |
 
@@ -77,6 +77,8 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | `/api/payments` | GET, POST | Payment/settlement CRUD |
 | `/api/whatsapp` | GET, POST | WhatsApp messages. GET returns contacts summary or messages for a contact. POST stores message + auto-creates deal if "lock" detected |
 | `/api/simulator` | POST | Reset all data and re-seed |
+| `/api/deliveries` | GET, POST | Delivery CRUD (filter by status). Tracks shipments to HK with buyer info, weight, shipping cost, status |
+| `/api/settlements` | GET, POST | Settlement CRUD (filter by status). Tracks payment received → transfer to Dubai → seller payment |
 
 #### Components Built
 
@@ -88,7 +90,9 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | Auth Gate | `auth-gate.tsx` | Wraps entire app, checks session cookie, shows PIN pad if locked |
 | PIN Pad | `pin-pad.tsx` | 6-digit numeric keypad with dot indicators, error feedback |
 | Stat Card | `stat-card.tsx` | Reusable KPI card (Catalyst stats-with-trending pattern) |
-| Deal Form | `deal-form.tsx` | Buy/sell entry form with dropdowns and number inputs |
+| Purchase Form | `purchase-form.tsx` | Buy form with refining section: metal, purity, qty, rate. Auto-shows refining for impure (18K/20K/22K) with yield %, wastage, cost per gram, effective cost per oz. Live calculation summary. |
+| Sale Form | `sale-form.tsx` | Sell form (always 24K): metal, qty, rate, buyer name. Fetches avg buy cost and shows profit/loss. Red warning + confirmation required when selling at or below cost. |
+| Deal Form | `deal-form.tsx` | Legacy buy/sell entry form (still used by WhatsApp API for lock-created deals) |
 | Stock Detail | `stock-detail.tsx` | Drill-down lot list with status badges (UAE/Refinery/Transit/HK) |
 | Contact List | `contact-list.tsx` | WhatsApp contact list split into Active (top) and Locked Deals (bottom) sections. Lock icons per deal (multiple locks = multiple icons). Contacts move back to Active when new incoming messages arrive after a lock. Outgoing confirmations don't count as new activity. |
 | Chat Thread | `chat-thread.tsx` | Chat bubbles with lock keyword highlighting in amber, manual message input. iOS-safe (16px font prevents Safari auto-zoom). |
@@ -98,8 +102,8 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Module | File | Purpose |
 |--------|------|---------|
-| Types | `types.ts` | All TypeScript interfaces: Deal, Payment, Price, WhatsAppMessage, WhatsAppContact, StockSummary. Constants: YIELD_TABLE, METAL_SYMBOLS, GRAMS_PER_TROY_OZ, PURE_PURITIES |
-| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. 6 tables: deals, payments, prices, settings, whatsapp_messages, schema_version. **Versioned migration system** — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
+| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. **8 tables:** deals, payments, prices, settings, whatsapp_messages, deliveries, settlements, schema_version. **Versioned migration system** (currently v3) — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
+| Types | `types.ts` | All interfaces: Deal (with refining_cost, total_cost, contact_name), Payment, Price, Delivery (buyer_type, shipping_cost, status), Settlement (amount_received, currency, channel, seller_paid), WhatsAppMessage, WhatsAppContact, StockSummary. Types: BuyerType, DeliveryStatus, SettlementStatus. Constants: YIELD_TABLE, METAL_SYMBOLS, GRAMS_PER_TROY_OZ, PURE_PURITIES |
 | Prices | `prices.ts` | Demo prices (Gold $2,341.5678, Silver $30.2450, Platinum $982.3400, Palladium $1,024.7800). Live fetch via goldapi.io (toggle) |
 | Calculations | `calculations.ts` | Stock summary, weighted avg cost, daily P&L, avg buy cost per metal |
 | Sample Data | `sample-data.ts` | Seeds 3 days of realistic transactions: 10-15 buys/day + 5-8 sells/day with corresponding payments |
@@ -571,7 +575,9 @@ niyam turakhia gold/
     │       ├── deals/route.ts      (GET/POST deals with filtering)
     │       ├── payments/route.ts   (GET/POST payments)
     │       ├── whatsapp/route.ts   (GET/POST messages + lock detection + deal creation)
-    │       └── simulator/route.ts  (POST reset)
+    │       ├── simulator/route.ts  (POST reset)
+    │       ├── deliveries/route.ts (GET/POST deliveries to HK)
+    │       └── settlements/route.ts (GET/POST settlements HK→Dubai)
     ├── components/
     │   ├── auth-gate.tsx           (session check → PIN pad or app)
     │   ├── pin-pad.tsx             (6-digit numeric keypad)
@@ -579,7 +585,9 @@ niyam turakhia gold/
     │   ├── sidebar-nav.tsx         (desktop nav: 6 items + settings + logout)
     │   ├── bottom-nav.tsx          (mobile nav: 5 tabs)
     │   ├── stat-card.tsx           (reusable KPI card)
-    │   ├── deal-form.tsx           (buy/sell entry form)
+    │   ├── purchase-form.tsx       (buy form with refining calculations)
+    │   ├── sale-form.tsx           (sell form with loss warning)
+    │   ├── deal-form.tsx           (legacy form, used by WhatsApp API)
     │   ├── stock-detail.tsx        (lot drill-down with status badges)
     │   ├── contact-list.tsx        (WhatsApp contacts with LOCKED badge)
     │   ├── chat-thread.tsx         (chat bubbles + lock highlighting + input)
