@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { StatCard } from "@/components/stat-card";
+import { LockedDeals } from "@/components/locked-deals";
 import type { Deal, Price, MetalSymbol } from "@/lib/types";
 
 const GRAMS_PER_OZ = 31.1035;
@@ -52,6 +53,7 @@ export default function DashboardPage() {
         <StatCard label="Stock Value" value={fmt(stockValue)} sublabel={`${unsold.length} positions`} />
         <StatCard label="Unrealized P&L" value={fmt(unrealizedPnl)} change={unrealizedPnl >= 0 ? `+${fmt(unrealizedPnl)}` : fmt(unrealizedPnl)} changeType={unrealizedPnl >= 0 ? "positive" : "negative"} sublabel="vs avg cost" />
       </div>
+      <LockedDeals />
       <div>
         <h2 className="mb-3 text-sm font-semibold text-white">Recent Activity</h2>
         <div className="space-y-2">

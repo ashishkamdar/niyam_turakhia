@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { DealForm } from "@/components/deal-form";
+import { LockedDeals } from "@/components/locked-deals";
 import type { Deal } from "@/lib/types";
 
 export default function DealsPage() {
@@ -15,6 +16,8 @@ export default function DealsPage() {
         <h1 className="text-lg font-semibold text-white">Deals</h1>
         <p className="mt-1 text-sm text-gray-400">Enter new deals or view recent transactions.</p>
       </div>
+
+      <LockedDeals />
 
       <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-white">New Deal</h2>
