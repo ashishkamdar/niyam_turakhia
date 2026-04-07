@@ -162,12 +162,14 @@ export default function WhatsAppPage() {
         </button>
       </div>
 
-      {/* Desktop: two panel, Mobile: list or thread */}
-      <div className="flex flex-1 overflow-hidden rounded-lg outline outline-1 outline-white/10">
-        <div className={`w-full shrink-0 overflow-y-auto border-r border-white/10 bg-gray-900 lg:block lg:w-80 ${showThread ? "hidden" : "block"}`}>
+      {/* Mobile: show list OR thread (not both). Desktop: side by side */}
+      <div className="relative flex-1 overflow-hidden rounded-lg outline outline-1 outline-white/10">
+        {/* Contact list */}
+        <div className={`absolute inset-0 overflow-y-auto border-r border-white/10 bg-gray-900 lg:relative lg:float-left lg:h-full lg:w-80 ${showThread ? "hidden lg:block" : "block"}`}>
           <ContactList contacts={contacts} selected={selected} onSelect={setSelected} />
         </div>
-        <div className={`flex-1 bg-gray-950 ${showThread ? "block" : "hidden lg:block"}`}>
+        {/* Chat thread */}
+        <div className={`absolute inset-0 bg-gray-950 lg:relative lg:ml-80 lg:h-full ${showThread ? "block" : "hidden lg:block"}`}>
           {selected ? (
             <ChatThread
               contactName={selected}
