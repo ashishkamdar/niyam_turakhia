@@ -62,7 +62,7 @@ export function PriceTicker() {
                 </span>
               </div>
               <p className="mt-0.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-                ${p.price_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${p.price_usd.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
               </p>
               <p className="text-[10px] text-gray-500">
                 {p.source === "demo" ? "Demo" : "Live LBMA"} USD/oz
