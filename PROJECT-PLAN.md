@@ -90,8 +90,8 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | Stat Card | `stat-card.tsx` | Reusable KPI card (Catalyst stats-with-trending pattern) |
 | Deal Form | `deal-form.tsx` | Buy/sell entry form with dropdowns and number inputs |
 | Stock Detail | `stock-detail.tsx` | Drill-down lot list with status badges (UAE/Refinery/Transit/HK) |
-| Contact List | `contact-list.tsx` | WhatsApp contact list with avatar, last message, unread count, LOCKED badge |
-| Chat Thread | `chat-thread.tsx` | Chat bubbles with lock keyword highlighting, manual message input |
+| Contact List | `contact-list.tsx` | WhatsApp contact list split into Active (top) and Locked Deals (bottom) sections. Lock icons per deal (multiple locks = multiple icons). Contacts move back to Active when new incoming messages arrive after a lock. Outgoing confirmations don't count as new activity. |
+| Chat Thread | `chat-thread.tsx` | Chat bubbles with lock keyword highlighting in amber, manual message input. iOS-safe (16px font prevents Safari auto-zoom). |
 | Locked Deals | `locked-deals.tsx` | Auto-refreshing card showing WhatsApp-captured deals (used on Dashboard + Deals pages) |
 
 #### Library Modules
@@ -117,7 +117,14 @@ Pre-built negotiation scripts with realistic multi-message flows:
 | Li Wei Trading | Hong Kong | Gold 24K | 5kg | **Walks away** — no lock (realistic) |
 | Patel Exports | UAE | Palladium 999 | 1kg | Urgent fast lock at $1,021.50/oz |
 
-Messages arrive every 3-8 seconds (random). Multiple conversations interleave. Lock detection uses `/\block\b/i` regex. When lock is detected, deal is auto-created with `created_by: "whatsapp"` and contact name.
+Messages arrive every 3-8 seconds (random via setTimeout chain). Multiple conversations interleave. Lock detection uses `/\block\b/i` regex. When lock is detected, deal is auto-created with `created_by: "whatsapp"` and contact name.
+
+#### Contact List Behavior
+- **Active section (top, green label):** Contacts with no locks, OR contacts who have new incoming messages after their last lock (they're back for more)
+- **Locked Deals section (bottom, amber label):** Contacts whose last activity ended on a lock — no new incoming messages since
+- **Lock icons:** Small amber lock icon next to name for each locked deal (2 deals = 2 icons)
+- **Movement logic:** Outgoing confirmation messages ("Locked. Deal confirmed.") don't count as new activity — only new **incoming** messages from the contact move them back to Active
+- **Example flow:** Mr. Chang negotiates → locks deal → moves to Locked (1 lock icon) → sends "I need more gold" → moves back to Active (1 lock icon visible) → locks again → moves to Locked (2 lock icons)
 
 ---
 
