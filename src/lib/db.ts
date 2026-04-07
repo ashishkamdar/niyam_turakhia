@@ -11,10 +11,16 @@ export function getDb(): Database.Database {
     _db.pragma("journal_mode = WAL");
     _db.pragma("foreign_keys = ON");
     initSchema(_db);
+    runMigrations(_db);
   }
   return _db;
 }
 
+/**
+ * Create tables if they don't exist.
+ * This is the CURRENT full schema — new tables go here.
+ * Existing tables are NOT modified by CREATE TABLE IF NOT EXISTS.
+ */
 function initSchema(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS deals (
@@ -73,17 +79,63 @@ function initSchema(db: Database.Database) {
       linked_deal_id TEXT,
       timestamp TEXT NOT NULL
     );
-  `);
 
-  // Migrations — add columns if not exists
-  const cols = db.prepare("PRAGMA table_info(deals)").all() as { name: string }[];
-  if (!cols.some((c) => c.name === "contact_name")) {
-    db.prepare("ALTER TABLE deals ADD COLUMN contact_name TEXT DEFAULT ''").run();
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY
+    );
+  `);
+}
+
+/**
+ * Versioned migrations — each runs once and only once.
+ * Add new migrations at the end. Never modify existing ones.
+ * Each migration safely modifies existing tables without losing data.
+ */
+function runMigrations(db: Database.Database) {
+  const currentVersion = (
+    db.prepare("SELECT MAX(version) as v FROM schema_version").get() as { v: number | null }
+  )?.v ?? 0;
+
+  const migrations: { version: number; description: string; up: () => void }[] = [
+    {
+      version: 1,
+      description: "Add contact_name to deals",
+      up: () => {
+        addColumnIfNotExists(db, "deals", "contact_name", "TEXT DEFAULT ''");
+      },
+    },
+    {
+      version: 2,
+      description: "Add refining_cost_per_gram and total_cost_usd to deals",
+      up: () => {
+        addColumnIfNotExists(db, "deals", "refining_cost_per_gram", "REAL DEFAULT 0");
+        addColumnIfNotExists(db, "deals", "total_cost_usd", "REAL DEFAULT 0");
+      },
+    },
+    // Future migrations go here:
+    // {
+    //   version: 3,
+    //   description: "Add shipping_cost to deals",
+    //   up: () => {
+    //     addColumnIfNotExists(db, "deals", "shipping_cost", "REAL DEFAULT 0");
+    //   },
+    // },
+  ];
+
+  for (const migration of migrations) {
+    if (migration.version > currentVersion) {
+      migration.up();
+      db.prepare("INSERT OR REPLACE INTO schema_version (version) VALUES (?)").run(migration.version);
+    }
   }
-  if (!cols.some((c) => c.name === "refining_cost_per_gram")) {
-    db.prepare("ALTER TABLE deals ADD COLUMN refining_cost_per_gram REAL DEFAULT 0").run();
-  }
-  if (!cols.some((c) => c.name === "total_cost_usd")) {
-    db.prepare("ALTER TABLE deals ADD COLUMN total_cost_usd REAL DEFAULT 0").run();
+}
+
+/**
+ * Safely add a column to an existing table — no-op if column already exists.
+ */
+function addColumnIfNotExists(db: Database.Database, table: string, column: string, definition: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) {
+    db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
   }
 }

@@ -99,7 +99,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | Module | File | Purpose |
 |--------|------|---------|
 | Types | `types.ts` | All TypeScript interfaces: Deal, Payment, Price, WhatsAppMessage, WhatsAppContact, StockSummary. Constants: YIELD_TABLE, METAL_SYMBOLS, GRAMS_PER_TROY_OZ, PURE_PURITIES |
-| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. Tables: deals, payments, prices, settings, whatsapp_messages. Auto-migration for contact_name column |
+| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. 6 tables: deals, payments, prices, settings, whatsapp_messages, schema_version. **Versioned migration system** — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
 | Prices | `prices.ts` | Demo prices (Gold $2,341.5678, Silver $30.2450, Platinum $982.3400, Palladium $1,024.7800). Live fetch via goldapi.io (toggle) |
 | Calculations | `calculations.ts` | Stock summary, weighted avg cost, daily P&L, avg buy cost per metal |
 | Sample Data | `sample-data.ts` | Seeds 3 days of realistic transactions: 10-15 buys/day + 5-8 sells/day with corresponding payments |
@@ -157,9 +157,55 @@ Messages arrive every 3-8 seconds (random via setTimeout chain). Multiple conver
 | **PM2 Instances** | 1 (fork mode) |
 
 ### Deploy Command (for updates)
+
+**Always use the safe deploy script:**
 ```bash
-ssh nuremberg "cd /var/www/nt-metals && git pull && npm run build && pm2 restart nt-metals"
+bash deploy.sh
 ```
+
+This script:
+1. Backs up `data.db` on the server with a timestamp (e.g. `data.db.bak.20260407_180000`)
+2. Pushes to GitHub
+3. Pulls on server
+4. Builds
+5. Restarts PM2
+
+**NEVER** delete `data.db` on the server. If you need to restore:
+```bash
+# From timestamped backup:
+ssh nuremberg "cd /var/www/nt-metals && cp data.db.bak.TIMESTAMP data.db && pm2 restart nt-metals"
+
+# From seed SQL (last resort — loses any data added since the dump):
+ssh nuremberg "cd /var/www/nt-metals && sqlite3 data.db < seed-backup.sql && pm2 restart nt-metals"
+```
+
+### Database Migration System
+
+The app uses a **versioned migration system** (in `src/lib/db.ts`) that safely handles schema changes:
+
+1. `CREATE TABLE IF NOT EXISTS` — creates tables only if they don't exist (fresh DB)
+2. `schema_version` table — tracks which migrations have run
+3. Each migration runs **once and only once** — checked by version number
+4. Migrations only **add** columns — never drop, rename, or modify existing ones
+5. `addColumnIfNotExists()` helper — safe even if migration runs on a DB that already has the column
+
+**To add a new column in the future:**
+```ts
+// In db.ts, add to the migrations array:
+{
+  version: 3,
+  description: "Add shipping_cost to deals",
+  up: () => {
+    addColumnIfNotExists(db, "deals", "shipping_cost", "REAL DEFAULT 0");
+  },
+},
+```
+
+This approach means: **deploy freely, the DB is never at risk.**
+
+### Backup Files
+- `seed-backup.sql` — full SQL dump in the repo (61 deals, 61 payments, 4 prices). Can recreate demo data from scratch.
+- `data.db.bak.*` — timestamped backups on the server, created by `deploy.sh`
 
 ---
 
