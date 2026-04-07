@@ -284,7 +284,7 @@ In addition to the live simulator, pre-load with 2-3 days of historical transact
 - **Price Feed:** Hardcoded realistic prices for demo (toggle to switch to live API when ready — goldapi.io)
 - **Deployment:** Self-hosted on Nuremberg server (`ssh nuremberg`), nginx reverse proxy, PM2 process manager
 - **Domain:** nt.areakpi.in (subdomain already created)
-- **No auth needed** for demo phase
+- **Auth:** PIN-based number pad lock screen. PIN: `639263`. Cookie-based session, stays logged in for 365 days. Logout icon in sidebar.
 
 ## Data Access Solutions (Post-Demo, For Implementation)
 
