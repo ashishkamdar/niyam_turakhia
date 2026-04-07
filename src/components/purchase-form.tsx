@@ -7,6 +7,8 @@ import { YIELD_TABLE, PURE_PURITIES, GRAMS_PER_TROY_OZ } from "@/lib/types";
 const METALS: Metal[] = ["gold", "silver", "platinum", "palladium"];
 const PURITIES: Purity[] = ["18K", "20K", "22K", "24K", "995", "999"];
 
+const AED_PER_USD = 3.6725;
+
 const DEFAULT_REFINING_COSTS: Record<Metal, number> = {
   gold: 1.50,
   silver: 0.15,
@@ -42,7 +44,11 @@ export function PurchaseForm({ onCreated }: { onCreated?: () => void }) {
     const effectiveCostPerOz = pureEquiv > 0 ? totalCostUsd / (pureEquiv / GRAMS_PER_TROY_OZ) : 0;
     const effectiveCostPerGram = pureEquiv > 0 ? totalCostUsd / pureEquiv : 0;
 
-    return { pureEquiv, wastage, purchaseCostUsd, refiningTotalUsd, totalCostUsd, effectiveCostPerOz, effectiveCostPerGram };
+    const totalCostAed = totalCostUsd * AED_PER_USD;
+    const purchaseCostAed = purchaseCostUsd * AED_PER_USD;
+    const refiningTotalAed = refiningTotalUsd * AED_PER_USD;
+
+    return { pureEquiv, wastage, purchaseCostUsd, purchaseCostAed, refiningTotalUsd, refiningTotalAed, totalCostUsd, totalCostAed, effectiveCostPerOz, effectiveCostPerGram };
   }, [qty, price, refCost, yieldFactor, needsRefining]);
 
   function handleMetalChange(m: Metal) {
@@ -76,7 +82,8 @@ export function PurchaseForm({ onCreated }: { onCreated?: () => void }) {
     onCreated?.();
   }
 
-  const fmt = (n: number) => "$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtUsd = (n: number) => "$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtAed = (n: number) => "AED " + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -128,7 +135,7 @@ export function PurchaseForm({ onCreated }: { onCreated?: () => void }) {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-400">
             <div>Wastage loss: <span className="text-orange-300">{calc.wastage.toFixed(2)}g</span></div>
-            <div>Refining total: <span className="text-orange-300">{fmt(calc.refiningTotalUsd)}</span></div>
+            <div>Refining: <span className="text-orange-300">{fmtAed(calc.refiningTotalAed)}</span></div>
           </div>
         </div>
       )}
@@ -146,18 +153,22 @@ export function PurchaseForm({ onCreated }: { onCreated?: () => void }) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Purchase ({qty.toFixed(0)}g {purity})</span>
-              <span className="text-white">{fmt(calc.purchaseCostUsd)}</span>
+              <span className="text-white">{fmtAed(calc.purchaseCostAed)}</span>
             </div>
             {needsRefining && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Refining ({qty.toFixed(0)}g x ${refCost}/g)</span>
-                <span className="text-orange-300">{fmt(calc.refiningTotalUsd)}</span>
+                <span className="text-orange-300">{fmtAed(calc.refiningTotalAed)}</span>
               </div>
             )}
             <div className="border-t border-white/10 pt-2">
               <div className="flex justify-between text-sm font-semibold">
-                <span className="text-white">Total Cost</span>
-                <span className="text-white">{fmt(calc.totalCostUsd)}</span>
+                <span className="text-white">Total Cost (AED)</span>
+                <span className="text-amber-400">{fmtAed(calc.totalCostAed)}</span>
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-gray-500">Equivalent USD</span>
+                <span className="text-gray-400">{fmtUsd(calc.totalCostUsd)}</span>
               </div>
             </div>
             <div className="border-t border-white/10 pt-2">
@@ -167,11 +178,11 @@ export function PurchaseForm({ onCreated }: { onCreated?: () => void }) {
               </div>
               <div className="flex justify-between text-xs mt-1">
                 <span className="text-gray-400">Effective cost per oz (pure)</span>
-                <span className="text-amber-400 font-medium">{fmt(calc.effectiveCostPerOz)}</span>
+                <span className="text-amber-400 font-medium">{fmtUsd(calc.effectiveCostPerOz)}</span>
               </div>
               <div className="flex justify-between text-xs mt-1">
                 <span className="text-gray-400">Effective cost per gram (pure)</span>
-                <span className="text-amber-400 font-medium">${calc.effectiveCostPerGram.toFixed(4)}</span>
+                <span className="text-amber-400 font-medium">{fmtAed(calc.effectiveCostPerGram * AED_PER_USD)}</span>
               </div>
             </div>
           </div>
