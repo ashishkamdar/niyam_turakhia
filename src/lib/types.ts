@@ -96,5 +96,5 @@ export interface WhatsAppContact {
   lastTimestamp: string;
   unread: number;
   lock_count: number;
-  last_msg_is_lock: number;
+  msgs_after_last_lock: number;
 }

@@ -74,10 +74,10 @@ export function ContactList({
   selected: string | null;
   onSelect: (name: string) => void;
 }) {
-  // Active: no locks at all, OR has new messages after last lock (last_msg_is_lock === 0)
-  const active = contacts.filter((c) => c.lock_count === 0 || c.last_msg_is_lock === 0);
-  // Settled: conversation ended on a lock (last message is a lock, no new activity)
-  const settled = contacts.filter((c) => c.lock_count > 0 && c.last_msg_is_lock === 1);
+  // Active: no locks, OR has new incoming messages after their last lock
+  const active = contacts.filter((c) => c.lock_count === 0 || c.msgs_after_last_lock > 0);
+  // Settled: has locks and no new incoming messages after last lock
+  const settled = contacts.filter((c) => c.lock_count > 0 && c.msgs_after_last_lock === 0);
 
   return (
     <div>

@@ -22,7 +22,13 @@ export async function GET(req: NextRequest) {
         (SELECT timestamp FROM whatsapp_messages m2 WHERE m2.contact_name = m1.contact_name ORDER BY timestamp DESC LIMIT 1) as lastTimestamp,
         COUNT(CASE WHEN direction = 'incoming' AND is_lock = 0 THEN 1 END) as unread,
         SUM(is_lock) as lock_count,
-        (SELECT is_lock FROM whatsapp_messages m3 WHERE m3.contact_name = m1.contact_name ORDER BY timestamp DESC LIMIT 1) as last_msg_is_lock
+        CASE WHEN SUM(is_lock) > 0 THEN
+          (SELECT COUNT(*) FROM whatsapp_messages m3
+           WHERE m3.contact_name = m1.contact_name
+           AND m3.direction = 'incoming'
+           AND m3.is_lock = 0
+           AND m3.timestamp > (SELECT MAX(m4.timestamp) FROM whatsapp_messages m4 WHERE m4.contact_name = m1.contact_name AND m4.is_lock = 1))
+        ELSE 0 END as msgs_after_last_lock
       FROM whatsapp_messages m1
       GROUP BY contact_name
       ORDER BY MAX(timestamp) DESC
