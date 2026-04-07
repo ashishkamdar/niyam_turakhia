@@ -25,11 +25,14 @@ function initSchema(db: Database.Database) {
       quantity_grams REAL NOT NULL,
       pure_equivalent_grams REAL NOT NULL,
       price_per_oz REAL NOT NULL,
+      refining_cost_per_gram REAL NOT NULL DEFAULT 0,
+      total_cost_usd REAL NOT NULL DEFAULT 0,
       direction TEXT NOT NULL,
       location TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'locked',
       date TEXT NOT NULL,
-      created_by TEXT NOT NULL DEFAULT 'manual'
+      created_by TEXT NOT NULL DEFAULT 'manual',
+      contact_name TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS payments (
