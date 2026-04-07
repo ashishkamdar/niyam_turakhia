@@ -313,7 +313,12 @@ Bot: "Locked. 1 Kg 24K Gold at USD 2340.5000."
 ### After The Demo
 - Say: "This is Phase 1 — the view layer. Phase 2 connects to your real data. Phase 3 adds the AI bot that negotiates deals automatically."
 - Don't quote a price. Say: "I'll send you a detailed proposal tomorrow."
-- Send proposal next day with Phase 1+2 at Rs 3-5L
+- **ASK THESE QUESTIONS** (critical for pricing and data bridge):
+  1. "What software do you use for daily entries?" (get the name and version)
+  2. "Can your staff export to Excel?" (most software has this)
+  3. "Where does the backup go?" (reveals the database type)
+  4. "How quickly do you need to see new deals — real-time, every 30 minutes, or daily?"
+  5. "What do you pay for the current software?" (anchors his budget expectation)
 
 ### Before The Demo (Polish Checklist)
 - [ ] Test every screen on mobile (your phone)
@@ -328,12 +333,49 @@ Bot: "Locked. 1 Kg 24K Gold at USD 2340.5000."
 
 ## Pricing Guidance
 
-- This is specialized financial software for a precious metals business
-- Similar dashboards for commodity traders cost Rs 5-15L+
-- Niyam is Kutchi — value-conscious but pays for clear ROI
-- **Don't quote in the demo meeting.** Show the demo, then send a phased proposal.
-- Anchor around Rs 3-5L for Phase 1+2, with Phase 3 as ongoing maintenance
-- Phase 3 (AI bot) is premium — additional Rs 2-3L or monthly fee
+### Reality Check
+- Niyam already pays for software that handles daily entries + trial balance + reports
+- He considers his current software "expensive" — so his budget expectation is LOW
+- Our dashboard is a **view layer / add-on** to his existing system — not a replacement
+- The hard part (and our differentiator) is the **data bridge** — getting data out of his software into our dashboard
+- Rs 3-5L for an add-on dashboard is likely too high for him
+- **Don't quote in the demo meeting.** Ask the 5 questions above first.
+
+### His Current Software (Unknown — Find Out)
+- Likely a Windows-based application (VB6/.NET era)
+- Probably uses: SQL Server Express, MS Access (.mdb/.accdb), or flat files
+- Has backup/restore for admins — the backup reveals the database type
+- Unlikely to have an API — we'll need to build a data bridge
+- Could be: Tally (has XML API), Busy, Marg, or custom software
+
+### Data Bridge Options
+| Approach | Complexity | How it works |
+|----------|-----------|-------------|
+| **Excel/CSV export** | Easiest | Staff exports daily, we import. Semi-manual. |
+| **Read database directly** | Medium | If MS Access or SQL Server, connect read-only. Need to identify the DB file on his Dubai server. |
+| **Watch backup folder** | Medium | His software backs up regularly. We parse the backup file automatically. |
+| **Screen scrape / OCR** | Hard | If software is proprietary with no data access at all. Last resort. |
+| **Parallel entry** | Easiest but annoying | Staff enters in both systems. He won't like this long-term. |
+
+**Recommendation:** First identify the software and database. Then pick the easiest bridge.
+
+### Revised Pricing Options
+
+| Option | Setup | Monthly | What he gets |
+|--------|-------|---------|-------------|
+| **A. Dashboard + manual sync** | Rs 50K-1L | Rs 5-10K/month | Dashboard works, staff exports Excel daily, we import |
+| **B. Dashboard + auto data bridge** | Rs 1.5-2.5L | Rs 10-15K/month | Fully automatic MIS — data syncs from his software |
+| **C. Full system replacement** | Rs 5-8L | Rs 15-25K/month | Replace his current software entirely + dashboard |
+
+**Recommended pitch: Option B** — this is where the value is. The data bridge is the moat. Once you crack his data, he's locked into your service. Monthly recurring is better than one-time.
+
+### Pitch Strategy
+- Show demo (free — this is the hook)
+- Quote Option A as the "starter" (low barrier)
+- Recommend Option B as the "real solution"
+- Mention Option C only if he's frustrated with his current software
+- The monthly fee is key — positions this as a service, not a one-time project
+- "I maintain the system, keep it updated, add features" justifies the monthly
 
 ## Key Selling Points
 
