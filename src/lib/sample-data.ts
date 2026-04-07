@@ -3,11 +3,11 @@ import { v4 as uuid } from "uuid";
 import { PURE_PURITIES, YIELD_TABLE, type Metal, type Purity } from "./types";
 
 const METALS: Metal[] = ["gold", "silver", "platinum", "palladium"];
-const PRICE_RANGES: Record<Metal, { min: number; max: number }> = {
-  gold: { min: 2300, max: 2400 },
-  silver: { min: 28, max: 32 },
-  platinum: { min: 950, max: 1010 },
-  palladium: { min: 990, max: 1060 },
+const BASE_PRICES: Record<Metal, number> = {
+  gold: 2341.5678,
+  silver: 30.2450,
+  platinum: 982.3400,
+  palladium: 1024.7800,
 };
 const PURITIES_WEIGHTED: Purity[] = ["18K", "18K", "22K", "22K", "24K", "24K", "24K", "999", "995"];
 
@@ -30,6 +30,13 @@ export function seedSampleData(): void {
 
   db.transaction(() => {
     for (let daysAgo = 2; daysAgo >= 0; daysAgo--) {
+      // Small daily price variation per metal (+-0.5%)
+      const dayPrices: Record<Metal, number> = {} as Record<Metal, number>;
+      for (const m of METALS) {
+        dayPrices[m] = BASE_PRICES[m] * (1 + rand(-0.005, 0.005));
+      }
+
+      // BUYS: always at 1-2.5% DISCOUNT to base (we buy cheap)
       const buyCount = Math.floor(Math.random() * 6) + 10;
       for (let i = 0; i < buyCount; i++) {
         const metal = pick(METALS);
@@ -37,8 +44,8 @@ export function seedSampleData(): void {
         const isPure = PURE_PURITIES.includes(purity);
         const qty = parseFloat(rand(100, 5000).toFixed(2));
         const pureEquiv = parseFloat((qty * YIELD_TABLE[purity]).toFixed(2));
-        const range = PRICE_RANGES[metal];
-        const price = parseFloat((rand(range.min, range.max) * (1 - rand(0.005, 0.015))).toFixed(4));
+        const discount = rand(0.010, 0.025); // 1-2.5% discount
+        const price = parseFloat((dayPrices[metal] * (1 - discount)).toFixed(4));
         const statuses = isPure ? ["locked", "in_transit", "in_hk"] : ["locked", "in_refinery", "in_transit", "in_hk"];
         const status = pick(statuses);
         const date = randomDate(daysAgo);
@@ -49,12 +56,14 @@ export function seedSampleData(): void {
         const amt = curr === "AED" ? costUsd * 3.6725 : costUsd;
         insPay.run(uuid(), parseFloat(amt.toFixed(2)), curr, "sent", "bank", "hong_kong", "uae", dealId, date);
       }
+
+      // SELLS: always at 0.3-1% PREMIUM to base (we sell higher)
       const sellCount = Math.floor(Math.random() * 4) + 5;
       for (let i = 0; i < sellCount; i++) {
         const metal = pick(METALS);
         const qty = parseFloat(rand(100, 3000).toFixed(2));
-        const range = PRICE_RANGES[metal];
-        const price = parseFloat((rand(range.min, range.max) * (1 + rand(0.003, 0.008))).toFixed(4));
+        const premium = rand(0.003, 0.010); // 0.3-1% premium
+        const price = parseFloat((dayPrices[metal] * (1 + premium)).toFixed(4));
         const date = randomDate(daysAgo);
         const dealId = uuid();
         insDeal.run(dealId, metal, "24K", 1, qty, qty, price, "sell", "hong_kong", "sold", date);
