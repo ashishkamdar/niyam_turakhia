@@ -28,8 +28,26 @@ export function PriceTicker() {
     );
   }
 
+  function handleLogout() {
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "logout" }),
+    }).then(() => window.location.reload());
+  }
+
   return (
     <div className="sticky top-0 z-50 border-b border-white/10 bg-gray-900/95 backdrop-blur">
+      <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 sm:px-4">
+        <span className="text-xs font-bold text-amber-400 lg:hidden">NT Metals</span>
+        <span className="hidden text-xs text-gray-500 lg:inline">Live Prices</span>
+        <button onClick={handleLogout} className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-gray-500 hover:text-rose-400">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+          </svg>
+          <span className="hidden sm:inline">Logout</span>
+        </button>
+      </div>
       <div className="grid grid-cols-2 gap-px bg-white/5 sm:grid-cols-4">
         {prices.map((p) => {
           const isUp = p.change >= 0;
