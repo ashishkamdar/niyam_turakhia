@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { StockDetail } from "@/components/stock-detail";
-import type { Deal, Price, Metal } from "@/lib/types";
+import type { Deal, Price, Metal, MetalSymbol } from "@/lib/types";
 
 const GRAMS_PER_OZ = 31.1035;
-const METAL_SYMBOLS: Record<string, string> = { gold: "XAU", silver: "XAG", platinum: "XPT", palladium: "XPD" };
+const METAL_SYMBOLS: Record<string, MetalSymbol> = { gold: "XAU", silver: "XAG", platinum: "XPT", palladium: "XPD" };
 
 export default function StockPage() {
   const [deals, setDeals] = useState<Deal[]>([]);

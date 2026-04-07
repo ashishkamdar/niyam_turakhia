@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { StatCard } from "@/components/stat-card";
-import type { Deal, Price } from "@/lib/types";
+import type { Deal, Price, MetalSymbol } from "@/lib/types";
 
 const GRAMS_PER_OZ = 31.1035;
-const METAL_MAP: Record<string, string> = { gold: "XAU", silver: "XAG", platinum: "XPT", palladium: "XPD" };
+const METAL_MAP: Record<string, MetalSymbol> = { gold: "XAU", silver: "XAG", platinum: "XPT", palladium: "XPD" };
 
 export default function DashboardPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
