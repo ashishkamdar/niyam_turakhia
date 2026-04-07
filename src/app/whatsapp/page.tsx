@@ -142,7 +142,7 @@ export default function WhatsAppPage() {
   const showThread = selected !== null;
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 10rem)" }}>
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 14rem)" }}>
       {/* Header with simulator toggle */}
       <div className="flex items-center justify-between pb-4">
         <div>
