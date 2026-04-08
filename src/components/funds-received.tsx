@@ -64,7 +64,7 @@ export function FundsReceived() {
         .catch(() => {});
     }
     fetchPayments();
-    const poll = setInterval(fetchPayments, 5000);
+    const poll = setInterval(fetchPayments, 3000);
     return () => clearInterval(poll);
   }, []);
 

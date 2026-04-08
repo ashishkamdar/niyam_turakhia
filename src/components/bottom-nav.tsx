@@ -28,7 +28,7 @@ export function BottomNav() {
       }).catch(() => {});
     }
     fetchCounts();
-    const poll = setInterval(fetchCounts, 5000);
+    const poll = setInterval(fetchCounts, 3000);
     return () => clearInterval(poll);
   }, []);
 

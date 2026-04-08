@@ -27,7 +27,7 @@ export default function DashboardPage() {
       fetch("/api/settlements?limit=100").then((r) => r.json()).then(setSettlements).catch(() => {});
     }
     fetchAll();
-    const poll = setInterval(fetchAll, 5000);
+    const poll = setInterval(fetchAll, 3000);
     return () => clearInterval(poll);
   }, []);
 

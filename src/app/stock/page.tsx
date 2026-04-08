@@ -18,7 +18,7 @@ export default function StockPage() {
       fetch("/api/prices").then((r) => r.json()).then(setPrices).catch(() => {});
     }
     fetchAll();
-    const poll = setInterval(fetchAll, 5000);
+    const poll = setInterval(fetchAll, 3000);
     return () => clearInterval(poll);
   }, []);
 
