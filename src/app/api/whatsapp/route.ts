@@ -48,24 +48,59 @@ export async function POST(req: NextRequest) {
   let linkedDealId: string | null = null;
 
   // If message contains "lock", create a deal
-  if (isLock && body.metal && body.quantity_grams && body.price_per_oz) {
-    const dealId = uuid();
-    const purity = (body.purity ?? "24K") as Purity;
-    const isPure = PURE_PURITIES.includes(purity);
-    const yieldFactor = YIELD_TABLE[purity] ?? 1.0;
-    const pureEquiv = body.quantity_grams * yieldFactor;
-    const direction = body.deal_direction ?? "buy";
-    const location = body.contact_location === "hong_kong" ? "hong_kong" : "uae";
+  if (isLock) {
+    // Use provided metadata (from simulator scripts) or parse from message text
+    let metal = body.metal as string | undefined;
+    let quantityGrams = body.quantity_grams as number | undefined;
+    let pricePerOz = body.price_per_oz as number | undefined;
+    let purityStr = body.purity as string | undefined;
+    let dealDirection = body.deal_direction as string | undefined;
 
-    db.prepare(`
-      INSERT INTO deals (id, metal, purity, is_pure, quantity_grams, pure_equivalent_grams, price_per_oz, direction, location, status, date, created_by, contact_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'locked', ?, 'whatsapp', ?)
-    `).run(
-      dealId, body.metal, purity, isPure ? 1 : 0,
-      body.quantity_grams, pureEquiv, body.price_per_oz,
-      direction, location, timestamp, body.contact_name
-    );
-    linkedDealId = dealId;
+    // Parse from message text if metadata not provided
+    if (!metal || !quantityGrams || !pricePerOz) {
+      const parsed = parseDealFromText(messageText);
+      metal = metal ?? parsed.metal;
+      quantityGrams = quantityGrams ?? parsed.quantityGrams;
+      pricePerOz = pricePerOz ?? parsed.pricePerOz;
+      purityStr = purityStr ?? parsed.purity;
+      dealDirection = dealDirection ?? parsed.direction;
+    }
+
+    // Also scan recent conversation for context if still missing
+    if (!metal || !quantityGrams || !pricePerOz) {
+      const recentMsgs = db
+        .prepare("SELECT message FROM whatsapp_messages WHERE contact_name = ? ORDER BY timestamp DESC LIMIT 20")
+        .all(body.contact_name) as { message: string }[];
+      for (const msg of recentMsgs) {
+        const parsed = parseDealFromText(msg.message);
+        metal = metal ?? parsed.metal;
+        quantityGrams = quantityGrams ?? parsed.quantityGrams;
+        pricePerOz = pricePerOz ?? parsed.pricePerOz;
+        purityStr = purityStr ?? parsed.purity;
+        dealDirection = dealDirection ?? parsed.direction;
+        if (metal && quantityGrams && pricePerOz) break;
+      }
+    }
+
+    if (metal && quantityGrams && pricePerOz) {
+      const dealId = uuid();
+      const purity = (purityStr ?? "24K") as Purity;
+      const isPure = PURE_PURITIES.includes(purity);
+      const yieldFactor = YIELD_TABLE[purity] ?? 1.0;
+      const pureEquiv = quantityGrams * yieldFactor;
+      const direction = dealDirection ?? "buy";
+      const location = body.contact_location === "hong_kong" ? "hong_kong" : "uae";
+
+      db.prepare(`
+        INSERT INTO deals (id, metal, purity, is_pure, quantity_grams, pure_equivalent_grams, price_per_oz, direction, location, status, date, created_by, contact_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'locked', ?, 'whatsapp', ?)
+      `).run(
+        dealId, metal, purity, isPure ? 1 : 0,
+        quantityGrams, pureEquiv, pricePerOz,
+        direction, location, timestamp, body.contact_name
+      );
+      linkedDealId = dealId;
+    }
   }
 
   db.prepare(`
@@ -74,4 +109,60 @@ export async function POST(req: NextRequest) {
   `).run(id, body.contact_name, body.contact_location, body.direction, messageText, isLock, linkedDealId, timestamp);
 
   return NextResponse.json({ id, is_lock: isLock, linked_deal_id: linkedDealId }, { status: 201 });
+}
+
+/**
+ * Parse deal details from message text.
+ * Handles formats like:
+ *   "10 Kg 24K Gold at USD 2338.7500 buy — lock"
+ *   "50 Kg 999 Silver at 29.985 sell lock"
+ *   "2 kg platinum 979.25 lock"
+ *   "Gold 5kg at $2340 lock"
+ *   "I need 10 kg of 24K gold"
+ */
+function parseDealFromText(text: string): {
+  metal?: string;
+  quantityGrams?: number;
+  pricePerOz?: number;
+  purity?: string;
+  direction?: string;
+} {
+  const lower = text.toLowerCase();
+
+  // Metal
+  let metal: string | undefined;
+  if (/\bgold\b/.test(lower)) metal = "gold";
+  else if (/\bsilver\b/.test(lower)) metal = "silver";
+  else if (/\bplatinum\b/.test(lower)) metal = "platinum";
+  else if (/\bpalladium\b/.test(lower)) metal = "palladium";
+
+  // Quantity — look for number followed by kg or g
+  let quantityGrams: number | undefined;
+  const kgMatch = lower.match(/(\d+(?:\.\d+)?)\s*kg\b/);
+  const gMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:gm|gms|gram|grams|g)\b/);
+  if (kgMatch) quantityGrams = parseFloat(kgMatch[1]) * 1000;
+  else if (gMatch) quantityGrams = parseFloat(gMatch[1]);
+
+  // Price — look for USD/$ followed by number, or number after "at"
+  let pricePerOz: number | undefined;
+  const priceMatch = text.match(/(?:USD|usd|\$)\s*(\d+(?:\.\d+)?)/);
+  const atMatch = text.match(/at\s+(?:USD|usd|\$)?\s*(\d+(?:\.\d+)?)/i);
+  if (priceMatch) pricePerOz = parseFloat(priceMatch[1]);
+  else if (atMatch) pricePerOz = parseFloat(atMatch[1]);
+
+  // Purity
+  let purity: string | undefined;
+  if (/\b24k\b/i.test(text)) purity = "24K";
+  else if (/\b22k\b/i.test(text)) purity = "22K";
+  else if (/\b20k\b/i.test(text)) purity = "20K";
+  else if (/\b18k\b/i.test(text)) purity = "18K";
+  else if (/\b999\b/.test(text)) purity = "999";
+  else if (/\b995\b/.test(text)) purity = "995";
+
+  // Direction
+  let direction: string | undefined;
+  if (/\bbuy\b/i.test(lower) || /\bpurchase\b/i.test(lower) || /\bneed\b/i.test(lower)) direction = "buy";
+  else if (/\bsell\b/i.test(lower) || /\bsale\b/i.test(lower) || /\boffer\b/i.test(lower)) direction = "sell";
+
+  return { metal, quantityGrams, pricePerOz, purity, direction };
 }
