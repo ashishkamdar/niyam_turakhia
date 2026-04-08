@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const fmtG = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 }) + "g";
   const fmtKg = (n: number) => (n / 1000).toFixed(2) + "kg";
 
-  const todayProfit = realizedPnl + unrealizedPnl;
+  const todayProfit = realizedPnl; // Only today's realized — unrealized shown separately in stat cards
   const whatsappDeals = deals.filter((d) => d.created_by === "whatsapp");
   const todayWhatsapp = whatsappDeals.filter((d) => d.date.startsWith(today));
 
