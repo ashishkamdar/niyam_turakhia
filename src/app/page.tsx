@@ -122,7 +122,7 @@ export default function DashboardPage() {
         </div>
         {metalHoldings.length > 0 && (
           <div className="mt-2">
-          <p className="mb-1 text-[9px] font-medium uppercase tracking-wider text-gray-500">Stock In Hand</p>
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-amber-400/70">Stock In Hand</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {metalHoldings.map((m) => (
               <span key={m.metal} className="text-xs">
