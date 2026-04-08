@@ -19,12 +19,12 @@ export function BottomNav() {
 
   useEffect(() => {
     function fetchCounts() {
-      fetch("/api/deals?limit=50").then((r) => r.json()).then((deals: { created_by: string }[]) => {
-        setLockedCount(deals.filter((d) => d.created_by === "whatsapp").length);
+      fetch("/api/deals?limit=100").then((r) => r.json()).then((deals: { created_by: string; direction: string }[]) => {
+        const waDeals = deals.filter((d) => d.created_by === "whatsapp");
+        setLockedCount(waDeals.length);
       }).catch(() => {});
-      fetch("/api/whatsapp").then((r) => r.json()).then((contacts: { lock_count: number; msgs_after_last_lock: number }[]) => {
-        const active = contacts.filter((c) => c.lock_count === 0 || c.msgs_after_last_lock > 0);
-        setWhatsappCount(active.length);
+      fetch("/api/whatsapp").then((r) => r.json()).then((contacts: { contact_name: string }[]) => {
+        setWhatsappCount(contacts.length);
       }).catch(() => {});
     }
     fetchCounts();
