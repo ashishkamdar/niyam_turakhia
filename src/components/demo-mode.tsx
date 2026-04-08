@@ -1,131 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { DEMO_SCRIPTS } from "@/lib/demo-scripts";
+import { useDemo } from "./demo-engine";
 
 export function DemoMode() {
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [stats, setStats] = useState({ sent: 0, locked: 0, active: 0 });
-  const activeRef = useRef(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progressRef = useRef(new Map<string, number>());
+  const { running, elapsed, stats, start, stop } = useDemo();
 
-  const MAX_DURATION = 10 * 60; // 10 minutes in seconds
-
-  function startDemo() {
-    activeRef.current = true;
-    setRunning(true);
-    setElapsed(0);
-    setStats({ sent: 0, locked: 0, active: 0 });
-    progressRef.current = new Map();
-    DEMO_SCRIPTS.forEach((s) => progressRef.current.set(s.contact_name, 0));
-
-    // Elapsed timer
-    timerRef.current = setInterval(() => {
-      setElapsed((prev) => {
-        if (prev >= MAX_DURATION - 1) {
-          stopDemo();
-          return MAX_DURATION;
-        }
-        return prev + 1;
-      });
-    }, 1000);
-
-    scheduleNext();
-  }
-
-  function stopDemo() {
-    activeRef.current = false;
-    setRunning(false);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (timerRef.current) clearInterval(timerRef.current);
-    timeoutRef.current = null;
-    timerRef.current = null;
-  }
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      activeRef.current = false;
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
-
-  function scheduleNext() {
-    if (!activeRef.current) return;
-
-    const active = DEMO_SCRIPTS.filter((s) => {
-      const progress = progressRef.current.get(s.contact_name) ?? 0;
-      return progress < s.messages.length;
-    });
-
-    if (active.length === 0) {
-      stopDemo();
-      return;
-    }
-
-    // Random delay: 2-6 seconds
-    const delay = Math.floor(Math.random() * 4000) + 2000;
-    timeoutRef.current = setTimeout(async () => {
-      if (!activeRef.current) return;
-
-      // Send 1-2 messages at a time (simulate parallel conversations)
-      const count = Math.random() > 0.6 ? 2 : 1;
-      for (let i = 0; i < count; i++) {
-        const remaining = DEMO_SCRIPTS.filter((s) => {
-          const p = progressRef.current.get(s.contact_name) ?? 0;
-          return p < s.messages.length;
-        });
-        if (remaining.length === 0) break;
-
-        const script = remaining[Math.floor(Math.random() * remaining.length)];
-        const idx = progressRef.current.get(script.contact_name) ?? 0;
-        const msg = script.messages[idx];
-        const isLockMsg = /\block\b/i.test(msg.text);
-
-        try {
-          await fetch("/api/whatsapp", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contact_name: script.contact_name,
-              contact_location: script.contact_location,
-              direction: msg.direction,
-              message: msg.text,
-              ...(isLockMsg && script.locks
-                ? {
-                    metal: script.metal,
-                    purity: script.purity,
-                    quantity_grams: script.quantity_grams,
-                    price_per_oz: script.price_per_oz,
-                    deal_direction: script.contact_location === "hong_kong" ? "sell" : "buy",
-                  }
-                : {}),
-            }),
-          });
-
-          progressRef.current.set(script.contact_name, idx + 1);
-
-          setStats((prev) => ({
-            sent: prev.sent + 1,
-            locked: prev.locked + (isLockMsg && script.locks ? 1 : 0),
-            active: DEMO_SCRIPTS.filter((s) => {
-              const p = progressRef.current.get(s.contact_name) ?? 0;
-              return p > 0 && p < s.messages.length;
-            }).length,
-          }));
-        } catch {
-          // ignore
-        }
-      }
-
-      scheduleNext();
-    }, delay);
-  }
-
+  const MAX_DURATION = 10 * 60;
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
   const timeStr = `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -137,7 +17,7 @@ export function DemoMode() {
   if (!running) {
     return (
       <button
-        onClick={startDemo}
+        onClick={start}
         className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 p-4 text-center shadow-lg shadow-emerald-500/20 transition hover:from-emerald-500 hover:to-emerald-400 active:scale-[0.98]"
       >
         <div className="flex items-center justify-center gap-3">
@@ -164,7 +44,7 @@ export function DemoMode() {
           </div>
         </div>
         <button
-          onClick={stopDemo}
+          onClick={stop}
           className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-500"
         >
           Stop
