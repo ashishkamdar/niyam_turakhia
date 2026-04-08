@@ -26,7 +26,7 @@ export function DemoMode() {
           </svg>
           <div>
             <p className="text-base font-bold text-white">Start Demo</p>
-            <p className="text-[10px] text-emerald-100/70">15 WhatsApp chats &middot; 10 min &middot; live deals</p>
+            <p className="text-[10px] text-emerald-100/70">25 WhatsApp chats &middot; 10 min &middot; live deals</p>
           </div>
         </div>
       </button>

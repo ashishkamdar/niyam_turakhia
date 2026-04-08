@@ -56,11 +56,11 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const delay = Math.floor(Math.random() * 4000) + 2000;
+    const delay = Math.floor(Math.random() * 6000) + 4000; // 4-10 seconds
     timeoutRef.current = setTimeout(async () => {
       if (!activeRef.current) return;
 
-      const count = Math.random() > 0.6 ? 2 : 1;
+      const count = Math.random() > 0.8 ? 2 : 1; // mostly 1 message at a time
       for (let i = 0; i < count; i++) {
         const remaining = DEMO_SCRIPTS.filter((s) => {
           const p = progressRef.current.get(s.contact_name) ?? 0;
