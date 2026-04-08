@@ -5,6 +5,7 @@ import { StatCard } from "@/components/stat-card";
 import { LockedDeals } from "@/components/locked-deals";
 import { DemoMode } from "@/components/demo-mode";
 import { FundsReceived } from "@/components/funds-received";
+import { useDemo } from "@/components/demo-engine";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import type { Deal, Price, MetalSymbol, Delivery, Settlement } from "@/lib/types";
 
@@ -14,11 +15,13 @@ const METAL_MAP: Record<string, MetalSymbol> = { gold: "XAU", silver: "XAG", pla
 const METAL_COLORS: Record<string, string> = { gold: "text-amber-400", silver: "text-gray-300", platinum: "text-blue-300", palladium: "text-purple-300" };
 
 export default function DashboardPage() {
+  const { dealTick } = useDemo();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [prices, setPrices] = useState<Price[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
 
+  // Refetch immediately when dealTick changes (deal locked) + poll every 3s
   useEffect(() => {
     function fetchAll() {
       fetch("/api/deals?limit=2000").then((r) => r.json()).then(setDeals).catch(() => {});
@@ -29,7 +32,7 @@ export default function DashboardPage() {
     fetchAll();
     const poll = setInterval(fetchAll, 3000);
     return () => clearInterval(poll);
-  }, []);
+  }, [dealTick]); // re-run immediately when a deal locks
 
   const today = new Date().toISOString().split("T")[0];
   const todayDeals = deals.filter((d) => d.date.startsWith(today));

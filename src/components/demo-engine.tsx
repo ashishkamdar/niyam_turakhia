@@ -7,6 +7,7 @@ interface DemoState {
   running: boolean;
   elapsed: number;
   stats: { sent: number; locked: number; active: number };
+  dealTick: number; // increments on every new deal — watch this to trigger refresh
   start: () => void;
   stop: () => void;
 }
@@ -15,6 +16,7 @@ const DemoContext = createContext<DemoState>({
   running: false,
   elapsed: 0,
   stats: { sent: 0, locked: 0, active: 0 },
+  dealTick: 0,
   start: () => {},
   stop: () => {},
 });
@@ -29,6 +31,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [stats, setStats] = useState({ sent: 0, locked: 0, active: 0 });
+  const [dealTick, setDealTick] = useState(0);
   const activeRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,14 +109,16 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
             }),
           });
           progressRef.current.set(script.contact_name, idx + 1);
+          const didLock = isLockMsg && script.locks;
           setStats((prev) => ({
             sent: prev.sent + 1,
-            locked: prev.locked + (isLockMsg && script.locks ? 1 : 0),
+            locked: prev.locked + (didLock ? 1 : 0),
             active: DEMO_SCRIPTS.filter((s) => {
               const p = progressRef.current.get(s.contact_name) ?? 0;
               return p > 0 && p < s.messages.length;
             }).length,
           }));
+          if (didLock) setDealTick((prev) => prev + 1);
         } catch {
           // ignore
         }
@@ -160,7 +165,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <DemoContext.Provider value={{ running, elapsed, stats, start: startFn, stop: stopFn }}>
+    <DemoContext.Provider value={{ running, elapsed, stats, dealTick, start: startFn, stop: stopFn }}>
       {children}
     </DemoContext.Provider>
   );
