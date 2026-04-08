@@ -213,6 +213,29 @@ export default function MoneyFlowPage() {
 }
 
 /* ─── Delivery Form ───────────────────────────────────────── */
+const BUYER_DIRECTORY: Record<string, { name: string; type: string }[]> = {
+  bank: [
+    { name: "HSBC Hong Kong", type: "bank" },
+    { name: "Standard Chartered HK", type: "bank" },
+    { name: "Bank of China HK", type: "bank" },
+  ],
+  firm: [
+    { name: "Chang Enterprises", type: "firm" },
+    { name: "Li Wei Trading", type: "firm" },
+    { name: "HK Gold Dealers Ltd", type: "firm" },
+    { name: "Asia Precious Metals Co", type: "firm" },
+  ],
+  individual: [
+    { name: "Mr. Chang", type: "individual" },
+    { name: "Mr. Wong", type: "individual" },
+  ],
+  crypto_exchange: [
+    { name: "Binance HK", type: "crypto_exchange" },
+    { name: "OKX Exchange", type: "crypto_exchange" },
+    { name: "Crypto.com", type: "crypto_exchange" },
+  ],
+};
+
 function DeliveryForm({ onCreated }: { onCreated: () => void }) {
   const [buyerType, setBuyerType] = useState("firm");
   const [buyerName, setBuyerName] = useState("");
@@ -220,6 +243,8 @@ function DeliveryForm({ onCreated }: { onCreated: () => void }) {
   const [weight, setWeight] = useState("");
   const [shippingCost, setShippingCost] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const suggestedBuyers = BUYER_DIRECTORY[buyerType] ?? [];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -256,6 +281,15 @@ function DeliveryForm({ onCreated }: { onCreated: () => void }) {
         <div>
           <label className="block text-xs font-medium text-gray-400">Buyer Name</label>
           <input type="text" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} placeholder="HSBC HK" className={`mt-1 ${inputCls}`} />
+          {suggestedBuyers.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {suggestedBuyers.map((b) => (
+                <button key={b.name} type="button" onClick={() => setBuyerName(b.name)} className={`rounded-full px-2 py-0.5 text-[10px] transition ${buyerName === b.name ? "bg-amber-500/20 text-amber-400" : "bg-white/5 text-gray-400 hover:text-white"}`}>
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-gray-400">Shipping + Insurance Cost (USD)</label>
