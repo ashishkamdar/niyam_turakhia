@@ -30,7 +30,7 @@ export function seedSampleData(): void {
   const insPay = db.prepare("INSERT INTO payments (id,amount,currency,direction,mode,from_location,to_location,linked_deal_id,date) VALUES (?,?,?,?,?,?,?,?,?)");
 
   db.transaction(() => {
-    for (let daysAgo = 2; daysAgo >= 0; daysAgo--) {
+    for (let daysAgo = 3; daysAgo >= 1; daysAgo--) {
       // Small daily price variation per metal (+-0.5%)
       const dayPrices: Record<Metal, number> = {} as Record<Metal, number>;
       for (const m of METALS) {
