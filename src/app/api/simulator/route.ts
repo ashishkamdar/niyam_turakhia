@@ -12,7 +12,9 @@ export async function POST(req: NextRequest) {
     db.prepare("DELETE FROM payments").run();
     db.prepare("DELETE FROM deals").run();
     db.prepare("DELETE FROM prices").run();
-    seedSampleData();
+    // Seeds demo prices only, no sample deals — start from zero
+    const { seedDemoPrices } = await import("@/lib/prices");
+    seedDemoPrices();
     return NextResponse.json({ status: "reset" });
   }
   if (action === "reset-demo") {
