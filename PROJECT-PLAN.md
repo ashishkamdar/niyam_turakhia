@@ -59,7 +59,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Page | Route | Description |
 |------|-------|-------------|
-| **Dashboard** | `/` | Hero profit card (big green/red number), 4 stat cards (Buys, Sales, Stock Value, Unrealized P&L), delivery pipeline summary (preparing/in transit/pending settlements), WhatsApp Locked Deals, recent activity with metal color coding (gold=amber, silver=gray, platinum=blue, palladium=purple) |
+| **Dashboard** | `/` | **Portfolio bar** (total AED value + per-metal stock in hand with low stock warnings below 5kg). **Start Demo button** (seeds 50kg opening stock, runs 25 WhatsApp chats for 10 min with live stats: messages/negotiating/locked). **Hero profit card** (today's realized P&L). **Weekly P&L bar chart** (7-day Recharts). **WhatsApp Deals** section (negotiating count + locked count + deal cards). **4 stat cards** (Buys, Sales, Stock Value, Unrealized P&L). **Funds Received from HK** (HKD/USD/USDT with FX rates to AED + "Transfer to Dubai Account" button → ADCB bank receipt). **Delivery pipeline** (preparing/in transit/pending). **Recent activity** with metal colors. All auto-refreshes every 3 seconds + instant refresh on deal lock via dealTick. |
 | **Stock In Hand** | `/stock` | Per-metal summary cards (total grams, avg cost, market value, unrealized P&L, location badges). Tap any metal → drill-down to individual lots with purchase date, purity, qty, status |
 | **Purchase & Sales** | `/deals` | Two tabs: **Purchase** (metal, purity, qty, rate + refining section auto-shows for impure metals with yield%, wastage, refining cost, effective cost per oz/gram) and **Sale** (always 24K, buyer name, warns if selling at/below avg cost with red confirmation). WhatsApp Locked Deals at top. Recent Purchases (with REFINED badge) and Recent Sales below. |
 | **WhatsApp** | `/whatsapp` | Simulated WhatsApp chat interface with 5 pre-built contacts. Contact list with last message preview. Chat thread with message bubbles. "Start Chats" toggle to simulate negotiations. Lock detection highlights deals in amber. LOCKED badge on contacts |
@@ -96,7 +96,12 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | Stock Detail | `stock-detail.tsx` | Drill-down lot list with status badges (UAE/Refinery/Transit/HK) |
 | Contact List | `contact-list.tsx` | WhatsApp contact list split into Active (top) and Locked Deals (bottom) sections. Lock icons per deal (multiple locks = multiple icons). Contacts move back to Active when new incoming messages arrive after a lock. Outgoing confirmations don't count as new activity. |
 | Chat Thread | `chat-thread.tsx` | Chat bubbles with lock keyword highlighting in amber, manual message input. iOS-safe (16px font prevents Safari auto-zoom). |
-| Locked Deals | `locked-deals.tsx` | Auto-refreshing card showing WhatsApp-captured deals (used on Dashboard + Deals pages) |
+| Locked Deals | `locked-deals.tsx` | "WhatsApp Deals" section — shows negotiating count (blue) + locked count (amber) + deal cards. Auto-refreshes 3s. |
+| Demo Engine | `demo-engine.tsx` | React Context provider. Runs 25 chat scripts globally (survives page navigation). Seeds opening stock. Tracks dealTick for instant dashboard refresh. |
+| Demo Mode | `demo-mode.tsx` | Start/Stop button + live stats panel (messages/negotiating/locked/timer). Uses DemoEngine context. |
+| Demo Indicator | `demo-indicator.tsx` | Floating pill "X locked \| Y live" visible on all pages during demo. |
+| Funds Received | `funds-received.tsx` | Funds from HK grouped by currency (HKD/USD/USDT) with FX rates to AED. "Transfer to Dubai Account" button → ADCB bank receipt with conversion details. |
+| Deal Toast | `deal-toast.tsx` | Slide-in notification on any page when a WhatsApp deal locks. Shows contact, metal, qty, rate. |
 
 #### Library Modules
 
@@ -107,7 +112,8 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | Prices | `prices.ts` | Demo prices (Gold $2,341.5678, Silver $30.2450, Platinum $982.3400, Palladium $1,024.7800). Live fetch via goldapi.io (toggle) |
 | Calculations | `calculations.ts` | Stock summary, weighted avg cost, daily P&L, avg buy cost per metal |
 | Sample Data | `sample-data.ts` | Seeds 3 days of realistic transactions: 10-15 buys/day + 5-8 sells/day with corresponding payments |
-| Chat Scripts | `chat-scripts.ts` | 5 pre-built negotiation scripts (Mr. Chang, Karim & Co., Shah Brothers, Li Wei Trading, Patel Exports) |
+| Chat Scripts | `chat-scripts.ts` | ChatScript interface with buyer_type, payment_currency, delay_seconds |
+| Demo Scripts | `demo-scripts.ts` | 25 contacts: 8 HK sells (Individuals→HKD, Banks→USD, Crypto→USDT), 12 UAE buys (small qty, staggered 2-5 min delay), 3 walk-aways, 2 from original scripts. All profitable. |
 
 #### WhatsApp Chat Simulator
 
@@ -331,12 +337,23 @@ Month 3+:
 ## Phases
 
 ### Phase 1: Demo (COMPLETE)
-- MIS dashboard with realistic demo data + hardcoded prices
+- MIS dashboard with real-time portfolio, profit, stock tracking
 - Live price ticker in header (4 metals, 4 decimal places)
-- Mobile-first design with bottom nav
-- PIN lock screen
-- WhatsApp chat simulator with lock detection
-- Locked deals auto-capture and display
+- Mobile-first design with bottom nav + settings gear + logout
+- PIN lock screen (639263, 365-day cookie session)
+- **Demo Mode:** Start Demo button on dashboard seeds 50kg opening stock per metal, runs 25 WhatsApp chats (8 sells to HK, 12 buys from UAE, 3 walk-aways, 2 already in old scripts). Sells fire first (stock depletes), buys staggered at 2-5 minutes (stock replenishes). Low stock warning (<5kg) with red alert. All deals profitable. 10-minute auto-stop.
+- **Real-time updates:** Dashboard, Stock In Hand, Funds Received all poll every 3 seconds + instant refresh via dealTick context when deals lock
+- WhatsApp chat simulator with lock detection + text parsing for manual messages
+- Locked deals auto-capture with buyer type: Individuals→HKD, Banks→USD, Crypto Exchanges→USDT
+- **Funds Received from HK:** Per-currency cards with FX rates. "Transfer to Dubai Account" button → 2s spinner → ADCB bank receipt showing AED conversion with reference number
+- Purchase form with refining calculations (AED). Sale form with loss warning.
+- Delivery & Payment module (3 tabs: Deliveries, Received, Settlement)
+- Data source selector in Settings (Excel Upload, Live Data Bridge, Scheduled Export, VPN Access — each with pros/cons)
+- Deal toast notifications on any page when deals lock
+- Floating demo indicator ("X locked | Y live") visible on all pages
+- Weekly P&L bar chart (Recharts)
+- Nav badges (deal count on Deals tab, contact count on Chats tab)
+- **Reset All Data:** Clears everything to zero (0 positions, 0 deals). Start Demo seeds opening stock.
 - Deployed at https://nt.areakpi.in
 
 ### Phase 2: Real WhatsApp Integration (NEXT)
@@ -440,17 +457,38 @@ Bot: "Locked. 1 Kg 24K Gold at USD 2340.5000."
 - He needs time to sit with his pain (weekly reports, no visibility) before seeing the solution
 - Anticipation makes the demo more impressive
 
-### Demo Flow (5-7 minutes, then STOP)
+### Demo Flow (8-10 minutes)
 
-1. **PIN pad** → "This is secured, only you can access it"
-2. **Dashboard** → "This is your daily MIS — live, right now"
-3. **Price ticker** → "London Fix prices, real-time. Gold, Silver, Platinum, Palladium"
-4. **Stock In Hand** → "Your entire inventory across UAE and HK. Tap gold to see every lot"
-5. **WhatsApp tab** → Start Chats → "Watch — your staff is negotiating deals on WhatsApp"
-6. **Lock happens** → "See? Mr. Chang just locked 10kg gold. Deal captured automatically. Zero manual entry."
-7. **Back to Dashboard** → "The locked deal is already here on your main screen"
-8. **Money Flow** → "All your currencies — USD, Dirham, HKD, USDT — one view"
-9. **STOP.** Don't oversell. Let him ask questions.
+**Before Niyam arrives:**
+1. Settings → Reset All Data (everything goes to zero)
+2. Back to Dashboard — confirm 0 positions, $0 profit, empty
+
+**When ready:**
+1. **PIN pad** → "This is secured, only you can access it" (639263)
+2. **Dashboard** → "This is your MIS. Right now it's empty — let me start the day."
+3. **Tap Start Demo** → Stock appears (50kg each metal). "You start the day with this inventory."
+4. **Watch the dashboard** → "Your staff is on WhatsApp negotiating with buyers in Hong Kong."
+   - WhatsApp Deals section shows: "3 negotiating" → "1 locked" → numbers grow
+   - Today's Profit ticks up with each sale
+   - Stock In Hand goes DOWN as sells happen
+   - Toast notifications slide in: "Deal Locked — Mr. Chang, 10kg Gold"
+5. **Scroll down** → "Funds are coming in — HK Dollars from individuals, US Dollars from banks, USDT from crypto exchanges."
+   - Funds Received section shows growing HKD/USD/USDT amounts with FX rates
+6. **Tap Transfer to Dubai Account** → Spinner → ADCB bank receipt: "AED 5.9M received. That's your money in your bank."
+7. **Stock drops low** → "See? Platinum is at 3kg — that's low. Your staff is already buying to replenish."
+   - Red LOW warning appears, then buy deals start locking
+8. **Go to Stock In Hand tab** → "Tap Gold — see every lot, purchase price, where it is"
+9. **Go to WhatsApp tab** → "Here are all the conversations. See the negotiations happening."
+10. **Go to Purchase & Sales** → "Your staff can also enter deals manually here. Refining costs calculated."
+11. **STOP.** Let him ask questions.
+
+**Key moments to point out:**
+- Stock going down with sells, up with buys (real-time)
+- Low stock warning appearing
+- Toast notifications on any page
+- Funds building up in 3 currencies
+- The ADCB bank receipt (money in his bank)
+- Everything updates without refreshing — live data
 
 ### What NOT To Do In The Demo
 - Don't explain the technology (Next.js, SQLite, etc.) — he doesn't care
@@ -591,12 +629,18 @@ niyam turakhia gold/
     │   ├── stock-detail.tsx        (lot drill-down with status badges)
     │   ├── contact-list.tsx        (WhatsApp contacts with LOCKED badge)
     │   ├── chat-thread.tsx         (chat bubbles + lock highlighting + input)
-    │   └── locked-deals.tsx        (auto-refreshing WhatsApp deal cards)
+    │   ├── locked-deals.tsx        (WhatsApp Deals section: negotiating + locked)
+    │   ├── demo-engine.tsx        (React Context: global demo simulator engine)
+    │   ├── demo-mode.tsx          (Start/Stop button + stats panel)
+    │   ├── demo-indicator.tsx     (floating "X locked | Y live" pill)
+    │   ├── funds-received.tsx     (HK funds by currency + Transfer to Dubai button + ADCB receipt)
+    │   └── deal-toast.tsx         (slide-in lock notification on any page)
     └── lib/
         ├── types.ts                (Deal, Payment, Price, WhatsAppMessage, WhatsAppContact, constants)
         ├── db.ts                   (SQLite singleton, schema init, migrations)
         ├── prices.ts               (demo prices + goldapi.io live fetch)
         ├── calculations.ts         (stock summary, P&L, weighted avg cost)
         ├── sample-data.ts          (3-day seeder: deals + payments)
-        └── chat-scripts.ts         (5 negotiation scripts for WhatsApp simulator)
+        ├── chat-scripts.ts         (ChatScript interface + original 5 scripts)
+        └── demo-scripts.ts         (25 demo contacts with buyer types, payment currencies, staggered delays)
 ```
