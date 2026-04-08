@@ -116,13 +116,16 @@ export default function DashboardPage() {
           </div>
         </div>
         {metalHoldings.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+          <div className="mt-2">
+          <p className="mb-1 text-[9px] font-medium uppercase tracking-wider text-gray-500">Stock In Hand</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
             {metalHoldings.map((m) => (
               <span key={m.metal} className="text-xs">
                 <span className={`font-medium capitalize ${m.color}`}>{m.metal}</span>
                 <span className="text-gray-400"> {m.grams >= 1000 ? `${(m.grams / 1000).toFixed(2)}kg` : `${m.grams.toFixed(0)}g`}</span>
               </span>
             ))}
+          </div>
           </div>
         )}
       </div>
