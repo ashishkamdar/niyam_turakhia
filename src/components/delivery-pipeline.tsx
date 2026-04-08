@@ -42,11 +42,12 @@ export function DeliveryPipeline() {
         })
         .catch(() => {});
 
-      // Get buy deals = seller payments (all buys with contact names — not just today)
+      // Get today's buy deals = seller payments (only today — opening stock already paid)
       fetch("/api/deals?direction=buy&limit=200")
         .then((r) => r.json())
         .then((deals: (Deal & { contact_name: string })[]) => {
-          const buysWithNames = deals.filter((d) => d.contact_name);
+          const today = new Date().toISOString().split("T")[0];
+          const buysWithNames = deals.filter((d) => d.contact_name && d.date.startsWith(today));
           const sellerMap = new Map<string, { metal: string; amount: number }>();
           for (const d of buysWithNames) {
             const existing = sellerMap.get(d.contact_name) ?? { metal: d.metal, amount: 0 };

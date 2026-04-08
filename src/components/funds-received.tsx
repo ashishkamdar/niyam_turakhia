@@ -110,10 +110,13 @@ export function FundsReceived() {
     try {
       const res = await fetch("/api/deals?direction=buy&limit=200");
       const deals: (Deal & { contact_name: string })[] = await res.json();
+      const today = new Date().toISOString().split("T")[0];
       const sellerMap = new Map<string, { metal: string; amount: number }>();
       for (const d of deals) {
         const name = d.contact_name;
-        if (!name) continue; // skip deals with no seller name
+        if (!name) continue;
+        // Only today's purchases — opening stock was already paid for
+        if (!d.date.startsWith(today)) continue;
         const existing = sellerMap.get(name) ?? { metal: d.metal, amount: 0 };
         const costUsd = (d.pure_equivalent_grams / 31.1035) * d.price_per_oz;
         existing.amount += costUsd * AED_PER_USD;
