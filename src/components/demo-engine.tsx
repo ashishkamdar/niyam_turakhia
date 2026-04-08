@@ -56,19 +56,29 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const delay = Math.floor(Math.random() * 6000) + 4000; // 4-10 seconds
+    const delay = Math.floor(Math.random() * 2000) + 3000; // 3-5 seconds
     timeoutRef.current = setTimeout(async () => {
       if (!activeRef.current) return;
 
-      const count = Math.random() > 0.8 ? 2 : 1; // mostly 1 message at a time
+      const count = Math.random() > 0.3 ? 2 : 3; // 2-3 messages at a time across different contacts
+      const alreadyPicked = new Set<string>();
       for (let i = 0; i < count; i++) {
         const remaining = DEMO_SCRIPTS.filter((s) => {
           const p = progressRef.current.get(s.contact_name) ?? 0;
-          return p < s.messages.length;
+          return p < s.messages.length && !alreadyPicked.has(s.contact_name);
         });
         if (remaining.length === 0) break;
 
-        const script = remaining[Math.floor(Math.random() * remaining.length)];
+        // Prioritize scripts closest to completion (locks happen sooner)
+        remaining.sort((a, b) => {
+          const pctA = (progressRef.current.get(a.contact_name) ?? 0) / a.messages.length;
+          const pctB = (progressRef.current.get(b.contact_name) ?? 0) / b.messages.length;
+          return pctB - pctA;
+        });
+        // Pick from top 3 most-progressed (with some randomness)
+        const topN = remaining.slice(0, Math.min(3, remaining.length));
+        const script = topN[Math.floor(Math.random() * topN.length)];
+        alreadyPicked.add(script.contact_name);
         const idx = progressRef.current.get(script.contact_name) ?? 0;
         const msg = script.messages[idx];
         const isLockMsg = /\block\b/i.test(msg.text);
