@@ -110,10 +110,10 @@ export function FundsReceived() {
     try {
       const res = await fetch("/api/deals?direction=buy&limit=200");
       const deals: (Deal & { contact_name: string })[] = await res.json();
-      const whatsappBuys = deals.filter((d) => d.created_by === "whatsapp" || d.created_by === "simulator");
       const sellerMap = new Map<string, { metal: string; amount: number }>();
-      for (const d of whatsappBuys) {
-        const name = d.contact_name || "Opening Stock";
+      for (const d of deals) {
+        const name = d.contact_name;
+        if (!name) continue; // skip deals with no seller name
         const existing = sellerMap.get(name) ?? { metal: d.metal, amount: 0 };
         const costUsd = (d.pure_equivalent_grams / 31.1035) * d.price_per_oz;
         existing.amount += costUsd * AED_PER_USD;
@@ -122,7 +122,6 @@ export function FundsReceived() {
       }
       const list: SellerPayment[] = Array.from(sellerMap.entries())
         .map(([contact_name, data]) => ({ contact_name, metal: data.metal, amount_aed: data.amount, paid: false }))
-        .filter((s) => s.contact_name !== "Opening Stock")
         .sort((a, b) => b.amount_aed - a.amount_aed);
       setSellers(list);
 

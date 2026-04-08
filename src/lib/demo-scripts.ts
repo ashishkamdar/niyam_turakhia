@@ -121,7 +121,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 3000,
     price_per_oz: 2310.0000,
     locks: true,
-    delay_seconds: 120,
+    delay_seconds: 20,
     messages: [
       { direction: "incoming", text: "Salaam. We have 3 kg of 18K gold scrap. Good quality." },
       { direction: "outgoing", text: "Wa alaikum assalam. What price?" },
@@ -141,7 +141,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 2000,
     price_per_oz: 2325.0000,
     locks: true,
-    delay_seconds: 130,
+    delay_seconds: 35,
     messages: [
       { direction: "incoming", text: "2 kg 24K gold available. Pure LBMA bars." },
       { direction: "outgoing", text: "Price?" },
@@ -159,7 +159,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 5000,
     price_per_oz: 29.5500,
     locks: true,
-    delay_seconds: 140,
+    delay_seconds: 50,
     messages: [
       { direction: "incoming", text: "5 kg silver 999. Need to clear stock." },
       { direction: "outgoing", text: "I can take it at $29.40/oz." },
@@ -177,7 +177,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 1000,
     price_per_oz: 2315.0000,
     locks: true,
-    delay_seconds: 180,
+    delay_seconds: 70,
     messages: [
       { direction: "incoming", text: "1 kg 22K gold. Souk special. Clean." },
       { direction: "outgoing", text: "$2,310/oz?" },
@@ -195,7 +195,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 1000,
     price_per_oz: 968.0000,
     locks: true,
-    delay_seconds: 190,
+    delay_seconds: 80,
     messages: [
       { direction: "incoming", text: "1 kg platinum 999 from recycling. Available now." },
       { direction: "outgoing", text: "$965/oz for recycled platinum." },
@@ -213,7 +213,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 500,
     price_per_oz: 1008.0000,
     locks: true,
-    delay_seconds: 200,
+    delay_seconds: 90,
     messages: [
       { direction: "incoming", text: "500 gm palladium. Urgent sale." },
       { direction: "outgoing", text: "$1,005/oz for urgent." },
@@ -231,7 +231,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 2000,
     price_per_oz: 2305.0000,
     locks: true,
-    delay_seconds: 240,
+    delay_seconds: 120,
     messages: [
       { direction: "incoming", text: "2 kg of 20K gold. Factory surplus." },
       { direction: "outgoing", text: "$2,300/oz for 20K?" },
@@ -305,7 +305,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 3000,
     price_per_oz: 2308.0000,
     locks: true,
-    delay_seconds: 250,
+    delay_seconds: 130,
     messages: [
       { direction: "incoming", text: "We have 3 kg of 18K jewelry scrap. Melted and ready." },
       { direction: "outgoing", text: "18K scrap — $2,300/oz?" },
@@ -342,7 +342,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 2000,
     price_per_oz: 2322.0000,
     locks: true,
-    delay_seconds: 260,
+    delay_seconds: 140,
     messages: [
       { direction: "incoming", text: "2 kg 24K gold bars. Bahrain certified. Good price." },
       { direction: "outgoing", text: "$2,318/oz for 2 kg 24K." },
@@ -379,7 +379,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 5000,
     price_per_oz: 29.4500,
     locks: true,
-    delay_seconds: 300,
+    delay_seconds: 180,
     messages: [
       { direction: "incoming", text: "5 kg silver 999. Surplus from our factory." },
       { direction: "outgoing", text: "$29.30/oz for factory surplus." },
@@ -416,7 +416,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 1000,
     price_per_oz: 966.0000,
     locks: true,
-    delay_seconds: 310,
+    delay_seconds: 190,
     messages: [
       { direction: "incoming", text: "1 kg platinum 999. Recycled from catalytic converters." },
       { direction: "outgoing", text: "$963/oz for recycled platinum." },
@@ -434,7 +434,7 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 1500,
     price_per_oz: 2312.0000,
     locks: true,
-    delay_seconds: 320,
+    delay_seconds: 200,
     messages: [
       { direction: "incoming", text: "1.5 kg 22K gold. Wedding season surplus." },
       { direction: "outgoing", text: "$2,308/oz for 22K." },

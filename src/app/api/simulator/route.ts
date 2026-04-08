@@ -4,10 +4,10 @@ import { seedSampleData } from "@/lib/sample-data";
 import { v4 as uuid } from "uuid";
 
 const OPENING_STOCK = [
-  { metal: "gold", price_per_oz: 2320.0000, qty: 50000 },
-  { metal: "silver", price_per_oz: 29.50, qty: 50000 },
-  { metal: "platinum", price_per_oz: 965.00, qty: 50000 },
-  { metal: "palladium", price_per_oz: 1005.00, qty: 50000 },
+  { metal: "gold", price_per_oz: 2320.0000, qty: 50000, seller: "Al Maktoum Gold Trading" },
+  { metal: "silver", price_per_oz: 29.50, qty: 50000, seller: "Dubai Silver Souk LLC" },
+  { metal: "platinum", price_per_oz: 965.00, qty: 50000, seller: "Gulf Platinum Refinery" },
+  { metal: "palladium", price_per_oz: 1005.00, qty: 50000, seller: "Arabian Metals Group" },
 ];
 
 export async function POST(req: NextRequest) {
@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const dateStr = yesterday.toISOString();
-      const ins = db.prepare("INSERT INTO deals (id, metal, purity, is_pure, quantity_grams, pure_equivalent_grams, price_per_oz, refining_cost_per_gram, total_cost_usd, direction, location, status, date, created_by, contact_name) VALUES (?,?,?,1,?,?,?,0,0,'buy','uae','in_hk',?,'simulator','Opening Stock')");
+      const ins = db.prepare("INSERT INTO deals (id, metal, purity, is_pure, quantity_grams, pure_equivalent_grams, price_per_oz, refining_cost_per_gram, total_cost_usd, direction, location, status, date, created_by, contact_name) VALUES (?,?,?,1,?,?,?,0,0,'buy','uae','in_hk',?,'simulator',?)");
       for (const s of OPENING_STOCK) {
-        ins.run(uuid(), s.metal, "24K", s.qty, s.qty, s.price_per_oz, dateStr);
+        ins.run(uuid(), s.metal, "24K", s.qty, s.qty, s.price_per_oz, dateStr, s.seller);
       }
     }
     return NextResponse.json({ status: "demo-reset" });
