@@ -83,55 +83,60 @@ export function FundsReceived() {
     return () => clearInterval(poll);
   }, []);
 
-  // Fetch UAE sellers (buy deals) for payoff
-  function loadSellers() {
-    fetch("/api/deals?direction=buy&limit=200")
-      .then((r) => r.json())
-      .then((deals: (Deal & { contact_name: string })[]) => {
-        const whatsappBuys = deals.filter((d) => d.created_by === "whatsapp" || d.created_by === "simulator");
-        const sellerMap = new Map<string, { metal: string; amount: number }>();
-        for (const d of whatsappBuys) {
-          const name = d.contact_name || "Opening Stock";
-          const existing = sellerMap.get(name) ?? { metal: d.metal, amount: 0 };
-          const costUsd = (d.pure_equivalent_grams / 31.1035) * d.price_per_oz;
-          existing.amount += costUsd * AED_PER_USD;
-          if (d.metal !== existing.metal) existing.metal = "multiple";
-          sellerMap.set(name, existing);
-        }
-        const list: SellerPayment[] = Array.from(sellerMap.entries())
-          .map(([contact_name, data]) => ({ contact_name, metal: data.metal, amount_aed: data.amount, paid: false }))
-          .filter((s) => s.contact_name !== "Opening Stock")
-          .sort((a, b) => b.amount_aed - a.amount_aed);
-        setSellers(list);
-      })
-      .catch(() => {});
-  }
-
   function handleRemit() {
     setView("remitting");
     setTimeout(() => setView("bank"), 2000);
   }
 
-  function handlePayOff() {
-    loadSellers();
+  async function handlePayOff() {
+    setView("paying");
     setBankBalance(totalAed);
     setCurrentSellerIdx(-1);
-    setView("paying");
-    // Start paying one by one after a short delay
-    setTimeout(() => payNextSeller(0), 1000);
+
+    // Fetch sellers and wait for data before starting animation
+    try {
+      const res = await fetch("/api/deals?direction=buy&limit=200");
+      const deals: (Deal & { contact_name: string })[] = await res.json();
+      const whatsappBuys = deals.filter((d) => d.created_by === "whatsapp" || d.created_by === "simulator");
+      const sellerMap = new Map<string, { metal: string; amount: number }>();
+      for (const d of whatsappBuys) {
+        const name = d.contact_name || "Opening Stock";
+        const existing = sellerMap.get(name) ?? { metal: d.metal, amount: 0 };
+        const costUsd = (d.pure_equivalent_grams / 31.1035) * d.price_per_oz;
+        existing.amount += costUsd * AED_PER_USD;
+        if (d.metal !== existing.metal) existing.metal = "multiple";
+        sellerMap.set(name, existing);
+      }
+      const list: SellerPayment[] = Array.from(sellerMap.entries())
+        .map(([contact_name, data]) => ({ contact_name, metal: data.metal, amount_aed: data.amount, paid: false }))
+        .filter((s) => s.contact_name !== "Opening Stock")
+        .sort((a, b) => b.amount_aed - a.amount_aed);
+      setSellers(list);
+
+      // Start animation after sellers are loaded
+      setTimeout(() => payNextSeller(0, list), 1000);
+    } catch {
+      setView("bank");
+    }
   }
 
-  function payNextSeller(idx: number) {
+  function payNextSeller(idx: number, sellerList?: SellerPayment[]) {
     setSellers((prev) => {
-      if (idx >= prev.length) {
-        setView("complete");
-        return prev;
+      const list = sellerList ?? prev;
+      if (idx >= list.length) {
+        setTimeout(() => setView("complete"), 500);
+        return list;
       }
-      const updated = [...prev];
-      updated[idx] = { ...updated[idx], paid: true };
-      setBankBalance((bal) => bal - updated[idx].amount_aed);
+      const updated = [...list];
+      // Mark all up to idx as paid (in case sellerList was passed fresh)
+      for (let i = 0; i <= idx; i++) {
+        updated[i] = { ...updated[i], paid: true };
+      }
+      setBankBalance((bal) => {
+        const newBal = bal - updated[idx].amount_aed;
+        return newBal;
+      });
       setCurrentSellerIdx(idx);
-      // Schedule next payment
       payTimerRef.current = setTimeout(() => payNextSeller(idx + 1), 1200);
       return updated;
     });
