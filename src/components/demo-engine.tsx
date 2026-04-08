@@ -70,11 +70,11 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const delay = Math.floor(Math.random() * 2000) + 3000; // 3-5 seconds
+    const delay = Math.floor(Math.random() * 1500) + 2000; // 2-3.5 seconds
     timeoutRef.current = setTimeout(async () => {
       if (!activeRef.current) return;
 
-      const count = Math.random() > 0.3 ? 2 : 3; // 2-3 messages at a time across different contacts
+      const count = Math.random() > 0.4 ? 3 : 2; // mostly 3 messages at a time
       const alreadyPicked = new Set<string>();
       for (let i = 0; i < count; i++) {
         const remaining = DEMO_SCRIPTS.filter((s) => {

@@ -56,15 +56,34 @@ export default function DashboardPage() {
     realizedPnl += ((sell.pure_equivalent_grams / GRAMS_PER_OZ) * sell.price_per_oz) - ((sell.pure_equivalent_grams / GRAMS_PER_OZ) * avgBuyCostPerOz);
   }
 
-  // Unrealized P&L
-  const unsold = deals.filter((d) => d.direction === "buy" && d.status !== "sold");
+  // Stock = total bought grams - total sold grams per metal
+  const allSells = deals.filter((d) => d.direction === "sell");
+  const allBuyDeals = deals.filter((d) => d.direction === "buy");
+  const netStockByMetal = new Map<string, { grams: number; cost: number }>();
+  for (const d of allBuyDeals) {
+    const existing = netStockByMetal.get(d.metal) ?? { grams: 0, cost: 0 };
+    existing.grams += d.pure_equivalent_grams;
+    existing.cost += (d.pure_equivalent_grams / GRAMS_PER_OZ) * d.price_per_oz;
+    netStockByMetal.set(d.metal, existing);
+  }
+  for (const d of allSells) {
+    const existing = netStockByMetal.get(d.metal) ?? { grams: 0, cost: 0 };
+    existing.grams -= d.pure_equivalent_grams;
+    netStockByMetal.set(d.metal, existing);
+  }
+
   let stockValue = 0, stockCost = 0;
-  for (const d of unsold) {
-    const mkt = priceMap.get(METAL_MAP[d.metal]) ?? d.price_per_oz;
-    stockValue += (d.pure_equivalent_grams / GRAMS_PER_OZ) * mkt;
-    stockCost += (d.pure_equivalent_grams / GRAMS_PER_OZ) * d.price_per_oz;
+  for (const [metal, data] of netStockByMetal) {
+    if (data.grams <= 0) continue;
+    const mkt = priceMap.get(METAL_MAP[metal]) ?? 0;
+    stockValue += (data.grams / GRAMS_PER_OZ) * mkt;
+    // Scale cost proportionally to remaining stock
+    const totalBoughtGrams = allBuyDeals.filter((d) => d.metal === metal).reduce((s, d) => s + d.pure_equivalent_grams, 0);
+    const costRatio = totalBoughtGrams > 0 ? data.grams / totalBoughtGrams : 0;
+    stockCost += data.cost * costRatio;
   }
   const unrealizedPnl = stockValue - stockCost;
+  const unsold = allBuyDeals; // For position count display
   const totalBuyGrams = todayBuys.reduce((s, d) => s + d.quantity_grams, 0);
   const totalSellGrams = todaySells.reduce((s, d) => s + d.quantity_grams, 0);
 
@@ -82,13 +101,14 @@ export default function DashboardPage() {
   const pendingSettlements = settlements.filter((s) => s.status === "pending").length;
   const unsettledAmount = settlements.filter((s) => s.status === "pending").reduce((s, d) => s + d.amount_received, 0);
 
-  // Portfolio totals per metal
+  // Portfolio totals per metal (net: buys - sells)
   const metalHoldings: { metal: string; grams: number; color: string }[] = [];
   for (const m of ["gold", "silver", "platinum", "palladium"] as const) {
-    const grams = unsold.filter((d) => d.metal === m).reduce((s, d) => s + d.pure_equivalent_grams, 0);
-    if (grams > 0) metalHoldings.push({ metal: m, grams, color: METAL_COLORS[m] });
+    const netGrams = netStockByMetal.get(m)?.grams ?? 0;
+    if (netGrams > 0) metalHoldings.push({ metal: m, grams: netGrams, color: METAL_COLORS[m] });
   }
   const portfolioAed = stockValue * AED_PER_USD;
+  const netPositionCount = metalHoldings.length;
 
   // Last 7 days P&L chart
   const weeklyData = useMemo(() => {
@@ -123,7 +143,7 @@ export default function DashboardPage() {
             <p className="text-xl font-bold text-amber-400">{fmtAed(portfolioAed)}</p>
           </div>
           <div className="text-right text-xs text-gray-400">
-            <p>{unsold.length} positions</p>
+            <p>{metalHoldings.length} metals</p>
           </div>
         </div>
         {metalHoldings.length > 0 && (
@@ -202,7 +222,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard label="Today's Buys" value={fmt(totalBuyValue)} sublabel={`${todayBuys.length} deals | ${fmtG(totalBuyGrams)}`} />
         <StatCard label="Today's Sales" value={fmt(totalSellRevenue)} sublabel={`${todaySells.length} deals | ${fmtG(totalSellGrams)}`} />
-        <StatCard label="Stock Value" value={fmt(stockValue)} sublabel={`${unsold.length} positions`} />
+        <StatCard label="Stock Value" value={fmt(stockValue)} sublabel={`${metalHoldings.length} metals`} />
         <StatCard label="Unrealized P&L" value={fmt(unrealizedPnl)} change={unrealizedPnl >= 0 ? `+${fmt(unrealizedPnl)}` : fmt(unrealizedPnl)} changeType={unrealizedPnl >= 0 ? "positive" : "negative"} sublabel="vs avg cost" />
       </div>
 

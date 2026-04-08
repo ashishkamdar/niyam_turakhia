@@ -23,18 +23,23 @@ export default function StockPage() {
   }, []);
 
   const priceMap = new Map(prices.map((p) => [p.metal, p.price_usd]));
-  const unsold = deals.filter((d) => d.direction === "buy" && d.status !== "sold");
+  const allBuys = deals.filter((d) => d.direction === "buy");
+  const allSells = deals.filter((d) => d.direction === "sell");
   const metals: Metal[] = ["gold", "silver", "platinum", "palladium"];
 
   const stockData = metals.map((metal) => {
-    const lots = unsold.filter((d) => d.metal === metal);
-    const totalGrams = lots.reduce((s, d) => s + d.pure_equivalent_grams, 0);
+    const lots = allBuys.filter((d) => d.metal === metal);
+    const soldGrams = allSells.filter((d) => d.metal === metal).reduce((s, d) => s + d.pure_equivalent_grams, 0);
+    const boughtGrams = lots.reduce((s, d) => s + d.pure_equivalent_grams, 0);
+    const totalGrams = Math.max(0, boughtGrams - soldGrams);
     let totalCost = 0;
     for (const d of lots) totalCost += (d.pure_equivalent_grams / GRAMS_PER_OZ) * d.price_per_oz;
-    const avgCostPerOz = totalGrams > 0 ? totalCost / (totalGrams / GRAMS_PER_OZ) : 0;
+    const costRatio = boughtGrams > 0 ? totalGrams / boughtGrams : 0;
+    const scaledCost = totalCost * costRatio;
+    const avgCostPerOz = totalGrams > 0 ? scaledCost / (totalGrams / GRAMS_PER_OZ) : 0;
     const marketPrice = priceMap.get(METAL_SYMBOLS[metal]) ?? 0;
     const marketValue = (totalGrams / GRAMS_PER_OZ) * marketPrice;
-    const unrealizedPnl = marketValue - totalCost;
+    const unrealizedPnl = marketValue - scaledCost;
     const byStatus = (s: string) => lots.filter((d) => d.status === s).reduce((sum, d) => sum + d.pure_equivalent_grams, 0);
 
     return { metal, totalGrams, avgCostPerOz, marketPrice, marketValue, unrealizedPnl, inUae: byStatus("locked") + byStatus("pending"), inRefinery: byStatus("in_refinery"), inTransit: byStatus("in_transit"), inHk: byStatus("in_hk"), lots };
