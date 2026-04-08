@@ -5,6 +5,7 @@ import { StatCard } from "@/components/stat-card";
 import { LockedDeals } from "@/components/locked-deals";
 import { DemoMode } from "@/components/demo-mode";
 import { FundsReceived } from "@/components/funds-received";
+import { DeliveryPipeline } from "@/components/delivery-pipeline";
 import { useDemo } from "@/components/demo-engine";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import type { Deal, Price, MetalSymbol, Delivery, Settlement } from "@/lib/types";
@@ -204,6 +205,8 @@ export default function DashboardPage() {
         <StatCard label="Stock Value" value={fmt(stockValue)} sublabel={`${unsold.length} positions`} />
         <StatCard label="Unrealized P&L" value={fmt(unrealizedPnl)} change={unrealizedPnl >= 0 ? `+${fmt(unrealizedPnl)}` : fmt(unrealizedPnl)} changeType={unrealizedPnl >= 0 ? "positive" : "negative"} sublabel="vs avg cost" />
       </div>
+
+      <DeliveryPipeline />
 
       <FundsReceived />
 
