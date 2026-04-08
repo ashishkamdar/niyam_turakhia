@@ -179,6 +179,8 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <LockedDeals />
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard label="Today's Buys" value={fmt(totalBuyValue)} sublabel={`${todayBuys.length} deals | ${fmtG(totalBuyGrams)}`} />
@@ -186,8 +188,6 @@ export default function DashboardPage() {
         <StatCard label="Stock Value" value={fmt(stockValue)} sublabel={`${unsold.length} positions`} />
         <StatCard label="Unrealized P&L" value={fmt(unrealizedPnl)} change={unrealizedPnl >= 0 ? `+${fmt(unrealizedPnl)}` : fmt(unrealizedPnl)} changeType={unrealizedPnl >= 0 ? "positive" : "negative"} sublabel="vs avg cost" />
       </div>
-
-      <LockedDeals />
 
       {/* Delivery & Settlement pipeline */}
       {(inTransit > 0 || preparing > 0 || pendingSettlements > 0) && (
