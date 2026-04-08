@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { StatCard } from "@/components/stat-card";
 import { LockedDeals } from "@/components/locked-deals";
+import { DemoMode } from "@/components/demo-mode";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import type { Deal, Price, MetalSymbol, Delivery, Settlement } from "@/lib/types";
 
@@ -134,6 +135,8 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      <DemoMode />
 
       {/* Hero profit card */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 p-5 outline outline-1 outline-white/10">
