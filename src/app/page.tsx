@@ -71,9 +71,12 @@ export default function DashboardPage() {
   const pendingSettlements = settlements.filter((s) => s.status === "pending").length;
   const unsettledAmount = settlements.filter((s) => s.status === "pending").reduce((s, d) => s + d.amount_received, 0);
 
-  // Portfolio totals
-  const totalStockGrams = unsold.reduce((s, d) => s + d.pure_equivalent_grams, 0);
-  const metalCount = new Set(unsold.map((d) => d.metal)).size;
+  // Portfolio totals per metal
+  const metalHoldings: { metal: string; grams: number; color: string }[] = [];
+  for (const m of ["gold", "silver", "platinum", "palladium"] as const) {
+    const grams = unsold.filter((d) => d.metal === m).reduce((s, d) => s + d.pure_equivalent_grams, 0);
+    if (grams > 0) metalHoldings.push({ metal: m, grams, color: METAL_COLORS[m] });
+  }
   const portfolioAed = stockValue * AED_PER_USD;
 
   // Last 7 days P&L chart
@@ -102,15 +105,26 @@ export default function DashboardPage() {
   return (
     <div className="space-y-4">
       {/* Portfolio summary bar */}
-      <div className="flex items-center justify-between rounded-lg bg-gradient-to-r from-amber-900/20 to-amber-800/10 px-4 py-3 outline outline-1 outline-amber-500/20">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-amber-400/70">Total Portfolio</p>
-          <p className="text-xl font-bold text-amber-400">{fmtAed(portfolioAed)}</p>
+      <div className="rounded-lg bg-gradient-to-r from-amber-900/20 to-amber-800/10 px-4 py-3 outline outline-1 outline-amber-500/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-amber-400/70">Total Portfolio</p>
+            <p className="text-xl font-bold text-amber-400">{fmtAed(portfolioAed)}</p>
+          </div>
+          <div className="text-right text-xs text-gray-400">
+            <p>{unsold.length} positions</p>
+          </div>
         </div>
-        <div className="text-right text-xs text-gray-400">
-          <p>{metalCount} metals &middot; {unsold.length} positions</p>
-          <p>{fmtKg(totalStockGrams)} pure metal</p>
-        </div>
+        {metalHoldings.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {metalHoldings.map((m) => (
+              <span key={m.metal} className="text-xs">
+                <span className={`font-medium capitalize ${m.color}`}>{m.metal}</span>
+                <span className="text-gray-400"> {m.grams >= 1000 ? `${(m.grams / 1000).toFixed(2)}kg` : `${m.grams.toFixed(0)}g`}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Hero profit card */}
