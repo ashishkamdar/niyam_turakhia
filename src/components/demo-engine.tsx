@@ -33,6 +33,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [stats, setStats] = useState({ sent: 0, locked: 0, active: 0 });
   const [dealTick, setDealTick] = useState(0);
   const activeRef = useRef(false);
+  const elapsedRef = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef = useRef(new Map<string, number>());
@@ -49,13 +50,23 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const scheduleNext = useCallback(() => {
     if (!activeRef.current) return;
 
-    const active = DEMO_SCRIPTS.filter((s) => {
+    const currentElapsed = elapsedRef.current;
+    const allRemaining = DEMO_SCRIPTS.filter((s) => {
       const p = progressRef.current.get(s.contact_name) ?? 0;
       return p < s.messages.length;
     });
 
-    if (active.length === 0) {
+    if (allRemaining.length === 0) {
       stopFn();
+      return;
+    }
+
+    // Only include scripts whose delay has elapsed
+    const active = allRemaining.filter((s) => currentElapsed >= (s.delay_seconds ?? 0));
+
+    if (active.length === 0) {
+      // Scripts remaining but not ready yet — wait and retry
+      scheduleNext();
       return;
     }
 
@@ -68,7 +79,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       for (let i = 0; i < count; i++) {
         const remaining = DEMO_SCRIPTS.filter((s) => {
           const p = progressRef.current.get(s.contact_name) ?? 0;
-          return p < s.messages.length && !alreadyPicked.has(s.contact_name);
+          return p < s.messages.length && !alreadyPicked.has(s.contact_name) && currentElapsed >= (s.delay_seconds ?? 0);
         });
         if (remaining.length === 0) break;
 
@@ -138,11 +149,13 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       activeRef.current = true;
       setRunning(true);
       setElapsed(0);
+      elapsedRef.current = 0;
       setStats({ sent: 0, locked: 0, active: 0 });
       progressRef.current = new Map();
       DEMO_SCRIPTS.forEach((s) => progressRef.current.set(s.contact_name, 0));
 
       timerRef.current = setInterval(() => {
+        elapsedRef.current += 1;
         setElapsed((prev) => {
           if (prev >= MAX_DURATION - 1) {
             stopFn();

@@ -10,6 +10,7 @@ export interface ChatScript {
   locks: boolean;
   buyer_type?: "individual" | "bank" | "crypto_exchange";
   payment_currency?: "HKD" | "USD" | "USDT";
+  delay_seconds?: number; // seconds to wait before starting this script
   messages: { direction: "incoming" | "outgoing"; text: string }[];
 }
 
