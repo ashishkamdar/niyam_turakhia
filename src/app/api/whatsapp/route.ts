@@ -100,6 +100,31 @@ export async function POST(req: NextRequest) {
         direction, location, timestamp, body.contact_name
       );
       linkedDealId = dealId;
+
+      // For sell deals, create a payment received record
+      if (direction === "sell") {
+        const paymentCurrency = body.payment_currency ?? "USD";
+        const revenueUsd = (pureEquiv / 31.1035) * pricePerOz;
+        const HKD_RATE = 7.82;
+        const paymentAmount = paymentCurrency === "HKD" ? revenueUsd * HKD_RATE : revenueUsd;
+        const mode = paymentCurrency === "USDT" ? "crypto_exchange" : paymentCurrency === "HKD" ? "local_dealer" : "bank";
+        const buyerType = body.buyer_type ?? "firm";
+
+        db.prepare(`
+          INSERT INTO payments (id, amount, currency, direction, mode, from_location, to_location, linked_deal_id, date)
+          VALUES (?, ?, ?, 'received', ?, 'hong_kong', 'uae', ?, ?)
+        `).run(uuid(), paymentAmount, paymentCurrency, mode, dealId, timestamp);
+
+        // Also create a settlement record as pending
+        db.prepare(`
+          INSERT INTO settlements (id, linked_delivery_id, amount_received, currency_received, payment_method, amount_sent_to_dubai, currency_sent, channel, seller_paid, seller_amount, status, date)
+          VALUES (?, ?, ?, ?, ?, 0, 'AED', '', '', 0, 'pending', ?)
+        `).run(
+          uuid(), null, paymentAmount, paymentCurrency,
+          buyerType === "bank" ? "Wire transfer (SWIFT)" : buyerType === "crypto_exchange" ? "Crypto transfer" : "Local bank transfer / Cash",
+          timestamp
+        );
+      }
     }
   }
 

@@ -8,6 +8,8 @@ export interface ChatScript {
   quantity_grams: number;
   price_per_oz: number;
   locks: boolean;
+  buyer_type?: "individual" | "bank" | "crypto_exchange";
+  payment_currency?: "HKD" | "USD" | "USDT";
   messages: { direction: "incoming" | "outgoing"; text: string }[];
 }
 

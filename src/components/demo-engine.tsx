@@ -89,6 +89,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
                     quantity_grams: script.quantity_grams,
                     price_per_oz: script.price_per_oz,
                     deal_direction: script.contact_location === "hong_kong" ? "sell" : "buy",
+                    buyer_type: script.buyer_type,
+                    payment_currency: script.payment_currency,
                   }
                 : {}),
             }),

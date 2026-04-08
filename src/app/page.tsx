@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { StatCard } from "@/components/stat-card";
 import { LockedDeals } from "@/components/locked-deals";
 import { DemoMode } from "@/components/demo-mode";
+import { FundsReceived } from "@/components/funds-received";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import type { Deal, Price, MetalSymbol, Delivery, Settlement } from "@/lib/types";
 
@@ -191,6 +192,8 @@ export default function DashboardPage() {
         <StatCard label="Stock Value" value={fmt(stockValue)} sublabel={`${unsold.length} positions`} />
         <StatCard label="Unrealized P&L" value={fmt(unrealizedPnl)} change={unrealizedPnl >= 0 ? `+${fmt(unrealizedPnl)}` : fmt(unrealizedPnl)} changeType={unrealizedPnl >= 0 ? "positive" : "negative"} sublabel="vs avg cost" />
       </div>
+
+      <FundsReceived />
 
       {/* Delivery & Settlement pipeline */}
       {(inTransit > 0 || preparing > 0 || pendingSettlements > 0) && (

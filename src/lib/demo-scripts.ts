@@ -19,6 +19,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 10000,
     price_per_oz: 2358.5000,
     locks: true,
+    buyer_type: "individual",
+    payment_currency: "HKD",
     messages: [
       { direction: "incoming", text: "Good morning. I need 10 kg of 24K gold. What's your best price today?" },
       { direction: "outgoing", text: "Good morning Mr. Chang. For 10 kg 24K, I can do $2,362.00/oz." },
@@ -40,6 +42,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 25000,
     price_per_oz: 2355.0000,
     locks: true,
+    buyer_type: "bank",
+    payment_currency: "USD",
     messages: [
       { direction: "incoming", text: "We need 25 kg 24K gold bars for our vault. Standard LBMA good delivery." },
       { direction: "outgoing", text: "25 kg available. $2,357/oz, delivery within 48 hours." },
@@ -57,6 +61,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 100000,
     price_per_oz: 30.6200,
     locks: true,
+    buyer_type: "individual",
+    payment_currency: "HKD",
     messages: [
       { direction: "incoming", text: "We need 100 kg of 999 silver. Large order. Best price?" },
       { direction: "outgoing", text: "100 kg silver 999. $30.75/oz for this volume." },
@@ -76,6 +82,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 5000,
     price_per_oz: 990.5000,
     locks: true,
+    buyer_type: "crypto_exchange",
+    payment_currency: "USDT",
     messages: [
       { direction: "incoming", text: "5 kg platinum 999 for our reserves. Price?" },
       { direction: "outgoing", text: "$992/oz for 5 kg platinum." },
@@ -93,6 +101,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 3000,
     price_per_oz: 1032.0000,
     locks: true,
+    buyer_type: "individual",
+    payment_currency: "HKD",
     messages: [
       { direction: "incoming", text: "3 kg palladium 999 available? Industrial client needs it urgently." },
       { direction: "outgoing", text: "Available. $1,035/oz for urgent delivery." },
@@ -267,6 +277,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 20000,
     price_per_oz: 2356.0000,
     locks: true,
+    buyer_type: "bank",
+    payment_currency: "USD",
     messages: [
       { direction: "incoming", text: "Good afternoon. We require 20 kg 24K gold LBMA bars for our custody vault." },
       { direction: "outgoing", text: "20 kg available. $2,360/oz with 48hr delivery." },
@@ -301,6 +313,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 75000,
     price_per_oz: 30.5800,
     locks: true,
+    buyer_type: "crypto_exchange",
+    payment_currency: "USDT",
     messages: [
       { direction: "incoming", text: "75 kg silver 999 for our physical backing reserve. USDT payment." },
       { direction: "outgoing", text: "$30.65/oz for 75 kg. USDT accepted." },
@@ -335,6 +349,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 8000,
     price_per_oz: 991.5000,
     locks: true,
+    buyer_type: "individual",
+    payment_currency: "HKD",
     messages: [
       { direction: "incoming", text: "We need 8 kg of 999 platinum for industrial client." },
       { direction: "outgoing", text: "$994/oz for 8 kg." },
@@ -369,6 +385,8 @@ export const DEMO_SCRIPTS: ChatScript[] = [
     quantity_grams: 6000,
     price_per_oz: 2354.0000,
     locks: true,
+    buyer_type: "individual",
+    payment_currency: "HKD",
     messages: [
       { direction: "incoming", text: "Hi, this is Mr. Chang's son. We need 6 kg 24K for our retail business." },
       { direction: "outgoing", text: "Hello! For Chang family, $2,358/oz." },
