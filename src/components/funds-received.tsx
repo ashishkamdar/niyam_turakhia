@@ -9,6 +9,12 @@ interface PaymentSummary {
   mode: string;
 }
 
+const FX_RATES: Record<string, { rate: number; label: string }> = {
+  HKD: { rate: 0.4697, label: "1 HKD = 0.4697 AED" },
+  USD: { rate: 3.6725, label: "1 USD = 3.6725 AED" },
+  USDT: { rate: 3.6700, label: "1 USDT = 3.6700 AED" },
+};
+
 const CURRENCY_CONFIG: Record<string, { color: string; bgColor: string; icon: string; label: string; source: string }> = {
   HKD: {
     color: "text-blue-400",
@@ -34,12 +40,17 @@ const CURRENCY_CONFIG: Record<string, { color: string; bgColor: string; icon: st
 };
 
 const fmt = (n: number, curr: string) => {
-  const pre = curr === "HKD" ? "HK$" : curr === "USDT" ? "USDT " : "$";
+  const pre = curr === "HKD" ? "HK$" : curr === "USDT" ? "USDT " : curr === "AED" ? "AED " : "$";
   return pre + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 };
 
+const fmtAed = (n: number) => "AED " + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
 export function FundsReceived() {
   const [payments, setPayments] = useState<PaymentSummary[]>([]);
+  const [remitted, setRemitted] = useState(false);
+  const [remitting, setRemitting] = useState(false);
+  const [totalAed, setTotalAed] = useState(0);
 
   useEffect(() => {
     function fetchPayments() {
@@ -54,12 +65,19 @@ export function FundsReceived() {
             existing.count += 1;
             byCurrency.set(p.currency, existing);
           }
-          setPayments(
-            Array.from(byCurrency.entries())
-              .map(([currency, data]) => ({ currency, ...data }))
-              .filter((p) => ["HKD", "USD", "USDT"].includes(p.currency))
-              .sort((a, b) => b.total - a.total)
-          );
+          const result = Array.from(byCurrency.entries())
+            .map(([currency, data]) => ({ currency, ...data }))
+            .filter((p) => ["HKD", "USD", "USDT"].includes(p.currency))
+            .sort((a, b) => b.total - a.total);
+          setPayments(result);
+
+          // Calculate total AED
+          let aed = 0;
+          for (const p of result) {
+            const fx = FX_RATES[p.currency];
+            if (fx) aed += p.total * fx.rate;
+          }
+          setTotalAed(aed);
         })
         .catch(() => {});
     }
@@ -68,12 +86,87 @@ export function FundsReceived() {
     return () => clearInterval(poll);
   }, []);
 
+  function handleRemit() {
+    setRemitting(true);
+    setTimeout(() => {
+      setRemitting(false);
+      setRemitted(true);
+    }, 2000);
+  }
+
   if (payments.length === 0) return null;
 
   const totalUsd = payments.reduce((s, p) => {
     if (p.currency === "HKD") return s + p.total / 7.82;
     return s + p.total;
   }, 0);
+
+  // Bank receipt view after remit
+  if (remitted) {
+    return (
+      <div className="space-y-3">
+        <div className="overflow-hidden rounded-xl bg-gradient-to-br from-[#1a365d] via-[#1e3a5f] to-[#1a365d] p-5 outline outline-1 outline-blue-400/20">
+          {/* Bank header */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-white/10">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-6 text-blue-300">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">ADCB</p>
+                <p className="text-[10px] text-blue-300/70">Abu Dhabi Commercial Bank</p>
+              </div>
+            </div>
+            <div className="rounded-full bg-emerald-500/20 px-2.5 py-1">
+              <p className="text-[10px] font-bold text-emerald-400">RECEIVED</p>
+            </div>
+          </div>
+
+          {/* Amount */}
+          <div className="py-5 text-center">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-blue-300/50">Amount Credited</p>
+            <p className="mt-1 text-3xl font-bold text-white">{fmtAed(totalAed)}</p>
+            <p className="mt-1 text-xs text-blue-300/70">~${totalUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} equivalent</p>
+          </div>
+
+          {/* Conversion details */}
+          <div className="space-y-2 border-t border-white/10 pt-3">
+            <p className="text-[9px] font-medium uppercase tracking-wider text-blue-300/50">Conversion Details</p>
+            {payments.map((p) => {
+              const fx = FX_RATES[p.currency];
+              if (!fx) return null;
+              const aed = p.total * fx.rate;
+              return (
+                <div key={p.currency} className="flex items-center justify-between text-xs">
+                  <span className="text-blue-200/70">{fmt(p.total, p.currency)}</span>
+                  <span className="text-[10px] text-blue-300/40">{fx.label}</span>
+                  <span className="font-medium text-white">{fmtAed(aed)}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="mt-4 border-t border-white/10 pt-3">
+            <div className="flex items-center justify-between text-[10px] text-blue-300/50">
+              <span>Ref: ADCB-{Date.now().toString(36).toUpperCase()}</span>
+              <span>{new Date().toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+            <p className="mt-1 text-[9px] text-blue-300/30">Account: Niyam Turakhia Trading LLC — ADCB Dubai</p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setRemitted(false)}
+          className="w-full rounded-lg bg-gray-800 py-2 text-xs font-medium text-gray-400 hover:text-white"
+        >
+          Back to funds view
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -93,7 +186,9 @@ export function FundsReceived() {
       <div className="space-y-2">
         {payments.map((p) => {
           const config = CURRENCY_CONFIG[p.currency];
-          if (!config) return null;
+          const fx = FX_RATES[p.currency];
+          if (!config || !fx) return null;
+          const aed = p.total * fx.rate;
           return (
             <div key={p.currency} className={`rounded-lg ${config.bgColor} p-3`}>
               <div className="flex items-center justify-between">
@@ -110,13 +205,37 @@ export function FundsReceived() {
                 </div>
                 <div className="text-right">
                   <p className={`text-base font-bold ${config.color}`}>{fmt(p.total, p.currency)}</p>
-                  <p className="text-[9px] text-gray-500">ready to transfer</p>
+                  <p className="text-[9px] text-gray-500">{fmtAed(aed)} &middot; {fx.label}</p>
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Remit button */}
+      <button
+        onClick={handleRemit}
+        disabled={remitting}
+        className="w-full rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 p-4 text-center shadow-lg shadow-blue-500/10 transition hover:from-blue-600 hover:to-blue-500 active:scale-[0.98] disabled:opacity-70"
+      >
+        {remitting ? (
+          <div className="flex items-center justify-center gap-3">
+            <div className="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            <span className="text-sm font-semibold text-white">Transferring to ADCB Dubai...</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-5 text-white">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
+            </svg>
+            <div>
+              <p className="text-sm font-bold text-white">Transfer to Dubai Account</p>
+              <p className="text-[10px] text-blue-200/70">{fmtAed(totalAed)} to ADCB Bank</p>
+            </div>
+          </div>
+        )}
+      </button>
     </div>
   );
 }
