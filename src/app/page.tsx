@@ -128,13 +128,22 @@ export default function DashboardPage() {
         {metalHoldings.length > 0 && (
           <div className="mt-2">
           <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-amber-400/70">Stock In Hand</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {metalHoldings.map((m) => (
-              <span key={m.metal} className="text-xs">
-                <span className={`font-medium capitalize ${m.color}`}>{m.metal}</span>
-                <span className="text-gray-400"> {m.grams >= 1000 ? `${(m.grams / 1000).toFixed(2)}kg` : `${m.grams.toFixed(0)}g`}</span>
-              </span>
-            ))}
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {metalHoldings.map((m) => {
+              const isLow = m.grams < 5000;
+              return (
+                <span key={m.metal} className={`flex items-center gap-1 text-xs ${isLow ? "rounded-full bg-rose-500/15 px-2 py-0.5" : ""}`}>
+                  {isLow && (
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="size-3 text-rose-400">
+                      <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  <span className={`font-medium capitalize ${isLow ? "text-rose-400" : m.color}`}>{m.metal}</span>
+                  <span className={isLow ? "text-rose-300" : "text-gray-400"}>{m.grams >= 1000 ? `${(m.grams / 1000).toFixed(2)}kg` : `${m.grams.toFixed(0)}g`}</span>
+                  {isLow && <span className="text-[9px] text-rose-400/70">LOW</span>}
+                </span>
+              );
+            })}
           </div>
           </div>
         )}
