@@ -13,8 +13,13 @@ export default function StockPage() {
   const [selectedMetal, setSelectedMetal] = useState<Metal | null>(null);
 
   useEffect(() => {
-    fetch("/api/deals?limit=1000").then((r) => r.json()).then(setDeals);
-    fetch("/api/prices").then((r) => r.json()).then(setPrices);
+    function fetchAll() {
+      fetch("/api/deals?limit=1000").then((r) => r.json()).then(setDeals).catch(() => {});
+      fetch("/api/prices").then((r) => r.json()).then(setPrices).catch(() => {});
+    }
+    fetchAll();
+    const poll = setInterval(fetchAll, 5000);
+    return () => clearInterval(poll);
   }, []);
 
   const priceMap = new Map(prices.map((p) => [p.metal, p.price_usd]));

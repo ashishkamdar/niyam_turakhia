@@ -18,10 +18,15 @@ export default function DashboardPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
 
   useEffect(() => {
-    fetch("/api/deals?limit=2000").then((r) => r.json()).then(setDeals);
-    fetch("/api/prices").then((r) => r.json()).then(setPrices);
-    fetch("/api/deliveries?limit=100").then((r) => r.json()).then(setDeliveries).catch(() => {});
-    fetch("/api/settlements?limit=100").then((r) => r.json()).then(setSettlements).catch(() => {});
+    function fetchAll() {
+      fetch("/api/deals?limit=2000").then((r) => r.json()).then(setDeals).catch(() => {});
+      fetch("/api/prices").then((r) => r.json()).then(setPrices).catch(() => {});
+      fetch("/api/deliveries?limit=100").then((r) => r.json()).then(setDeliveries).catch(() => {});
+      fetch("/api/settlements?limit=100").then((r) => r.json()).then(setSettlements).catch(() => {});
+    }
+    fetchAll();
+    const poll = setInterval(fetchAll, 5000);
+    return () => clearInterval(poll);
   }, []);
 
   const today = new Date().toISOString().split("T")[0];
