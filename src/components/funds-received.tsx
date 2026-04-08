@@ -83,9 +83,22 @@ export function FundsReceived() {
     return () => clearInterval(poll);
   }, []);
 
+  const [remitStep, setRemitStep] = useState(0);
+
   function handleRemit() {
     setView("remitting");
-    setTimeout(() => setView("bank"), 2000);
+    setRemitStep(0);
+    // Animate through each currency conversion
+    const currencies = payments.map((p) => p.currency);
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      setRemitStep(step);
+      if (step > currencies.length) {
+        clearInterval(interval);
+        setTimeout(() => setView("bank"), 500);
+      }
+    }, 1200);
   }
 
   async function handlePayOff() {
@@ -334,13 +347,75 @@ export function FundsReceived() {
     );
   }
 
-  // ─── REMITTING: Spinner ───
+  // ─── REMITTING: Currency conversion animation ───
   if (view === "remitting") {
+    let runningAed = 0;
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl bg-gray-900 py-12 outline outline-1 outline-white/10">
-        <div className="size-10 animate-spin rounded-full border-3 border-blue-400 border-t-transparent" />
-        <p className="mt-4 text-sm font-semibold text-white">Transferring to ADCB Dubai...</p>
-        <p className="mt-1 text-xs text-gray-400">{fmtAed(totalAed)}</p>
+      <div className="overflow-hidden rounded-xl bg-gradient-to-br from-[#1a365d] via-[#1e3a5f] to-[#1a365d] p-5 outline outline-1 outline-blue-400/20">
+        <div className="flex items-center gap-2.5 border-b border-white/10 pb-3">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-white/10">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-6 text-blue-300">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white">ADCB</p>
+            <p className="text-[10px] text-blue-300/70">Converting & Transferring...</p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {payments.map((p, i) => {
+            const fx = FX_RATES[p.currency];
+            if (!fx) return null;
+            const aed = p.total * fx.rate;
+            const isDone = remitStep > i;
+            const isActive = remitStep === i;
+            if (isDone) runningAed += aed;
+            const config = CURRENCY_CONFIG[p.currency];
+
+            return (
+              <div key={p.currency} className={`rounded-lg p-3 transition-all duration-500 ${isDone ? "bg-emerald-500/10" : isActive ? "bg-blue-500/10" : "bg-white/5"}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isDone ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="size-5 text-emerald-400">
+                        <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" />
+                      </svg>
+                    ) : isActive ? (
+                      <div className="size-5 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                    ) : (
+                      <div className="size-5 rounded-full border border-gray-600" />
+                    )}
+                    <span className={`text-sm font-semibold ${config?.color ?? "text-white"}`}>{config?.label ?? p.currency}</span>
+                  </div>
+                  <span className={`text-xs ${isDone ? "text-emerald-400" : "text-gray-500"}`}>{isDone ? "Converted" : isActive ? "Converting..." : "Pending"}</span>
+                </div>
+                {(isDone || isActive) && (
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-blue-200/70">{fmt(p.total, p.currency)}</span>
+                    <span className="text-gray-500">&rarr;</span>
+                    <span className="text-[10px] text-blue-300/40">{fx.label}</span>
+                    <span className="text-gray-500">&rarr;</span>
+                    <span className={`font-semibold ${isDone ? "text-emerald-400" : "text-blue-300"}`}>{fmtAed(aed)}</span>
+                  </div>
+                )}
+                {isActive && (
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full animate-pulse rounded-full bg-blue-400" style={{ width: "70%" }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Running total */}
+        <div className="mt-4 border-t border-white/10 pt-3 text-center">
+          <p className="text-[10px] text-blue-300/50">Credited so far</p>
+          <p className="text-2xl font-bold text-white">{fmtAed(runningAed)}</p>
+          <p className="text-[10px] text-blue-300/40">of {fmtAed(totalAed)}</p>
+        </div>
       </div>
     );
   }
