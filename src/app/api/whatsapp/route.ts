@@ -91,13 +91,15 @@ export async function POST(req: NextRequest) {
       const direction = dealDirection ?? "buy";
       const location = body.contact_location === "hong_kong" ? "hong_kong" : "uae";
 
+      const status = direction === "sell" ? "sold" : "locked";
+
       db.prepare(`
         INSERT INTO deals (id, metal, purity, is_pure, quantity_grams, pure_equivalent_grams, price_per_oz, direction, location, status, date, created_by, contact_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'locked', ?, 'whatsapp', ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'whatsapp', ?)
       `).run(
         dealId, metal, purity, isPure ? 1 : 0,
         quantityGrams, pureEquiv, pricePerOz,
-        direction, location, timestamp, body.contact_name
+        direction, location, status, timestamp, body.contact_name
       );
       linkedDealId = dealId;
 
