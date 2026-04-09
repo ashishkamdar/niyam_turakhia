@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { StatCard } from "@/components/stat-card";
+import { useDemo } from "@/components/demo-engine";
 import type { Deal, Metal } from "@/lib/types";
 
 const GRAMS_PER_OZ = 31.1035;
@@ -21,9 +22,15 @@ function getDateRange(period: Period) {
 }
 
 export default function ReportsPage() {
+  const { dealTick } = useDemo();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [period, setPeriod] = useState<Period>("daily");
-  useEffect(() => { fetch("/api/deals?limit=2000").then((r) => r.json()).then(setDeals); }, []);
+  useEffect(() => {
+    function fetchDeals() { fetch("/api/deals?limit=2000").then((r) => r.json()).then(setDeals).catch(() => {}); }
+    fetchDeals();
+    const poll = setInterval(fetchDeals, 3000);
+    return () => clearInterval(poll);
+  }, [dealTick]);
 
   const { start, end, label } = getDateRange(period);
   const filtered = deals.filter((d) => d.date >= start && d.date <= end);

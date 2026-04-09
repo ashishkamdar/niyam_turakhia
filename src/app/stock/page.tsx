@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { StockDetail } from "@/components/stock-detail";
+import { useDemo } from "@/components/demo-engine";
 import type { Deal, Price, Metal, MetalSymbol } from "@/lib/types";
 
 const GRAMS_PER_OZ = 31.1035;
 const METAL_SYMBOLS: Record<string, MetalSymbol> = { gold: "XAU", silver: "XAG", platinum: "XPT", palladium: "XPD" };
 
 export default function StockPage() {
+  const { dealTick } = useDemo();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [prices, setPrices] = useState<Price[]>([]);
   const [selectedMetal, setSelectedMetal] = useState<Metal | null>(null);
@@ -20,7 +22,7 @@ export default function StockPage() {
     fetchAll();
     const poll = setInterval(fetchAll, 3000);
     return () => clearInterval(poll);
-  }, []);
+  }, [dealTick]);
 
   const priceMap = new Map(prices.map((p) => [p.metal, p.price_usd]));
   const allBuys = deals.filter((d) => d.direction === "buy");
@@ -64,16 +66,21 @@ export default function StockPage() {
         <p className="text-sm text-gray-400">Current positions. Tap a row to see individual lots.</p>
       </div>
       <div className="space-y-3">
-        {stockData.map((s) => (
-          <button key={s.metal} onClick={() => setSelectedMetal(s.metal)} className="w-full rounded-lg bg-gray-900 p-4 text-left outline outline-1 outline-white/10 transition hover:bg-gray-800/80">
+        {stockData.filter((s) => s.totalGrams > 0).map((s) => {
+          const isLow = s.totalGrams < 5000;
+          return (
+          <button key={s.metal} onClick={() => setSelectedMetal(s.metal)} className={`w-full rounded-lg bg-gray-900 p-4 text-left outline outline-1 transition hover:bg-gray-800/80 ${isLow ? "outline-rose-500/30" : "outline-white/10"}`}>
             <div className="flex items-center justify-between">
-              <span className="text-base font-semibold capitalize text-white">{s.metal}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold capitalize text-white">{s.metal}</span>
+                {isLow && <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold text-rose-400">LOW STOCK</span>}
+              </div>
               <span className={`text-sm font-semibold ${s.unrealizedPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                 {s.unrealizedPnl >= 0 ? "+" : ""}{fmt(s.unrealizedPnl)}
               </span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
-              <div><span className="text-gray-500">Total</span><p className="font-medium text-gray-200">{s.totalGrams.toFixed(0)}g</p></div>
+              <div><span className="text-gray-500">Total</span><p className={`font-medium ${isLow ? "text-rose-300" : "text-gray-200"}`}>{s.totalGrams >= 1000 ? (s.totalGrams / 1000).toFixed(2) + "kg" : s.totalGrams.toFixed(0) + "g"}</p></div>
               <div><span className="text-gray-500">Avg Cost</span><p className="font-medium text-gray-200">${s.avgCostPerOz.toFixed(2)}/oz</p></div>
               <div><span className="text-gray-500">Market</span><p className="font-medium text-gray-200">${s.marketPrice.toFixed(2)}/oz</p></div>
               <div><span className="text-gray-500">Value</span><p className="font-medium text-gray-200">{fmt(s.marketValue)}</p></div>
@@ -85,7 +92,8 @@ export default function StockPage() {
               {s.inHk > 0 && <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] text-blue-400">HK {s.inHk.toFixed(0)}g</span>}
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

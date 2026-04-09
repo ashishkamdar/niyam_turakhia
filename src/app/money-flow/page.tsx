@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { StatCard } from "@/components/stat-card";
+import { useDemo } from "@/components/demo-engine";
 import type { Delivery, Settlement, Payment, Currency } from "@/lib/types";
 
 type Tab = "deliveries" | "payments" | "settlement";
@@ -52,13 +53,19 @@ export default function MoneyFlowPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [showForm, setShowForm] = useState(false);
 
+  const { dealTick } = useDemo();
+
   const load = useCallback(() => {
     fetch("/api/deliveries?limit=200").then((r) => r.json()).then(setDeliveries).catch(() => {});
     fetch("/api/settlements?limit=200").then((r) => r.json()).then(setSettlements).catch(() => {});
     fetch("/api/payments?limit=200").then((r) => r.json()).then(setPayments).catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const poll = setInterval(load, 3000);
+    return () => clearInterval(poll);
+  }, [load, dealTick]);
 
   const inTransit = deliveries.filter((d) => d.status === "in_transit").length;
   const preparing = deliveries.filter((d) => d.status === "preparing").length;

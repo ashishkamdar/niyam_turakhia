@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { PurchaseForm } from "@/components/purchase-form";
 import { SaleForm } from "@/components/sale-form";
 import { LockedDeals } from "@/components/locked-deals";
+import { useDemo } from "@/components/demo-engine";
 import type { Deal } from "@/lib/types";
 
 const METAL_COLORS: Record<string, string> = { gold: "text-amber-400", silver: "text-gray-300", platinum: "text-blue-300", palladium: "text-purple-300" };
@@ -11,10 +12,15 @@ const METAL_COLORS: Record<string, string> = { gold: "text-amber-400", silver: "
 type Tab = "purchase" | "sale";
 
 export default function DealsPage() {
+  const { dealTick } = useDemo();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [tab, setTab] = useState<Tab>("purchase");
-  const loadDeals = useCallback(() => { fetch("/api/deals?limit=200").then((r) => r.json()).then(setDeals); }, []);
-  useEffect(() => { loadDeals(); }, [loadDeals]);
+  const loadDeals = useCallback(() => { fetch("/api/deals?limit=200").then((r) => r.json()).then(setDeals).catch(() => {}); }, []);
+  useEffect(() => {
+    loadDeals();
+    const poll = setInterval(loadDeals, 3000);
+    return () => clearInterval(poll);
+  }, [loadDeals, dealTick]);
 
   const buys = deals.filter((d) => d.direction === "buy");
   const sells = deals.filter((d) => d.direction === "sell");
