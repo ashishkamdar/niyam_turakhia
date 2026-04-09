@@ -5,7 +5,7 @@
 
 export type ParsedMetal = "gold" | "silver" | "platinum" | "palladium";
 export type ParsedDirection = "buy" | "sell";
-export type ParsedStatus = "locked" | "cancelled" | "working" | "pending";
+export type ParsedStatus = "locked" | "settled" | "cancelled" | "working" | "pending";
 
 export interface ParsedDeal {
   id: string;
@@ -176,7 +176,8 @@ function parseDirection(text: string): ParsedDirection | null {
 function parseStatus(text: string): ParsedStatus | null {
   const t = text.toLowerCase();
   if (/cancel+ed|cancelled/.test(t)) return "cancelled";
-  if (/\blocke?d\b|鎖價/.test(t)) return "locked";
+  if (/\block\b|\blocke?d\b|鎖價|鎖|锁价|please lock|can lock/.test(t)) return "locked";
+  if (/\ball settled\b|\bsettled\b/.test(t)) return "settled";
   if (/\bworking\b/.test(t)) return "working";
   return null;
 }

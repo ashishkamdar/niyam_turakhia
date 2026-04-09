@@ -28,6 +28,7 @@ const METAL_BG: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, string> = {
   locked: "bg-amber-500/20 text-amber-300 border border-amber-500/40",
+  settled: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40",
   cancelled: "bg-gray-500/20 text-gray-400 border border-gray-500/40",
   working: "bg-blue-500/20 text-blue-300 border border-blue-500/40",
   pending: "bg-gray-600/20 text-gray-400 border border-gray-500/30",
@@ -53,6 +54,8 @@ function formatDate(iso: string): string {
 // ---------------------------------------------------------------------------
 function SummaryBar({ deals }: { deals: ParsedDeal[] }) {
   const locked = deals.filter((d) => d.status === "locked").length;
+  const settled = deals.filter((d) => d.status === "settled").length;
+  const working = deals.filter((d) => d.status === "working").length;
   const totalUsdt = deals.reduce((s, d) => s + d.total_usdt, 0);
   const totalGrams = deals.reduce((s, d) => s + d.quantity_grams, 0);
 
@@ -60,7 +63,7 @@ function SummaryBar({ deals }: { deals: ParsedDeal[] }) {
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {[
         { label: "Deals Found", value: String(deals.length), accent: "text-white" },
-        { label: "Locked", value: String(locked), accent: "text-amber-400" },
+        { label: "Locked / Settled", value: `${locked} / ${settled}`, accent: "text-amber-400" },
         { label: "Total Volume", value: formatQuantity(totalGrams), accent: "text-emerald-400" },
         { label: "Total USDT", value: formatUsdt(totalUsdt), accent: "text-sky-400" },
       ].map((s) => (
@@ -281,9 +284,11 @@ export default function BotPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<string>("upload");
-  // Filter state
+  // Filter & sort state
   const [filterMetal, setFilterMetal] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterSource, setFilterSource] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("date-desc");
 
   // Load previously parsed deals on mount
   useEffect(() => {
@@ -335,15 +340,28 @@ export default function BotPage() {
     );
   }
 
-  // Filtered deals
+  // Filtered + sorted deals
   const filtered = deals.filter((d) => {
     if (filterMetal !== "all" && d.metal !== filterMetal) return false;
     if (filterStatus !== "all" && d.status !== filterStatus) return false;
+    if (filterSource !== "all" && d.chat_source !== filterSource) return false;
     return true;
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case "date-asc": return a.date.localeCompare(b.date);
+      case "date-desc": return b.date.localeCompare(a.date);
+      case "metal": return a.metal.localeCompare(b.metal);
+      case "status": return a.status.localeCompare(b.status);
+      case "amount-desc": return b.total_usdt - a.total_usdt;
+      case "amount-asc": return a.total_usdt - b.total_usdt;
+      case "quantity-desc": return b.quantity_grams - a.quantity_grams;
+      default: return b.date.localeCompare(a.date);
+    }
   });
 
   const metals = ["all", ...Array.from(new Set(deals.map((d) => d.metal)))];
   const statuses = ["all", ...Array.from(new Set(deals.map((d) => d.status)))];
+  const sources = ["all", ...Array.from(new Set(deals.map((d) => d.chat_source)))];
 
   return (
     <div className="space-y-6 pb-24 lg:pb-8">
@@ -389,34 +407,35 @@ export default function BotPage() {
           {/* Summary */}
           <SummaryBar deals={deals} />
 
-          {/* Filters */}
+          {/* Filters & Sort */}
           <div className="flex flex-wrap gap-2">
             <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-gray-800/50 px-2 py-1">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wide">Source</span>
+              <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="bg-transparent text-xs text-gray-200 outline-none">
+                {sources.map((s) => <option key={s} value={s} className="bg-gray-900">{s === "all" ? "All sources" : s}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-gray-800/50 px-2 py-1">
               <span className="text-[10px] text-gray-500 uppercase tracking-wide">Metal</span>
-              <select
-                value={filterMetal}
-                onChange={(e) => setFilterMetal(e.target.value)}
-                className="bg-transparent text-xs text-gray-200 outline-none"
-              >
-                {metals.map((m) => (
-                  <option key={m} value={m} className="bg-gray-900">
-                    {m === "all" ? "All metals" : m}
-                  </option>
-                ))}
+              <select value={filterMetal} onChange={(e) => setFilterMetal(e.target.value)} className="bg-transparent text-xs text-gray-200 outline-none">
+                {metals.map((m) => <option key={m} value={m} className="bg-gray-900">{m === "all" ? "All metals" : m}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-gray-800/50 px-2 py-1">
               <span className="text-[10px] text-gray-500 uppercase tracking-wide">Status</span>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-transparent text-xs text-gray-200 outline-none"
-              >
-                {statuses.map((s) => (
-                  <option key={s} value={s} className="bg-gray-900">
-                    {s === "all" ? "All statuses" : s}
-                  </option>
-                ))}
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-transparent text-xs text-gray-200 outline-none">
+                {statuses.map((s) => <option key={s} value={s} className="bg-gray-900">{s === "all" ? "All" : s}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-gray-800/50 px-2 py-1">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wide">Sort</span>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-transparent text-xs text-gray-200 outline-none">
+                <option value="date-desc" className="bg-gray-900">Newest first</option>
+                <option value="date-asc" className="bg-gray-900">Oldest first</option>
+                <option value="metal" className="bg-gray-900">By metal</option>
+                <option value="status" className="bg-gray-900">By status</option>
+                <option value="amount-desc" className="bg-gray-900">Highest USDT</option>
+                <option value="quantity-desc" className="bg-gray-900">Highest quantity</option>
               </select>
             </div>
             <span className="ml-auto self-center text-xs text-gray-500">
