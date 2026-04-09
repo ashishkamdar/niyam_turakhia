@@ -127,6 +127,11 @@ function initSchema(db: Database.Database) {
       raw_messages TEXT DEFAULT '',
       parsed_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS meta_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 }
 
@@ -172,6 +177,11 @@ function runMigrations(db: Database.Database) {
         // Table is created by CREATE TABLE IF NOT EXISTS above.
         // No ALTER needed — this is a new table.
       },
+    },
+    {
+      version: 5,
+      description: "Add meta_config table for WhatsApp Business API",
+      up: () => {},
     },
   ];
 
