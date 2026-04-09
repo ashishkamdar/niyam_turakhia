@@ -380,9 +380,22 @@ Niyam asked to start WhatsApp automation on April 9 (1 hour after demo). He prov
 
 | Phase | Feature | Description | Timeline |
 |-------|---------|-------------|----------|
-| **Bot Phase 1** | Chat Parser | Read WhatsApp text, extract deals, classify buy/sell/locked/cancelled. Bot tab. **Built and tested — 63 real deals extracted.** | Done |
-| **Bot Phase 2** | Image Reader | Read payment screenshots (USDT amounts, wallets, tx IDs), match to deals. Bilingual (EN + CN). | 2-3 weeks |
-| **Bot Phase 3** | Auto-Negotiator | AI replies to buyers, negotiates within price boundaries, locks deals. 24/7. | 4-6 weeks |
+| **Bot Phase 1** | Chat Parser + Bot Tab | Read WhatsApp text, extract deals, classify buy/sell/locked/cancelled/working/settled. Bot tab with filters (source, metal, status, sort). **Built — 63 real deals from Niyam's chats.** | Done |
+| **Bot Phase 2** | WhatsApp Webhook + Image OCR | Meta Cloud API webhook receives real-time messages. Auto deal detection on every message. Image OCR reads payment screenshots (4 providers: Tesseract free, Google Vision 1000 free/month, Claude, GPT-4o-mini). **Built — webhook live, OCR ready.** | Done |
+| **Bot Phase 3** | Live WhatsApp Connection | Connect Niyam's WhatsApp Business number to Meta Cloud API. Messages flow into PrismX in real-time. Deals auto-captured. Payments auto-read from screenshots. **Waiting for Niyam's Meta setup.** | 1-2 days after Meta setup |
+| **Bot Phase 4** | Auto-Negotiator | AI replies to buyers on WhatsApp, negotiates price within Niyam's boundaries, locks deals automatically. 24/7 operation across time zones. | 4-6 weeks |
+
+#### What's Built & Deployed (Bot Infrastructure)
+
+| Component | Status | URL/Details |
+|-----------|--------|-------------|
+| Bot tab | Live | /bot — 63 deals parsed from real chats, filterable by source/metal/status/sort |
+| Webhook endpoint | Live | https://nt.areakpi.in/api/whatsapp/webhook — Meta verification working |
+| Config API | Live | /api/whatsapp/config — stores Meta tokens securely |
+| Image OCR | Ready | 4 providers: Tesseract (free local), Google Vision (1000 free/month), Claude, GPT-4o-mini |
+| Settings UI | Live | Meta WhatsApp config section + OCR provider selector with pros/cons |
+| Chat parser | Tested | 63 deals extracted from 2 real WhatsApp exports |
+| Deal detection | Ready | Runs on every incoming webhook message |
 
 #### Key Findings From Real Chats
 - **15+ participants** across 2 groups. Roles: Dealer, Trader, Calculator (Gusini), Treasury, Logistics.
