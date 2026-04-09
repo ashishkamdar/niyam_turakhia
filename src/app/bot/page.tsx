@@ -7,7 +7,7 @@ import { formatQuantity, formatUsdt } from "@/lib/chat-parser";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type ViewDeal = ParsedDeal & { _expanded?: boolean };
+type ViewDeal = ParsedDeal & { chat_source?: string; _expanded?: boolean };
 
 // ---------------------------------------------------------------------------
 // Helpers
