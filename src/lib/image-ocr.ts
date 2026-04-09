@@ -153,22 +153,60 @@ async function ocrTesseract(imageBuffer: Buffer): Promise<OcrResult> {
 
   try {
     fs.writeFileSync(inputPath, imageBuffer);
-    // execFileSync is safe — arguments are an array, not a shell string
-    execFileSync("tesseract", [inputPath, outputBase, "-l", "eng+chi_sim+chi_tra+ara"], {
-      timeout: 30000,
-      stdio: "pipe",
-    });
-    const text = fs.readFileSync(outputBase + ".txt", "utf8");
+
+    // Try English first (faster, better for numbers and simple text)
+    let text = "";
+    try {
+      execFileSync("tesseract", [inputPath, outputBase, "-l", "eng", "--psm", "6"], {
+        timeout: 15000,
+        stdio: "pipe",
+      });
+      text = fs.readFileSync(outputBase + ".txt", "utf8").trim();
+      try { fs.unlinkSync(outputBase + ".txt"); } catch {}
+    } catch {}
+
+    // If English returned nothing, try multi-language with auto page segmentation
+    if (!text) {
+      try {
+        execFileSync("tesseract", [inputPath, outputBase, "-l", "eng+chi_sim+chi_tra+ara", "--psm", "3"], {
+          timeout: 30000,
+          stdio: "pipe",
+        });
+        text = fs.readFileSync(outputBase + ".txt", "utf8").trim();
+        try { fs.unlinkSync(outputBase + ".txt"); } catch {}
+      } catch {}
+    }
+
+    // Last resort: try with just digits mode
+    if (!text) {
+      try {
+        execFileSync("tesseract", [inputPath, outputBase, "-l", "eng", "--psm", "7", "-c", "tessedit_char_whitelist=0123456789.,$-+USDTHKAEBusdt "], {
+          timeout: 15000,
+          stdio: "pipe",
+        });
+        text = fs.readFileSync(outputBase + ".txt", "utf8").trim();
+        try { fs.unlinkSync(outputBase + ".txt"); } catch {}
+      } catch {}
+    }
+
     try { fs.unlinkSync(inputPath); } catch {}
-    try { fs.unlinkSync(outputBase + ".txt"); } catch {}
-    return parseOcrText(text, "tesseract");
+
+    if (text) {
+      return parseOcrText(text, "tesseract");
+    }
+
+    return {
+      provider: "tesseract",
+      type: "unknown",
+      raw_text: "Could not extract text from this image. The image may be too blurry or low-contrast. Try a clearer screenshot.",
+    };
   } catch {
     try { fs.unlinkSync(inputPath); } catch {}
     try { fs.unlinkSync(outputBase + ".txt"); } catch {}
     return {
       provider: "tesseract",
       type: "unknown",
-      raw_text: "Could not extract text from this image. Try a clearer photo, or select Google Cloud Vision (free, 1000 images/month) for better accuracy.",
+      raw_text: "Image analysis encountered an issue. Please try a different image.",
     };
   }
 }
