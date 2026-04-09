@@ -5,6 +5,103 @@ import type { ParsedDeal } from "@/lib/chat-parser";
 import { formatQuantity, formatUsdt } from "@/lib/chat-parser";
 
 // ---------------------------------------------------------------------------
+// Capabilities roadmap — collapsible
+// ---------------------------------------------------------------------------
+const CAPABILITIES = [
+  {
+    title: "Available Now",
+    badge: "Working",
+    badgeColor: "bg-emerald-500/20 text-emerald-400",
+    items: [
+      "Parse WhatsApp chat exports and extract deals",
+      "Detect metal, quantity, price, premium/discount per deal",
+      "Classify deals: locked, working, settled, cancelled",
+      "Identify participants and counterparties",
+      "Image OCR: read payment screenshots (USDT, wallets, dates)",
+      "Filter & sort by source, metal, status, date, amount",
+      "Multi-language: English, Chinese, Arabic",
+    ],
+  },
+  {
+    title: "With WhatsApp API",
+    badge: "Ready — needs Meta setup",
+    badgeColor: "bg-blue-500/20 text-blue-400",
+    items: [
+      "Real-time message capture — every message appears instantly",
+      "Live deal detection — captured the moment 'lock' is typed",
+      "Live image OCR — payment screenshots read as shared",
+      "Contact directory with deal history",
+      "Instant deal lock notifications on any screen",
+      "Multi-device: see on phone what staff does on WhatsApp Web",
+    ],
+  },
+  {
+    title: "Phase 2",
+    badge: "After go-live",
+    badgeColor: "bg-amber-500/20 text-amber-400",
+    items: [
+      "OroSoft data bridge — full MIS with real ERP data",
+      "Payment matching — screenshots auto-matched to deals",
+      "Deal history & analytics — trends, top counterparties",
+      "Settlement tracking — HK payments remitted vs pending",
+      "Multi-group support — 10+ WhatsApp groups simultaneously",
+    ],
+  },
+  {
+    title: "Phase 3",
+    badge: "Future",
+    badgeColor: "bg-purple-500/20 text-purple-400",
+    items: [
+      "Bot auto-replies — 'Deal noted' confirmations",
+      "AI daily summary sent to your WhatsApp",
+      "AI auto-negotiator within your price boundaries",
+      "Smart alerts — low stock, pending payments, new counterparty",
+      "Voice note transcription — parse deals from audio",
+    ],
+  },
+];
+
+function CapabilitiesSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg bg-gray-900 outline outline-1 outline-white/10">
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-4 py-3 text-left">
+        <div className="flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-4 text-amber-400">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+          <span className="text-sm font-semibold text-white">Bot Capabilities</span>
+          <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">4 PHASES</span>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={`size-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-white/5 px-4 pb-4 pt-3">
+          {CAPABILITIES.map((phase) => (
+            <div key={phase.title} className="rounded-lg bg-white/5 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-semibold text-white">{phase.title}</span>
+                <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${phase.badgeColor}`}>{phase.badge}</span>
+              </div>
+              <ul className="space-y-1">
+                {phase.items.map((item, i) => (
+                  <li key={i} className="flex items-start gap-1.5 text-[11px] text-gray-400">
+                    <span className="mt-0.5 text-[8px]">●</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 type ViewDeal = ParsedDeal & { chat_source?: string; _expanded?: boolean };
@@ -370,6 +467,9 @@ export default function BotPage() {
         <h1 className="text-lg font-semibold text-white">Deal Bot</h1>
         <p className="text-xs text-gray-400">Parse WhatsApp chat exports to extract precious metal deals</p>
       </div>
+
+      {/* Capabilities roadmap — collapsible */}
+      <CapabilitiesSection />
 
       {/* Upload zone */}
       <UploadZone onText={handleChatText} disabled={loading} />
