@@ -69,6 +69,8 @@ export default function SettingsPage() {
   const [metaOpenaiKey, setMetaOpenaiKey] = useState("");
   const [metaOcrProvider, setMetaOcrProvider] = useState("tesseract");
   const [metaSaving, setMetaSaving] = useState(false);
+  const [ocrTesting, setOcrTesting] = useState(false);
+  const [ocrResult, setOcrResult] = useState<{ provider: string; type: string; amount?: number; currency?: string; sender_wallet?: string; receiver_wallet?: string; transaction_id?: string; date?: string; status?: string; weight_grams?: number; bar_count?: number; raw_text: string } | null>(null);
   const [metaSaveStatus, setMetaSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [webhookCopied, setWebhookCopied] = useState(false);
 
@@ -452,6 +454,123 @@ export default function SettingsPage() {
             {metaOcrProvider === "tesseract" && (
               <div className="mt-3 rounded-md bg-emerald-500/5 p-3">
                 <p className="text-xs text-emerald-400">No API key needed. Built-in OCR engine runs directly on the server — completely free, unlimited images, supports English, Chinese, and Arabic.</p>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Test OCR ─── */}
+          <div className="border-t border-white/10 pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-300">Test Image OCR</h3>
+            <p className="mt-1 text-[11px] text-gray-500">Upload a payment screenshot or bar list photo to test the OCR engine. Uses the provider selected above.</p>
+
+            <div className="mt-3">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-white/20 bg-gray-800/30 px-4 py-6 transition hover:border-amber-500/50 hover:bg-gray-800/50">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-8 text-gray-500">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5a2.25 2.25 0 0 0 2.25-2.25V6a2.25 2.25 0 0 0-2.25-2.25H3.75A2.25 2.25 0 0 0 1.5 6v12.75c0 1.243 1.007 2.25 2.25 2.25Z" />
+                </svg>
+                <span className="mt-2 text-xs text-gray-400">{ocrTesting ? "Analyzing..." : "Tap to upload image"}</span>
+                <span className="text-[10px] text-gray-500">JPG, PNG — payment screenshots, bar lists, receipts</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={ocrTesting}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setOcrTesting(true);
+                    setOcrResult(null);
+                    try {
+                      const form = new FormData();
+                      form.append("image", file);
+                      const res = await fetch("/api/ocr-test", { method: "POST", body: form });
+                      const data = await res.json();
+                      setOcrResult(data);
+                    } catch {
+                      setOcrResult({ provider: "error", type: "unknown", raw_text: "Failed to analyze image" });
+                    }
+                    setOcrTesting(false);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
+            {ocrTesting && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-amber-400">
+                <div className="size-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+                Reading image...
+              </div>
+            )}
+
+            {ocrResult && (
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${ocrResult.type === "payment" ? "bg-emerald-500/20 text-emerald-400" : ocrResult.type === "barlist" ? "bg-blue-500/20 text-blue-400" : "bg-gray-500/20 text-gray-400"}`}>
+                    {ocrResult.type.toUpperCase()}
+                  </span>
+                  <span className="text-[10px] text-gray-500">via {ocrResult.provider === "tesseract" ? "Built-in OCR" : ocrResult.provider}</span>
+                </div>
+
+                {/* Structured data */}
+                {(ocrResult.amount || ocrResult.weight_grams) && (
+                  <div className="rounded-lg bg-white/5 p-3 space-y-1.5">
+                    {ocrResult.amount && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Amount</span>
+                        <span className="font-semibold text-emerald-400">{ocrResult.currency} {ocrResult.amount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {ocrResult.sender_wallet && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">From</span>
+                        <span className="font-mono text-[10px] text-gray-300">{ocrResult.sender_wallet.substring(0, 8)}...{ocrResult.sender_wallet.slice(-6)}</span>
+                      </div>
+                    )}
+                    {ocrResult.receiver_wallet && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">To</span>
+                        <span className="font-mono text-[10px] text-gray-300">{ocrResult.receiver_wallet.substring(0, 8)}...{ocrResult.receiver_wallet.slice(-6)}</span>
+                      </div>
+                    )}
+                    {ocrResult.transaction_id && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Tx ID</span>
+                        <span className="font-mono text-[10px] text-gray-300">{ocrResult.transaction_id.substring(0, 12)}...</span>
+                      </div>
+                    )}
+                    {ocrResult.date && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Date</span>
+                        <span className="text-gray-300">{ocrResult.date}</span>
+                      </div>
+                    )}
+                    {ocrResult.status && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Status</span>
+                        <span className={`font-medium ${ocrResult.status === "confirmed" ? "text-emerald-400" : "text-amber-400"}`}>{ocrResult.status}</span>
+                      </div>
+                    )}
+                    {ocrResult.weight_grams && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Weight</span>
+                        <span className="text-gray-300">{ocrResult.weight_grams >= 1000 ? (ocrResult.weight_grams / 1000).toFixed(2) + " kg" : ocrResult.weight_grams + "g"}</span>
+                      </div>
+                    )}
+                    {ocrResult.bar_count && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400">Bars</span>
+                        <span className="text-gray-300">{ocrResult.bar_count} pcs</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Raw text */}
+                <div>
+                  <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Extracted Text</p>
+                  <pre className="mt-1 max-h-40 overflow-y-auto rounded-lg bg-gray-800/50 p-3 text-[11px] text-gray-300 whitespace-pre-wrap break-all">{ocrResult.raw_text || "(no text detected)"}</pre>
+                </div>
               </div>
             )}
           </div>
