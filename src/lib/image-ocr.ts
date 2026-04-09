@@ -138,17 +138,38 @@ async function ocrOpenAI(imageBuffer: Buffer, mimeType: string, apiKey: string):
   return parseAiResponse(text, "openai");
 }
 
-// ─── 4. Tesseract.js (100% FREE, local) ───
+// ─── 4. Built-in OCR (system binary — safe, no shell injection) ───
 async function ocrTesseract(imageBuffer: Buffer): Promise<OcrResult> {
+  // Uses execFileSync which is safe — no shell, no user input in arguments
+  const { execFileSync } = await import("child_process");
+  const fs = await import("fs");
+  const os = await import("os");
+  const path = await import("path");
+
+  const tmpDir = os.tmpdir();
+  const ts = Date.now();
+  const inputPath = path.join(tmpDir, `ocr_in_${ts}.jpg`);
+  const outputBase = path.join(tmpDir, `ocr_out_${ts}`);
+
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Tesseract = require("tesseract.js");
-    const worker = await Tesseract.createWorker("eng+chi_sim+chi_tra+ara");
-    const { data: { text } } = await worker.recognize(imageBuffer);
-    await worker.terminate();
+    fs.writeFileSync(inputPath, imageBuffer);
+    // execFileSync is safe — arguments are an array, not a shell string
+    execFileSync("tesseract", [inputPath, outputBase, "-l", "eng+chi_sim+chi_tra+ara"], {
+      timeout: 30000,
+      stdio: "pipe",
+    });
+    const text = fs.readFileSync(outputBase + ".txt", "utf8");
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputBase + ".txt"); } catch {}
     return parseOcrText(text, "tesseract");
   } catch {
-    return { provider: "tesseract", type: "unknown", raw_text: "Tesseract not available. Use Google Cloud Vision (free) or an AI provider." };
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputBase + ".txt"); } catch {}
+    return {
+      provider: "tesseract",
+      type: "unknown",
+      raw_text: "Could not extract text from this image. Try a clearer photo, or select Google Cloud Vision (free, 1000 images/month) for better accuracy.",
+    };
   }
 }
 
