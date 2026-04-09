@@ -141,17 +141,14 @@ async function ocrOpenAI(imageBuffer: Buffer, mimeType: string, apiKey: string):
 // ─── 4. Tesseract.js (100% FREE, local) ───
 async function ocrTesseract(imageBuffer: Buffer): Promise<OcrResult> {
   try {
-    // Dynamic import — may fail in some build environments
-    const Tesseract = await import(/* webpackIgnore: true */ "tesseract.js");
-    const createWorker = Tesseract.createWorker ?? (Tesseract as { default: typeof Tesseract }).default?.createWorker;
-    if (!createWorker) throw new Error("Tesseract createWorker not found");
-    const worker = await createWorker("eng+chi_sim+chi_tra");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Tesseract = require("tesseract.js");
+    const worker = await Tesseract.createWorker("eng+chi_sim+chi_tra");
     const { data: { text } } = await worker.recognize(imageBuffer);
     await worker.terminate();
     return parseOcrText(text, "tesseract");
   } catch {
-    // Fallback: just use regex on raw buffer (very basic)
-    return { provider: "tesseract", type: "unknown", raw_text: "Tesseract not available in this environment. Use Google Cloud Vision (free) or upload images for AI analysis." };
+    return { provider: "tesseract", type: "unknown", raw_text: "Tesseract not available. Use Google Cloud Vision (free) or an AI provider." };
   }
 }
 
