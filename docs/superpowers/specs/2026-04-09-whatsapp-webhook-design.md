@@ -130,6 +130,42 @@ CREATE TABLE IF NOT EXISTS meta_config (
 
 Migration version 5.
 
+## Image OCR (Part of POC)
+
+When an image is received via webhook:
+
+1. Meta provides a media URL + media ID in the payload
+2. We download the image using the Access Token
+3. Send to **Claude Vision API** (or GPT-4V) for OCR
+4. Extract: USDT amount, wallet addresses, transaction hash, date, payment status
+5. Store the extracted text + structured data in the message record
+6. If it's a payment confirmation → match to a recent deal and mark as "payment received"
+7. Show the extracted text in the WhatsApp tab alongside the image
+
+### Image Types We Handle
+
+| Type | What We Extract |
+|------|----------------|
+| USDT payment screenshot (TronScan) | Amount, sender wallet, receiver wallet, tx hash, date, status (confirmed/pending) |
+| USDT transfer screenshot (Tether app) | Amount, from/to wallet, transaction ID, date |
+| Bar list / weighing photo | Weight in grams, number of bars/pieces |
+| Payment receipt | Amount, currency (HKD/USD), date |
+
+### OCR Approach
+
+Use **Claude API** with vision (claude-sonnet with image input):
+- Send image as base64
+- System prompt: "Extract financial transaction details from this image. Return JSON with: type, amount, currency, sender, receiver, transaction_id, date, status"
+- Cost: ~$0.01-0.03 per image (very cheap)
+- No local OCR library needed — API handles all languages (English + Chinese)
+
+### Display
+
+In the WhatsApp tab, images show with:
+- Thumbnail of the image
+- Extracted text below: "USDT 23,055 | Wallet: TKgN...ZvcB | Confirmed"
+- If matched to a deal: "Payment for Deal #X — 10kg Silver"
+
 ## What Already Works (No Changes Needed)
 
 - WhatsApp tab displays messages from `whatsapp_messages` table — **works**
