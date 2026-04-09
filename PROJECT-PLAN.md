@@ -2,8 +2,12 @@
 
 ## Client
 - **Name:** Niyam Turakhia (Kutchi businessman, Matunga Gymkhana)
+- **Company:** PrismX
 - **Business:** Precious metals dealing (gold, silver, platinum, palladium) — Dubai + Hong Kong operations
+- **HQ:** Dubai (staff connects via FortiGate VPN from Mumbai)
+- **Mumbai office:** Matunga
 - **Contact:** WhatsApp (connected via Ashish's Gymkhana network)
+- **Status:** Demo shown April 9, 2026. Positive response. App link + PIN shared. Dubai visit invited. Awaiting next meeting at Gymkhana.
 
 ## Business Context
 
@@ -446,16 +450,32 @@ Bot: "Locked. 1 Kg 24K Gold at USD 2340.5000."
 ## Demo Strategy & Timing
 
 ### Timeline
-- **2026-04-07 (Monday):** Met Niyam 10:00-11:30 AM at Gymkhana. Demo built same day.
+- **2026-04-07 (Monday):** Met Niyam 10:00-11:30 AM at Gymkhana. Understood his business. Demo built same day.
 - **2026-04-07 evening:** Sent WhatsApp: "Niyam bhai, great meeting today. I understood your business well. My team and I will work on something and get back to you in a few days."
-- **2026-04-09 or 2026-04-10 (Wed/Thu):** SHOW THE DEMO. Don't show earlier — he'll think it was too easy and undervalue the work.
-- **Day after demo:** Send phased proposal (don't quote in the demo meeting).
+- **2026-04-08 (Tuesday):** Niyam confirmed: "Sure". Continued polishing the demo. Rebranded to PrismX (his company name).
+- **2026-04-09 (Wednesday):** Demo at Niyam's Matunga office, Mumbai.
 
-### Why Wait 2-3 Days
+### Demo Outcome (April 9)
+- **Positive.** Niyam was evaluating Ashish as a person more than the software — watching the presenter, not the screen. This is typical for a Kutchi businessman — trust in the person first.
+- **Asked for the app link (nt.areakpi.in) and PIN (639263)** — wants to explore himself or show his Dubai team.
+- **"We will meet at Gymkhana again"** — wants to continue the conversation informally.
+- **Asked if Ashish is ready to come to Dubai** — strong buying signal. Wants to show the actual operation (server, software, staff workflow).
+- **Did NOT discuss pricing** — as planned. Let the app do the talking.
+
+### What Happens Next
+- **Don't chase him.** He has the app. Let him play with it.
+- **Keep nt.areakpi.in live and working** — he or his Dubai team may check it anytime.
+- **Gymkhana meeting** — when he initiates, go casual. Tea and talk. No documents.
+- **Dubai trip** — this is where the contract closes. See the server, the existing software, the staff workflow. Understand the data bridge requirement firsthand.
+- **Don't send the proposal document** unless he asks — let the app speak.
+- **If someone from Dubai contacts you** about the app — that's the buying signal. He showed it to his team.
+
+### Earlier Strategy (Pre-Demo)
+#### Why We Waited 2 Days
 - "Too fast = too cheap" — if he knows it took half a day, he'll negotiate the price down hard
 - "My team and I" sets the perception of serious effort
-- He needs time to sit with his pain (weekly reports, no visibility) before seeing the solution
-- Anticipation makes the demo more impressive
+- He needed time to sit with his pain (weekly reports, no visibility) before seeing the solution
+- Anticipation made the demo more impressive
 
 ### Demo Flow (8-10 minutes)
 
