@@ -9,7 +9,7 @@ import { DemoIndicator } from "@/components/demo-indicator";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NT Precious Metals - MIS Dashboard",
+  title: "PrismX - Precious Metals MIS",
   description: "Real-time profitability dashboard for precious metals trading",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };

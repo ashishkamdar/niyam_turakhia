@@ -39,7 +39,7 @@ export function PriceTicker() {
   return (
     <div className="sticky top-0 z-50 border-b border-white/10 bg-gray-900/95 backdrop-blur">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 sm:px-4">
-        <span className="text-xs font-bold text-amber-400 lg:hidden">NT Metals</span>
+        <span className="text-xs font-bold text-amber-400 lg:hidden">PrismX</span>
         <span className="hidden text-xs text-gray-500 lg:inline">Live Prices</span>
         <div className="flex items-center gap-4">
           <a href="/settings" className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-gray-500 hover:text-amber-400">

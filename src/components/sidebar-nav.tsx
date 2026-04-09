@@ -19,7 +19,7 @@ export function SidebarNav() {
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-60 lg:flex-col">
       <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-white/10 bg-gray-900 px-6">
         <div className="flex h-16 shrink-0 items-center">
-          <span className="text-lg font-bold text-amber-400">NT Metals</span>
+          <span className="text-lg font-bold text-amber-400">PrismX</span>
         </div>
         <nav className="flex flex-1 flex-col">
           <ul role="list" className="-mx-2 space-y-1">
