@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useDemo } from "./demo-engine";
 
 const NAV_ITEMS = [
   { name: "Home", href: "/", icon: "M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25", badge: "" },
@@ -14,14 +15,14 @@ const NAV_ITEMS = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { stats, running } = useDemo();
   const [whatsappCount, setWhatsappCount] = useState(0);
   const [lockedCount, setLockedCount] = useState(0);
 
   useEffect(() => {
     function fetchCounts() {
-      fetch("/api/deals?limit=100").then((r) => r.json()).then((deals: { created_by: string; direction: string }[]) => {
-        const waDeals = deals.filter((d) => d.created_by === "whatsapp");
-        setLockedCount(waDeals.length);
+      fetch("/api/deals?limit=100").then((r) => r.json()).then((deals: { created_by: string }[]) => {
+        setLockedCount(deals.filter((d) => d.created_by === "whatsapp").length);
       }).catch(() => {});
       fetch("/api/whatsapp").then((r) => r.json()).then((contacts: { contact_name: string }[]) => {
         setWhatsappCount(contacts.length);
@@ -30,11 +31,15 @@ export function BottomNav() {
     fetchCounts();
     const poll = setInterval(fetchCounts, 3000);
     return () => clearInterval(poll);
-  }, []);
+  }, [stats.locked]); // refetch when demo locks a deal
+
+  // Use demo stats directly when running for instant updates
+  const effectiveChats = running ? Math.max(whatsappCount, stats.active + stats.locked) : whatsappCount;
+  const effectiveLocked = running ? Math.max(lockedCount, stats.locked) : lockedCount;
 
   function getBadgeCount(badge: string): number {
-    if (badge === "deals" && lockedCount > 0) return lockedCount;
-    if (badge === "chats" && whatsappCount > 0) return whatsappCount;
+    if (badge === "deals" && effectiveLocked > 0) return effectiveLocked;
+    if (badge === "chats" && effectiveChats > 0) return effectiveChats;
     return 0;
   }
 
