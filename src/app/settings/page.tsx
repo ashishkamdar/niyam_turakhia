@@ -65,6 +65,9 @@ export default function SettingsPage() {
   const [metaPhoneNumberId, setMetaPhoneNumberId] = useState("");
   const [metaAccessToken, setMetaAccessToken] = useState("");
   const [metaAnthropicKey, setMetaAnthropicKey] = useState("");
+  const [metaGoogleKey, setMetaGoogleKey] = useState("");
+  const [metaOpenaiKey, setMetaOpenaiKey] = useState("");
+  const [metaOcrProvider, setMetaOcrProvider] = useState("tesseract");
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaSaveStatus, setMetaSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [webhookCopied, setWebhookCopied] = useState(false);
@@ -80,6 +83,9 @@ export default function SettingsPage() {
         if (data.phone_number_id) setMetaPhoneNumberId(data.phone_number_id);
         if (data.access_token) setMetaAccessToken(data.access_token);
         if (data.anthropic_api_key) setMetaAnthropicKey(data.anthropic_api_key);
+        if (data.google_api_key) setMetaGoogleKey(data.google_api_key);
+        if (data.openai_api_key) setMetaOpenaiKey(data.openai_api_key);
+        if (data.ocr_provider) setMetaOcrProvider(data.ocr_provider);
       })
       .catch(() => {});
   }, []);
@@ -97,6 +103,9 @@ export default function SettingsPage() {
           phone_number_id: metaPhoneNumberId,
           access_token: metaAccessToken,
           anthropic_api_key: metaAnthropicKey,
+          google_api_key: metaGoogleKey,
+          openai_api_key: metaOpenaiKey,
+          ocr_provider: metaOcrProvider,
         }),
       });
       setMetaSaveStatus(res.ok ? "saved" : "error");
@@ -333,17 +342,118 @@ export default function SettingsPage() {
             />
           </div>
 
-          {/* Anthropic API Key */}
-          <div>
-            <label className="block text-xs font-medium text-gray-400">Anthropic API Key</label>
-            <p className="mb-1 text-[11px] text-gray-500">Used for Claude Vision OCR on payment screenshots sent via WhatsApp.</p>
-            <input
-              type="password"
-              value={metaAnthropicKey}
-              onChange={(e) => setMetaAnthropicKey(e.target.value)}
-              placeholder="sk-ant-..."
-              className={`mt-1 ${inputCls}`}
-            />
+          {/* ─── Image OCR Provider ─── */}
+          <div className="border-t border-white/10 pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-400">Image OCR — Read Payment Screenshots</h3>
+            <p className="mt-1 text-[11px] text-gray-500">Choose how payment screenshots and bar list photos are read. Each option has different capabilities and cost.</p>
+
+            <div className="mt-3 space-y-2">
+              {[
+                {
+                  id: "tesseract",
+                  name: "Tesseract (Local)",
+                  badge: "100% Free",
+                  badgeColor: "bg-emerald-500/10 text-emerald-400",
+                  desc: "Runs locally on the server. No API calls, no cost, no limits. Reads English + Chinese text.",
+                  pros: "Free forever, no API key needed, works offline, unlimited images",
+                  cons: "Lower accuracy on complex screenshots (payment apps with mixed layouts). May miss wallet addresses or transaction IDs in stylized text.",
+                  needsKey: false,
+                },
+                {
+                  id: "google",
+                  name: "Google Cloud Vision",
+                  badge: "1,000 Free/Month",
+                  badgeColor: "bg-blue-500/10 text-blue-400",
+                  desc: "Google's production OCR. Best text extraction quality. 1,000 images/month on free tier — no credit card needed.",
+                  pros: "Excellent accuracy, reads all languages, handles complex layouts, 1,000 free/month",
+                  cons: "Needs Google Cloud account + API key. Beyond 1,000 images: $1.50 per 1,000. Extracts text only — doesn't understand context (e.g. won't know it's a USDT payment).",
+                  needsKey: true,
+                  keyField: "google",
+                },
+                {
+                  id: "claude",
+                  name: "Claude Vision (AI)",
+                  badge: "Best Understanding",
+                  badgeColor: "bg-purple-500/10 text-purple-400",
+                  desc: "Anthropic's AI reads AND understands the image. Knows it's a USDT payment, extracts amount, wallet, status, and transaction ID intelligently.",
+                  pros: "Best context understanding, returns structured data, handles any language, identifies payment type automatically",
+                  cons: "~$0.01-0.03 per image. Needs Anthropic API key. $5 free credit for new accounts.",
+                  needsKey: true,
+                  keyField: "anthropic",
+                },
+                {
+                  id: "openai",
+                  name: "GPT-4o-mini (AI)",
+                  badge: "Cheapest AI",
+                  badgeColor: "bg-cyan-500/10 text-cyan-400",
+                  desc: "OpenAI's lightweight vision model. Good understanding at the lowest AI cost. $5 free credit for new accounts.",
+                  pros: "Very cheap (~$0.003/image), good accuracy, returns structured data",
+                  cons: "Needs OpenAI API key. Slightly less accurate than Claude on Chinese text.",
+                  needsKey: true,
+                  keyField: "openai",
+                },
+              ].map((opt) => {
+                const isSelected = metaOcrProvider === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => setMetaOcrProvider(opt.id)}
+                    className={`w-full rounded-lg p-3 text-left outline outline-1 transition ${isSelected ? "bg-gray-800/80 outline-amber-500/50" : "bg-gray-900 outline-white/10 hover:bg-gray-800/50"}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-semibold ${isSelected ? "text-white" : "text-gray-200"}`}>{opt.name}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${opt.badgeColor}`}>{opt.badge}</span>
+                      {isSelected && (
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="ml-auto size-5 shrink-0 text-amber-400">
+                          <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-400">{opt.desc}</p>
+                    {isSelected && (
+                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="rounded-md bg-emerald-500/5 p-2">
+                          <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400">Pros</p>
+                          <p className="mt-0.5 text-[10px] text-gray-300">{opt.pros}</p>
+                        </div>
+                        <div className="rounded-md bg-rose-500/5 p-2">
+                          <p className="text-[9px] font-semibold uppercase tracking-wider text-rose-400">Limitations</p>
+                          <p className="mt-0.5 text-[10px] text-gray-300">{opt.cons}</p>
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* API Key fields based on selection */}
+            {metaOcrProvider === "google" && (
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-gray-400">Google Cloud Vision API Key</label>
+                <p className="mb-1 text-[11px] text-gray-500">console.cloud.google.com → Enable Vision API → Credentials → Create API Key</p>
+                <input type="password" value={metaGoogleKey} onChange={(e) => setMetaGoogleKey(e.target.value)} placeholder="AIza..." className={`mt-1 ${inputCls}`} />
+              </div>
+            )}
+            {metaOcrProvider === "claude" && (
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-gray-400">Anthropic API Key</label>
+                <p className="mb-1 text-[11px] text-gray-500">console.anthropic.com → API Keys → Create Key ($5 free credit for new accounts)</p>
+                <input type="password" value={metaAnthropicKey} onChange={(e) => setMetaAnthropicKey(e.target.value)} placeholder="sk-ant-..." className={`mt-1 ${inputCls}`} />
+              </div>
+            )}
+            {metaOcrProvider === "openai" && (
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-gray-400">OpenAI API Key</label>
+                <p className="mb-1 text-[11px] text-gray-500">platform.openai.com → API Keys → Create Key ($5 free credit for new accounts)</p>
+                <input type="password" value={metaOpenaiKey} onChange={(e) => setMetaOpenaiKey(e.target.value)} placeholder="sk-..." className={`mt-1 ${inputCls}`} />
+              </div>
+            )}
+            {metaOcrProvider === "tesseract" && (
+              <div className="mt-3 rounded-md bg-emerald-500/5 p-3">
+                <p className="text-xs text-emerald-400">No API key needed. Tesseract runs locally on the server — completely free, unlimited images.</p>
+              </div>
+            )}
           </div>
 
           {/* Save button + status */}
