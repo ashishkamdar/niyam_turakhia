@@ -360,6 +360,40 @@ Month 3+:
 - **Reset All Data:** Clears everything to zero (0 positions, 0 deals). Start Demo seeds opening stock.
 - Deployed at https://nt.areakpi.in
 
+### WhatsApp Bot (Niyam's Priority — Quote Expected)
+
+Niyam asked to start WhatsApp automation on April 9 (1 hour after demo). He provided 2 real WhatsApp chat exports. His business runs on **WhatsApp Business**. He expects a formal quote.
+
+#### What We Analyzed
+- **Chat 1 (SAPAN-HK):** 301 lines, silver deals, 28 images. 3 deals extracted (2 locked, 1 cancelled).
+- **Chat 2 (Tak Fung Gold/PD/USDT):** 16,560 lines, gold + palladium deals, 3,259 images. 60 deals extracted.
+- **Full analysis:** docs/chat-analysis.md
+
+#### Image Types Found in Chats
+- **USDT payment confirmations** (TronScan/Tether) — amount, sender/receiver wallet, tx hash, date
+- **Physical metal photos** — silver balls, gold bars with weight labels
+- **HKD cash photos** — banknotes for delivery fees
+- **Weighing/bar list photos** — scale readings, serial numbers
+- **Compliance documents** — Account opening forms, KYC
+
+#### Bot Quote Structure (3 Phases)
+
+| Phase | Feature | Description | Timeline |
+|-------|---------|-------------|----------|
+| **Bot Phase 1** | Chat Parser | Read WhatsApp text, extract deals, classify buy/sell/locked/cancelled. Bot tab. **Built and tested — 63 real deals extracted.** | Done |
+| **Bot Phase 2** | Image Reader | Read payment screenshots (USDT amounts, wallets, tx IDs), match to deals. Bilingual (EN + CN). | 2-3 weeks |
+| **Bot Phase 3** | Auto-Negotiator | AI replies to buyers, negotiates within price boundaries, locks deals. 24/7. | 4-6 weeks |
+
+#### Key Findings From Real Chats
+- **15+ participants** across 2 groups. Roles: Dealer, Trader, Calculator (Gusini), Treasury, Logistics.
+- **Languages:** 65-85% English, 15-30% Chinese. Bot needs bilingual.
+- **Price:** Spot + premium (silver: "+1"). Fix +/- discount (gold: "-4", "-0.2%"). Per troy ounce.
+- **Formula:** `(price ± premium) / 31.1035 * weight_grams = USDT_amount`
+- **Lock keywords:** "Locked", "鎖價". Payment: USDT on TRC-20 (Tron). Wallets rotate.
+- **Metals:** Gold (XAU), Silver (balls/珠子), Platinum (PT), Palladium (PD)
+- **"k" = kg** (10k = 10kg = 10,000g). "LB" = London bar (~12.5kg).
+- **OroSoft** = their existing ERP (Mumbai-based, AWS-hosted). May have API access.
+
 ### Phase 2: Real WhatsApp Integration (NEXT)
 Connect the demo to real WhatsApp messages:
 
