@@ -351,12 +351,12 @@ export default function SettingsPage() {
               {[
                 {
                   id: "tesseract",
-                  name: "Tesseract (Local)",
+                  name: "Built-in Image OCR",
                   badge: "100% Free",
                   badgeColor: "bg-emerald-500/10 text-emerald-400",
-                  desc: "Runs locally on the server. No API calls, no cost, no limits. Reads English + Chinese text.",
-                  pros: "Free forever, no API key needed, works offline, unlimited images",
-                  cons: "Lower accuracy on complex screenshots (payment apps with mixed layouts). May miss wallet addresses or transaction IDs in stylized text.",
+                  desc: "Built-in OCR engine runs directly on the server. No external API calls, no cost, no limits. Reads English, Chinese, and Arabic text.",
+                  pros: "Free forever, no API key needed, works offline, unlimited images, supports English + Chinese + Arabic",
+                  cons: "Lower accuracy on complex screenshots with mixed layouts. May miss wallet addresses or transaction IDs in stylized text. Best for simple text extraction.",
                   needsKey: false,
                 },
                 {
@@ -451,7 +451,7 @@ export default function SettingsPage() {
             )}
             {metaOcrProvider === "tesseract" && (
               <div className="mt-3 rounded-md bg-emerald-500/5 p-3">
-                <p className="text-xs text-emerald-400">No API key needed. Tesseract runs locally on the server — completely free, unlimited images.</p>
+                <p className="text-xs text-emerald-400">No API key needed. Built-in OCR engine runs directly on the server — completely free, unlimited images, supports English, Chinese, and Arabic.</p>
               </div>
             )}
           </div>
