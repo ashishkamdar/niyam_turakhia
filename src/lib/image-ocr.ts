@@ -192,6 +192,8 @@ async function ocrTesseract(imageBuffer: Buffer): Promise<OcrResult> {
     try { fs.unlinkSync(inputPath); } catch {}
 
     if (text) {
+      // Clean common OCR artifacts: leading @, |, ~, `, stray symbols from dots/icons
+      text = text.replace(/^[@|~`•●○■□►▶»«<>]+/gm, "").trim();
       return parseOcrText(text, "tesseract");
     }
 
