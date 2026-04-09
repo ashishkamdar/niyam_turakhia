@@ -143,7 +143,7 @@ async function ocrTesseract(imageBuffer: Buffer): Promise<OcrResult> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Tesseract = require("tesseract.js");
-    const worker = await Tesseract.createWorker("eng+chi_sim+chi_tra");
+    const worker = await Tesseract.createWorker("eng+chi_sim+chi_tra+ara");
     const { data: { text } } = await worker.recognize(imageBuffer);
     await worker.terminate();
     return parseOcrText(text, "tesseract");

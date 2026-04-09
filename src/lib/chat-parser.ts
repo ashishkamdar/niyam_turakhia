@@ -175,10 +175,12 @@ function parseDirection(text: string): ParsedDirection | null {
 // ---------------------------------------------------------------------------
 function parseStatus(text: string): ParsedStatus | null {
   const t = text.toLowerCase();
-  if (/cancel+ed|cancelled/.test(t)) return "cancelled";
-  if (/\block\b|\blocke?d\b|鎖價|鎖|锁价|please lock|can lock/.test(t)) return "locked";
-  if (/\ball settled\b|\bsettled\b/.test(t)) return "settled";
-  if (/\bworking\b/.test(t)) return "working";
+  if (/cancel+ed|cancelled|ملغي|取消/.test(t)) return "cancelled";
+  // Lock: English + Chinese + Arabic (تأكيد = confirm, مؤكد = confirmed, قفل = lock)
+  if (/\block\b|\blocke?d\b|鎖價|鎖|锁价|please lock|can lock|تأكيد|مؤكد|قفل/.test(t)) return "locked";
+  // Settled: English + Chinese + Arabic (تمت التسوية = settled)
+  if (/\ball settled\b|\bsettled\b|تمت التسوية/.test(t)) return "settled";
+  if (/\bworking\b|جاري/.test(t)) return "working";
   return null;
 }
 
