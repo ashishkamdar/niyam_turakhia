@@ -111,6 +111,22 @@ function initSchema(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY
     );
+
+    CREATE TABLE IF NOT EXISTS parsed_deals (
+      id TEXT PRIMARY KEY,
+      chat_source TEXT NOT NULL,
+      date TEXT NOT NULL,
+      metal TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      quantity_grams REAL NOT NULL,
+      price_per_oz REAL NOT NULL,
+      premium_discount TEXT DEFAULT '',
+      total_usdt REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'detected',
+      participants TEXT DEFAULT '',
+      raw_messages TEXT DEFAULT '',
+      parsed_at TEXT NOT NULL
+    );
   `);
 }
 
@@ -147,6 +163,14 @@ function runMigrations(db: Database.Database) {
         // Tables are created by CREATE TABLE IF NOT EXISTS above.
         // This migration exists so existing DBs get the version bumped.
         // No ALTER needed — these are new tables.
+      },
+    },
+    {
+      version: 4,
+      description: "Add parsed_deals table for WhatsApp chat bot",
+      up: () => {
+        // Table is created by CREATE TABLE IF NOT EXISTS above.
+        // No ALTER needed — this is a new table.
       },
     },
   ];
