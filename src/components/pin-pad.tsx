@@ -46,8 +46,13 @@ export function PinPad({ onSuccess }: { onSuccess: () => void }) {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 px-4">
       <div className="w-full max-w-xs">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-amber-400">PrismX</h1>
-          <p className="mt-2 text-sm text-gray-400">Enter PIN to continue</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/prismx-logo.png"
+            alt="PrismX"
+            className="mx-auto h-10 w-auto"
+          />
+          <p className="mt-3 text-sm text-gray-400">Enter PIN to continue</p>
         </div>
 
         {/* PIN dots */}

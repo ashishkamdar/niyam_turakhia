@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AuthGate } from "@/components/auth-gate";
 import { PriceTicker } from "@/components/price-ticker";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -9,9 +9,21 @@ import { DemoIndicator } from "@/components/demo-indicator";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PrismX - Precious Metals MIS",
+  title: "PrismX — Precious Metals MIS",
   description: "Real-time profitability dashboard for precious metals trading",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+  applicationName: "PrismX",
+  appleWebApp: {
+    capable: true,
+    title: "PrismX",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#030712",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

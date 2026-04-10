@@ -39,8 +39,17 @@ export function PriceTicker() {
   return (
     <div className="sticky top-0 z-50 border-b border-white/10 bg-gray-900/95 backdrop-blur">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 sm:px-4">
-        <span className="text-base font-bold text-amber-400 lg:hidden">PrismX</span>
-        <span className="hidden text-sm font-medium text-gray-400 lg:inline">PrismX — Live Prices</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/prismx-logo.png"
+          alt="PrismX"
+          className="h-5 w-auto sm:h-6 lg:hidden"
+        />
+        <div className="hidden items-center gap-2 lg:flex">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/prismx-logo.png" alt="PrismX" className="h-6 w-auto" />
+          <span className="text-sm font-medium text-gray-500">· Live Prices</span>
+        </div>
         <div className="flex items-center gap-5">
           <a href="/settings" className="flex items-center gap-1.5 rounded-md px-2 py-1 text-gray-400 hover:text-amber-400">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-5">
