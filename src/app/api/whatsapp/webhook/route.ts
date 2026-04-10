@@ -87,9 +87,20 @@ export async function POST(req: NextRequest) {
         // Staff in the internal PrismX group send messages like:
         //   #NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG
         // These get parsed and routed to the maker-checker review screen.
-        // Messages without the #NT trigger fall through to the old lock-keyword path below.
-        const parseResult = parseDealCode(messageText);
-        if (parseResult.is_deal_code) {
+        //
+        // Batching: staff often want to post multiple locked deals in a single
+        // WhatsApp message with line breaks between them. We split the message
+        // on newlines and parse each line independently, inserting one pending_deals
+        // row per valid deal line. Non-deal lines (chatter before/after the codes,
+        // empty lines, unrelated prose) are silently ignored.
+        //
+        // Messages without any #NT line fall through to the legacy lock-keyword
+        // path below, which still works for historical free-text chats.
+        const lines = messageText.split(/\r?\n/);
+        for (const line of lines) {
+          const parseResult = parseDealCode(line);
+          if (!parseResult.is_deal_code) continue;
+
           const pendingId = uuid();
           const parseErrorsJson =
             parseResult.errors.length > 0 ? JSON.stringify(parseResult.errors) : null;
@@ -104,7 +115,7 @@ export async function POST(req: NextRequest) {
             msgId,
             senderPhone,
             senderName,
-            messageText,
+            line.trim(),
             timestamp,
             parseResult.fields.deal_type,
             parseResult.fields.direction,
