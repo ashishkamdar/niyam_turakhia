@@ -103,28 +103,80 @@ Internal staff WhatsApp group (#NTK / #NTP / #NT codes)
                           OroSoft meeting)
 ```
 
-### What's live at nt.areakpi.in right now
+### What's live at nt.areakpi.in right now (Apr 10-11, 2026)
+
+**Core review pipeline:**
 
 | Feature | Status | URL / file |
 |---|---|---|
 | `#NTK` / `#NTP` / `#NT` deal code parser (pure function, 9 test fixtures) | ✅ Live | `src/lib/deal-code-parser.ts` |
-| Meta Cloud API webhook (inbound only) | ✅ Live | https://nt.areakpi.in/api/whatsapp/webhook |
-| Webhook handler splits batched messages on newlines → one row per deal line | ✅ Live | `src/app/api/whatsapp/webhook/route.ts` |
+| Meta Cloud API webhook (inbound only) — receives text + image messages | ✅ Live | `src/app/api/whatsapp/webhook/route.ts` |
+| Webhook handler splits batched messages on newlines → one row per deal line | ✅ Live | Same file |
 | `pending_deals` table (migration v6) | ✅ Live | `src/lib/db.ts` |
 | Review API (list, counts, approve, reject, patch) | ✅ Live | `/api/review`, `/api/review/[id]` |
 | Deal Review screen — mobile-first cards, one-tap classify+approve for `#NT` | ✅ Live | https://nt.areakpi.in/review |
-| Auto-refresh polling every 3 seconds with visible "Live" indicator | ✅ Live | `/review` header |
-| End-to-end tested with real WhatsApp messages via Meta Test Number | ✅ Live | Ashish's `test2WattsApp` app (App ID `1184960910192872`, Test Number `+1 555 629 9466`, Phone Number ID `835944509608655`) |
+| Auto-refresh polling every 3 seconds with visible pulsing "Live" indicator | ✅ Live | `/review` header |
+| Mobile overflow protection (`overflow-x-hidden`, `<pre>` block wrapping) | ✅ Live | `/review` cards never push wider than viewport |
+| 4-tab filter strip: Pending / Approved / Rejected / **Ignored** | ✅ Live | Ignored holds in-memory non-deal messages (100-entry ring buffer) |
+| Ignored messages buffer (in-memory, not persisted) | ✅ Live | `src/lib/ignored-messages.ts` |
+| Per-card **Edit toggle** — inline form for all 9 writable fields | ✅ Live | Works on Pending AND Rejected cards; approved cards stay immutable |
+| Re-approve rejected deals ("Approve anyway" button) | ✅ Live | Rejected → Approved in one click |
+| Atomic classify+approve for `#NT` unclassified cards | ✅ Live | Green "Approve as Kachha" / "Approve as Pakka" buttons |
+| Parse errors panel on malformed deal codes | ✅ Live | Red error panel with specific field reasons |
+
+**Screenshot OCR pipeline (Phase C — shipped Apr 10):**
+
+| Feature | Status | Details |
+|---|---|---|
+| Image download via Meta Graph API | ✅ Live | Uses configured access token, 500ms-1s per image |
+| Local Tesseract OCR (English + Chinese + Arabic) | ✅ Live | Runs via `execFileSync` with 15-30s timeout, multi-pass fallback |
+| Image save to disk (`<cwd>/screenshots/<uuid>.ext`) | ✅ Live | Persistent on Nuremberg VPS filesystem, `.gitignore`'d |
+| `/api/screenshots/[filename]` route with UUID validation + caching | ✅ Live | Strict regex blocks path traversal; `Cache-Control: public, max-age=3600, immutable` |
+| Caption linking — image with `#NT` caption creates deal + OCR attached | ✅ Live | One-shot atomic flow |
+| Reply linking (Case A) — text `#NT` reply to earlier image attaches orphan's OCR | ✅ Live | Via Meta's `msg.context.id` reply mechanism |
+| Reply linking (Case B) — image reply to earlier text deal updates that deal | ✅ Live | Updates existing `pending_deals` row's `screenshot_ocr` + `screenshot_url` |
+| Orphan buffer (Case C) — image with no caption/reply held in memory 1h | ✅ Live | `src/lib/orphaned-attachments.ts` (50-entry ring, auto-expire) |
+| Sky-blue OCR panel on review card — thumbnail + extracted fields + raw text | ✅ Live | Placed directly under raw message, above parsed fields |
+| Image thumbnail (`max-h-48`, tap-to-expand in new tab) | ✅ Live | Served from `/api/screenshots/<uuid>.jpg` |
+
+**Branding / PWA:**
+
+| Feature | Status | Details |
+|---|---|---|
+| PrismX logo in sidebar, price ticker, PIN login, favicon, PWA home-screen | ✅ Live | Source JPG processed to transparent PNG via Pillow script; Next.js auto-generates `icon.png` + `apple-icon.png` |
+| PWA manifest with standalone display, PrismX icons (192×192, 512×512, "any" + "maskable") | ✅ Live | `src/app/manifest.ts` — iOS "Add to Home Screen" + Android "Install" prompts work |
+| Sidebar + bottom-nav count badges on Review, Deals, Chats | ✅ Live | Review badge is amber (work queue), Deals/Chats are rose (informational); Review badge stays visible even on active tab |
+
+**Meta credentials — configured in `meta_config` table (Apr 10):**
+
+| Key | Value | Notes |
+|---|---|---|
+| `phone_number_id` | `835944509608655` | Test Number (+1 555 629 9466) |
+| `access_token` | Permanent System User token, 60-day expiry | Generated Apr 10 via business.facebook.com → System Users → ashishkamdar |
+| `verify_token` | `prismx_webhook_verify` | Matches Meta's webhook configuration |
+| `ocr_provider` | `tesseract` | Local, free, unlimited |
+| `app_secret` | **CLEARED** (see Known Issues) | HMAC signature verification currently disabled |
 
 ### What's NEXT
 
 | Phase | Status | Blocked on |
 |---|---|---|
-| **Kachha → SBS Excel writer** | ⏳ Next build chunk | Nothing — Bullion Sales Order.xlsx schema confirmed |
-| **Pakka → OroSoft API writer** | ⏳ In progress | **Monday April 13, 11:15 AM meeting with OroSoft** — their API is not publicly documented, so integration shape is unknown until that meeting |
-| **Screenshot OCR on review cards** | ⏳ Queued | Tesseract local is preferred for Kachha (privacy); access token required for Meta media download (will be entered in PrismX Settings UI, not chat) |
-| **Niyam's own Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Documents uploaded by Niyam + domain verification at prismx.org |
-| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | Same endpoint, different number — ~10-minute switch once verified |
+| **Kachha → SBS Excel writer** | ⏳ Next build chunk | Nothing — `Bullion Sales Order.xlsx` schema confirmed. Kachha approvals will append rows to a daily Excel file downloadable from a new `/excel` page. |
+| **Pakka → OroSoft API writer** | ⏳ Blocked on Monday meeting | **Monday April 13, 11:15 AM meeting with OroSoft** — their API is not publicly documented. Integration shape unknown until that meeting. See `project_orosoft_monday_meeting.md` in memory. |
+| **HMAC signature verification fix** (see Known Issues below) | ⏳ Investigation needed | Requires re-entering App Secret or debugging why the saved value didn't match Meta's signed output |
+| **Niyam's own Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Niyam uploads Trade License + Business Verification documents; domain verification at prismx.org is already configured |
+| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | Same endpoint (`nt.areakpi.in/api/whatsapp/webhook`), different number ID — ~10-minute swap once Niyam's WABA is live |
+| **Claude / GPT-4o-mini Vision OCR** (upgrade from Tesseract) | 💡 Optional polish | For higher accuracy on stylized bank app screenshots. Requires API key in `meta_config`. Tesseract works well enough for text-heavy payment screenshots. |
+| **Bot Phase 4 — Auto-negotiator** | 🔒 Deferred | Requires Phase A + B + C stable AND Niyam's Meta verification complete. Multi-week build. |
+
+### Known Issues / Pending Fixes (Apr 10, 2026)
+
+| # | Issue | Impact | Workaround | Fix |
+|---|---|---|---|---|
+| 1 | **HMAC signature verification fails with the saved App Secret** | All webhook POSTs returned HTTP 401 when `app_secret` was populated in `meta_config`. Meta retried 5× with exponential backoff, all rejected. | `app_secret` has been **cleared** — webhook now accepts unsigned POSTs as before. No functional impact on deal flow. | Investigate: (a) whether the pasted App Secret had whitespace or was the wrong field, (b) whether `verifyWebhookSignature()` in `src/lib/meta-whatsapp.ts` computes the HMAC correctly. Add temporary logging of expected-vs-received signature to diagnose. Likely one-line fix once the mismatch is identified. |
+| 2 | Access token has a **60-day expiry** instead of "never expires" | Token will stop working around **mid-June 2026** without action. Webhook + inbound still work (inbound doesn't need token), but image OCR stops until token is regenerated. | Regenerate via the same Playwright flow used on Apr 10 (`business.facebook.com → System Users → ashishkamdar → Generate token`). Takes ~2 minutes. | Next time the System User token wizard opens, explicitly click "Never" in the expiry step before the wizard auto-advances. |
+| 3 | `whatsapp_messages` legacy log still uses our UUID as primary key instead of Meta's wamid | Old free-text bot path can't be used for reply-linking. Not relevant to new structured-code path. | None needed — the new pipeline uses `pending_deals.whatsapp_message_id` with Meta's real wamid. | Leave as-is; legacy table can be dropped later if needed. |
+| 4 | Old test data in `pending_deals` | Earlier test rows (pre-screenshot feature) have `screenshot_url = null` even though their `screenshot_ocr` may be populated. Thumbnails won't render on those cards. | None — new messages populate both fields correctly. | Optional: backfill old rows manually or just let them age out of the demo queue. |
 
 ### What's SUPERSEDED from the original plan
 
@@ -155,7 +207,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Page | Route | Description |
 |------|-------|-------------|
-| **Review** | `/review` | **Maker-checker queue for WhatsApp lock codes (Phase A, April 10, 2026).** Shows pending/approved/rejected tabs with counts, card-based list of pending_deals ordered newest-first, one-tap approve/reject, atomic classify-and-approve for unclassified `#NT` cards (green "Approve as Kachha" + "Approve as Pakka" picker), parse-error panel for malformed messages, visible pulsing "Live" indicator with "Xs ago" timestamp, 3-second polling auto-refresh, mobile-first layout with overflow protection. |
+| **Review** | `/review` | **Maker-checker queue for WhatsApp lock codes (Phase A, Apr 10-11, 2026).** **4-tab filter strip:** Pending / Approved / Rejected / **Ignored** (Ignored holds non-deal text messages in an in-memory ring buffer, 100 entries max, cleared on restart — proof the bot is listening to everything). **Card-based list** of pending_deals ordered newest-first. **Header per card:** sender name, timestamp, Edit toggle (iOS-style slider), Type badge (Kachha/Pakka/Unclassified). **Raw message** in monospace code block. **Screenshot OCR panel** (sky-blue, sits directly under raw message) — shows thumbnail of the attached image (tap to open full-size in new tab), OCR-extracted fields (amount, currency, wallet addresses, tx hash, date), and collapsible "Show raw text" pre block. **Parsed fields grid:** Direction, Metal, Quantity, Rate, Premium, Party. **Action buttons:** Approve + Reject for classified cards; "Approve as Kachha" + "Approve as Pakka" atomic picker for unclassified cards; Save + Cancel when editing. **Edit mode** (toggle on per card) — inline form with 9 editable fields (type, direction, metal, purity, qty in kg, rate, premium + premium type, party alias) — draft state is isolated per card and survives polling without clobbering. **Edit also works on rejected cards** (rescue flow) with "Approve anyway" button. **Parse errors panel** (red) on malformed deals with per-field error messages. **Pulsing "Live" indicator** in top-right header with "Xs ago" counter ticking every second. **3-second polling auto-refresh.** **Mobile-first layout** with `overflow-x-hidden` safety net and `<pre>` blocks for long text wrapping. |
 | **Dashboard** | `/` | **Portfolio bar** (total AED value + per-metal stock in hand with low stock warnings below 5kg). **Start Demo button** (seeds 50kg opening stock, runs 25 WhatsApp chats for 10 min with live stats: messages/negotiating/locked). **Hero profit card** (today's realized P&L). **Weekly P&L bar chart** (7-day Recharts). **WhatsApp Deals** section (negotiating count + locked count + deal cards). **4 stat cards** (Buys, Sales, Stock Value, Unrealized P&L). **Funds Received from HK** (HKD/USD/USDT with FX rates to AED + "Transfer to Dubai Account" button → ADCB bank receipt). **Delivery pipeline** (preparing/in transit/pending). **Recent activity** with metal colors. All auto-refreshes every 3 seconds + instant refresh on deal lock via dealTick. |
 | **Stock In Hand** | `/stock` | Per-metal summary cards (total grams, avg cost, market value, unrealized P&L, location badges). Tap any metal → drill-down to individual lots with purchase date, purity, qty, status |
 | **Purchase & Sales** | `/deals` | Two tabs: **Purchase** (metal, purity, qty, rate + refining section auto-shows for impure metals with yield%, wastage, refining cost, effective cost per oz/gram) and **Sale** (always 24K, buyer name, warns if selling at/below avg cost with red confirmation). WhatsApp Locked Deals at top. Recent Purchases (with REFINED badge) and Recent Sales below. |
@@ -173,10 +225,11 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | `/api/deals` | GET, POST | Deal CRUD with filtering (direction, metal, status, limit). Auto-calculates pure equivalent on create |
 | `/api/payments` | GET, POST | Payment/settlement CRUD |
 | `/api/whatsapp` | GET, POST | WhatsApp messages. GET returns contacts summary or messages for a contact. POST stores message + auto-creates deal if "lock" detected |
-| `/api/whatsapp/webhook` | GET, POST | **Meta Cloud API webhook endpoint.** GET handles Meta verification handshake (challenge/response). POST receives inbound messages, splits on newlines, parses each line with `parseDealCode`, and inserts pending_deals rows. Legacy free-text "lock" keyword branch still runs as a fallback. |
-| `/api/whatsapp/config` | GET, POST | Stores Meta WhatsApp credentials (phone_number_id, access_token, app_secret, verify_token) in the `meta_config` table |
-| `/api/review` | GET | **Lists pending_deals with status filter** (`?status=pending\|approved\|rejected\|all`), returns counts per status for nav badges |
-| `/api/review/[id]` | PATCH, POST | **Maker-checker mutations.** PATCH updates writable fields (deal_type, direction, qty_grams, metal, purity, rate, premium, party, notes). POST with `{action:"approve"}` approves; POST with `{action:"approve",deal_type:"K"\|"P"}` atomically classifies + approves in one transaction (used by unclassified `#NT` cards). POST with `{action:"reject"}` rejects. |
+| `/api/whatsapp/webhook` | GET, POST | **Meta Cloud API webhook endpoint.** GET handles Meta verification handshake (challenge/response). POST receives inbound messages. For **text** messages: splits on newlines, parses each line with `parseDealCode`, and inserts one pending_deals row per valid deal line (batched messages supported). Non-deal text → Ignored buffer. For **image** messages: downloads via Graph API, saves to `<cwd>/screenshots/<uuid>.ext`, runs Tesseract OCR, then routes via one of four attachment-linking cases (caption with deal code → atomic insert; image with no context → orphan buffer; text reply to orphan → attach OCR to new deal; image reply to earlier text deal → update that deal). HMAC signature verification is gated on `meta_config.app_secret` being populated (currently cleared — see Known Issues). Legacy free-text "lock" keyword branch still runs as a fallback for old bot path. |
+| `/api/whatsapp/config` | GET, POST | Stores Meta WhatsApp credentials (phone_number_id, access_token, app_secret, verify_token, ocr_provider) in the `meta_config` table |
+| `/api/review` | GET | **Lists pending_deals with status filter** (`?status=pending\|approved\|rejected\|ignored\|all`), returns counts per status for nav badges. Parses `screenshot_ocr` JSON blob server-side so clients receive a native object. `?status=ignored` returns the in-memory ignored buffer shaped like deal rows with null fields. |
+| `/api/review/[id]` | PATCH, POST | **Maker-checker mutations.** PATCH updates any of the 10 writable fields (deal_type, direction, qty_grams, metal, purity, rate_usd_per_oz, premium_type, premium_value, party_alias, reviewer_notes). POST with `{action:"approve"}` approves; POST with `{action:"approve",deal_type:"K"\|"P"}` atomically classifies + approves in one transaction (used by unclassified `#NT` cards); POST with `{action:"reject"}` rejects. Re-approve of an already-rejected deal is supported (no intermediate pending state). |
+| `/api/screenshots/[filename]` | GET | **Serves WhatsApp payment screenshots** saved by the webhook. Strict filename validation against UUID v4 + extension regex (`.jpg\|.jpeg\|.png\|.webp`) blocks path traversal before the filesystem is touched. Returns the file with correct Content-Type and `Cache-Control: public, max-age=3600, immutable`. Files live in `<cwd>/screenshots/` (gitignored, persistent across deploys on Nuremberg VPS). |
 | `/api/simulator` | POST | Reset all data and re-seed |
 | `/api/deliveries` | GET, POST | Delivery CRUD (filter by status). Tracks shipments to HK with buyer info, weight, shipping cost, status |
 | `/api/settlements` | GET, POST | Settlement CRUD (filter by status). Tracks payment received → transfer to Dubai → seller payment |
@@ -185,11 +238,12 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Component | File | Description |
 |-----------|------|-------------|
-| Price Ticker | `price-ticker.tsx` | Sticky header, 2x2 mobile / 4-col desktop, 4 decimal prices, Demo/Live label. Top bar with NT Metals branding (mobile) / Live Prices label (desktop), settings gear icon + logout icon (with spacing) |
-| Sidebar Nav | `sidebar-nav.tsx` | Desktop left sidebar (hidden on mobile), 6 nav items + Settings + Logout |
-| Bottom Nav | `bottom-nav.tsx` | Mobile bottom tab bar (hidden on desktop), 5 tabs: Home, Stock, Deals, WhatsApp, Money |
+| Price Ticker | `price-ticker.tsx` | Sticky header, 2x2 mobile / 4-col desktop, 4 decimal prices, Demo/Live label. Top bar with **PrismX logo (h-5 mobile, h-6 desktop + "· Live Prices" subtitle on desktop)**, settings gear icon + logout icon |
+| Sidebar Nav | `sidebar-nav.tsx` | Desktop left sidebar (hidden on mobile), **8 nav items** (Dashboard, **Review**, Stock, Deals, WhatsApp, Bot, Money Flow, Reports) + Settings + Logout. **PrismX logo as header** (h-8 transparent PNG, replacing the old text). **Count badges** on Review (amber, stays visible on active tab), Deals (rose), Chats (rose) — polls every 3 seconds |
+| Bottom Nav | `bottom-nav.tsx` | Mobile bottom tab bar (hidden on desktop), **5 tabs:** Home, **Review**, Stock, Deals, Chats. **Amber Review badge** (queue counter, stays visible even on active tab); **rose Deals/Chats badges** (hide on own active tab). Polls every 3 seconds. |
 | Auth Gate | `auth-gate.tsx` | Wraps entire app, checks session cookie, shows PIN pad if locked |
-| PIN Pad | `pin-pad.tsx` | 6-digit numeric keypad with dot indicators, error feedback |
+| PIN Pad | `pin-pad.tsx` | 6-digit numeric keypad with dot indicators, error feedback. **PrismX logo centred above "Enter PIN to continue"** |
+| Review Page | `src/app/review/page.tsx` | Main maker-checker screen. Components defined inline: `DealCard` (with edit state, approve/reject/cancel actions), `OcrSection` (sky-blue panel with thumbnail + extracted fields + collapsible raw text), `IgnoredCard` (muted grey, no actions), `EditToggle` (iOS-style amber slider), `DealEditForm` (9-field form with pill selectors, native selects, number/text inputs), `PillSelect`, `SelectField`, `TextField`, `NumberField`, `LiveIndicator` (emerald pulsing dot + "Xs ago" ticker), `TypeBadge` (Kachha/Pakka/Unclassified), `Field` (read-only field renderer) |
 | Stat Card | `stat-card.tsx` | Reusable KPI card (Catalyst stats-with-trending pattern) |
 | Purchase Form | `purchase-form.tsx` | Buy form with refining section: metal, purity, qty, rate. Auto-shows refining for impure (18K/20K/22K) with yield %, wastage, cost per gram, effective cost per oz. Live calculation summary. |
 | Sale Form | `sale-form.tsx` | Sell form (always 24K): metal, qty, rate, buyer name. Fetches avg buy cost and shows profit/loss. Red warning + confirmation required when selling at or below cost. |
@@ -208,8 +262,12 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Module | File | Purpose |
 |--------|------|---------|
-| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. **12 tables:** deals, payments, prices, settings, whatsapp_messages, deliveries, settlements, schema_version, parsed_deals (legacy bot), meta_config, **pending_deals (new Apr 10 — maker-checker queue with 19 columns)**, plus indexes on pending_deals(status) and pending_deals(received_at). **Versioned migration system** (currently v6) — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
+| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. **12 tables:** deals, payments, prices, settings, whatsapp_messages, deliveries, settlements, schema_version, parsed_deals (legacy bot), meta_config, **pending_deals (Apr 10 — maker-checker queue with 19 columns including screenshot_url + screenshot_ocr)**, plus indexes on pending_deals(status) and pending_deals(received_at). **Versioned migration system** (currently v6) — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
 | Deal Code Parser | `deal-code-parser.ts` | **Pure function** that extracts structured fields from a WhatsApp lock-code message. Accepts `#NTK` / `#NTP` / `#NT` trigger variants (case-insensitive), parses direction (BUY/SELL), quantity + unit (kg/g/oz with normalisation to grams via 31.1035), metal (gold/silver/platinum/palladium with aliases XAU/XAG/XPT/XPD/PD/PT), purity (18K/20K/22K/24K/995/999/9999/4N with defaults), rate (USD per troy oz), premium (absolute or percent), and party alias. Returns `{is_deal_code, parsed, fields, errors}`. Validated against 9 test fixtures covering happy paths, edge cases, and a deliberately malformed input. |
+| Ignored Messages Buffer | `ignored-messages.ts` | **In-memory ring buffer** (max 100 entries) for WhatsApp text messages that arrive at the webhook but contain no `#NT` deal code trigger. Not persisted to the database — cleared on server restart. Shown in the `/review` **Ignored tab** as proof the bot is listening to everything and not silently dropping junk. Module-scoped state works because PM2 runs nt-metals as a single fork-mode instance. |
+| Orphaned Attachments Buffer | `orphaned-attachments.ts` | **In-memory ring buffer** (max 50 entries, 1-hour TTL) for WhatsApp image attachments that arrive without a matching deal context (no caption, no reply). When a later text message arrives as a reply to one of these orphans (via Meta's `msg.context.id`), the webhook attaches the orphan's OCR + screenshot_url to the new pending_deal and drops the orphan from the buffer. Auto-prunes expired entries on every push/find. |
+| Meta WhatsApp Helpers | `meta-whatsapp.ts` | `verifyWebhookSignature(payload, signature, appSecret)` — HMAC-SHA256 signature verification per Meta's spec (currently disabled in practice — see Known Issues). `downloadMedia(mediaId, accessToken)` — two-step Graph API flow (GET media URL → GET media bytes) returning a Buffer. `sendTextMessage()`, `markAsRead()` — outbound message helpers (not yet used). `getMetaConfig(db)` / `setMetaConfig(db, key, value)` — reads/writes the meta_config key-value store. |
+| Image OCR | `image-ocr.ts` | **Multi-provider OCR** with 4 backends: (1) Google Cloud Vision, (2) Claude Vision, (3) GPT-4o-mini, (4) **Tesseract (local, free, default)** via `execFileSync` with 15-30s timeout. The Tesseract path runs 3 passes: English first (fastest), then English+Chinese+Arabic with auto page segmentation, then digits-only as a last resort. `parseOcrText()` post-processes raw text to extract USDT/HKD/USD amounts, TRC-20 wallet addresses, tx hashes, timestamps, weights, and bar counts. Returns a structured `OcrResult`. `analyzeImage()` is the main entry point — picks the provider based on `meta_config.ocr_provider`. |
 | Types | `types.ts` | All interfaces: Deal (with refining_cost, total_cost, contact_name), Payment, Price, Delivery (buyer_type, shipping_cost, status), Settlement (amount_received, currency, channel, seller_paid), WhatsAppMessage, WhatsAppContact, StockSummary. Types: BuyerType, DeliveryStatus, SettlementStatus. Constants: YIELD_TABLE, METAL_SYMBOLS, GRAMS_PER_TROY_OZ, PURE_PURITIES |
 | Prices | `prices.ts` | Demo prices (Gold $2,341.5678, Silver $30.2450, Platinum $982.3400, Palladium $1,024.7800). Live fetch via goldapi.io (toggle) |
 | Calculations | `calculations.ts` | Stock summary, weighted avg cost, daily P&L, avg buy cost per metal |
