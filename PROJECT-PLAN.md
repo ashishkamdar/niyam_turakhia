@@ -407,6 +407,67 @@ Niyam asked to start WhatsApp automation on April 9 (1 hour after demo). He prov
 - **"k" = kg** (10k = 10kg = 10,000g). "LB" = London bar (~12.5kg).
 - **OroSoft** = their existing ERP (Mumbai-based, AWS-hosted). May have API access.
 
+#### Meta WhatsApp API — Safety & Costs
+
+**Is there a risk of getting blacklisted by Meta?** No. We are using Meta's official Cloud API for its intended purpose (reading business messages). This is what Salesforce, HubSpot, Zoho, and 200M+ business accounts do.
+
+| Action | Risk | Applies to us? |
+|--------|------|---------------|
+| Sending spam | High risk | No — we're a silent listener |
+| Bulk marketing without opt-in | High risk | No — we don't send marketing |
+| Unofficial/hacked WhatsApp APIs | Instant ban | No — official Meta Cloud API |
+| Scraping WhatsApp Web | Ban | No — using official webhook |
+| Too many messages sent | Rate limit | No — we send almost nothing |
+
+**The only risk** is if Niyam's WhatsApp Business number gets reported for spam by users — that's about his business behavior, not our API connection.
+
+**API Costs for Silent Listening:**
+
+| Action | Cost |
+|--------|------|
+| Receiving webhook notifications (all messages) | FREE — unlimited |
+| Reading message content | FREE — unlimited |
+| Reading images/media | FREE — unlimited |
+| Staff sends 5,000 messages/day on WhatsApp Web | FREE to us — we just listen |
+| Niyam sends a few messages via our bot | FREE — 1,000 replies/month free tier |
+| **Total monthly cost** | **$0.00** |
+
+**Can the webhook URL be changed after approval?** Yes — anytime, no re-approval. Just change it in Meta Dashboard. The approval is for the WhatsApp Business number, not the URL.
+
+#### Next Steps — Getting Meta Approval
+
+Niyam needs to:
+1. Go to **business.facebook.com** → Create Meta Business Account (as PrismX)
+2. Go to **developers.facebook.com** → Create App (Business type) → Add WhatsApp product
+3. In WhatsApp → Getting Started → Connect his business WhatsApp number
+4. Share with us: Phone Number ID + Access Token
+5. Configure webhook URL: `https://nt.areakpi.in/api/whatsapp/webhook`
+6. Subscribe to `messages` webhook field
+
+After that, messages flow into PrismX automatically. Staff changes nothing — they keep using WhatsApp Web.
+
+#### Staff Deal Entry Format
+
+Once live, staff can type a structured code for 100% accurate deal capture:
+```
+LOCK BUY 50KG GOLD -20
+LOCK SELL 10KG SILVER +1.2
+LOCK BUY 3KG PLATINUM -0.2%
+LOCK SELL 100KG PD -33
+```
+Format: `LOCK [BUY/SELL] [QTY] [METAL] [PREMIUM/DISCOUNT]`
+
+The bot also detects natural language deals from ongoing conversations (existing parser handles English + Chinese + Arabic).
+
+#### Quotation Sent
+- **Document:** docs/PrismX-Quotation.docx
+- **Total:** Rs 2,25,000 one-time (4 modules)
+- **Maintenance:** Rs 50,000/year (Year 1 free)
+- **Payment:** 50% advance + 50% on go-live
+- **Timeline:** 4 weeks
+- **Dashboard (Module 1) included free** — already demo'd
+- **Phase 3 (AI auto-negotiator) quoted separately** when needed
+
 ### Phase 2: Real WhatsApp Integration (NEXT)
 Connect the demo to real WhatsApp messages:
 
