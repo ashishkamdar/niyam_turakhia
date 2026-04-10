@@ -4,6 +4,21 @@ import { useCallback, useEffect, useState } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
+interface ScreenshotOcr {
+  provider?: string;
+  type?: "payment" | "barlist" | "receipt" | "unknown";
+  amount?: number;
+  currency?: string;
+  sender_wallet?: string;
+  receiver_wallet?: string;
+  transaction_id?: string;
+  date?: string;
+  status?: string;
+  weight_grams?: number;
+  bar_count?: number;
+  raw_text?: string;
+}
+
 interface PendingDeal {
   id: string;
   whatsapp_message_id: string;
@@ -24,6 +39,7 @@ interface PendingDeal {
   status: "pending" | "approved" | "rejected";
   reviewed_by: string | null;
   reviewed_at: string | null;
+  screenshot_ocr: ScreenshotOcr | null;
 }
 
 interface ReviewResponse {
@@ -397,6 +413,10 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
         </div>
       )}
 
+      {/* Screenshot OCR — shown when a payment/receipt image has been linked
+          to this deal (either via caption, reply, or orphan buffer matching) */}
+      {!editing && deal.screenshot_ocr && <OcrSection ocr={deal.screenshot_ocr} />}
+
       {/* ACTION BUTTONS — three mutually exclusive states:
             1. editing          → Save + Cancel
             2. (pending OR rejected) + unclassified + not editing → Approve-as picker + Reject
@@ -493,6 +513,109 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
             by {deal.reviewed_by ?? "—"} · {formatTime(deal.reviewed_at)}
           </span>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Screenshot OCR display ───────────────────────────────────────────────
+
+function truncateMiddle(s: string, keepStart = 6, keepEnd = 4): string {
+  if (s.length <= keepStart + keepEnd + 3) return s;
+  return `${s.slice(0, keepStart)}…${s.slice(-keepEnd)}`;
+}
+
+function OcrSection({ ocr }: { ocr: ScreenshotOcr }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasPayment = ocr.amount != null && ocr.currency;
+  const hasWallets = ocr.sender_wallet || ocr.receiver_wallet;
+  const hasTx = !!ocr.transaction_id;
+  const hasWeight = ocr.weight_grams != null || ocr.bar_count != null;
+  const kindLabel =
+    ocr.type === "payment"
+      ? "Payment screenshot"
+      : ocr.type === "barlist"
+      ? "Bar list photo"
+      : ocr.type === "receipt"
+      ? "Receipt"
+      : "Screenshot attached";
+
+  return (
+    <div className="mt-3 rounded border border-sky-500/30 bg-sky-500/5 p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] font-bold uppercase tracking-wide text-sky-300">
+          📎 {kindLabel}
+        </div>
+        {ocr.provider && (
+          <span className="text-[9px] italic text-sky-400/70">via {ocr.provider}</span>
+        )}
+      </div>
+
+      {hasPayment && (
+        <div className="mt-1.5 text-sm font-semibold text-white">
+          {ocr.currency}{" "}
+          {typeof ocr.amount === "number" ? ocr.amount.toLocaleString() : ocr.amount}
+          {ocr.status && (
+            <span className="ml-2 text-[10px] font-normal text-emerald-400">
+              · {ocr.status}
+            </span>
+          )}
+        </div>
+      )}
+
+      {hasWeight && (
+        <div className="mt-1.5 text-sm font-semibold text-white">
+          {ocr.weight_grams != null && <span>{(ocr.weight_grams / 1000).toFixed(3)} kg</span>}
+          {ocr.bar_count != null && (
+            <span className="ml-2 text-[10px] font-normal text-gray-400">
+              · {ocr.bar_count} pcs
+            </span>
+          )}
+        </div>
+      )}
+
+      {hasWallets && (
+        <div className="mt-1.5 space-y-0.5 font-mono text-[10px] text-gray-400">
+          {ocr.sender_wallet && (
+            <div>
+              <span className="text-gray-600">From:</span> {truncateMiddle(ocr.sender_wallet, 6, 4)}
+            </div>
+          )}
+          {ocr.receiver_wallet && (
+            <div>
+              <span className="text-gray-600">To:</span> {truncateMiddle(ocr.receiver_wallet, 6, 4)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasTx && ocr.transaction_id && (
+        <div className="mt-1 font-mono text-[10px] text-gray-400">
+          <span className="text-gray-600">Tx:</span> {truncateMiddle(ocr.transaction_id, 8, 6)}
+        </div>
+      )}
+
+      {ocr.date && (
+        <div className="mt-1 text-[10px] text-gray-400">
+          <span className="text-gray-600">Date:</span> {ocr.date}
+        </div>
+      )}
+
+      {ocr.raw_text && (
+        <>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-sky-400 hover:text-sky-300"
+          >
+            {expanded ? "Hide raw text ▲" : "Show raw text ▼"}
+          </button>
+          {expanded && (
+            <pre className="mt-1.5 w-full min-w-0 whitespace-pre-wrap break-all rounded bg-black/40 p-2 font-mono text-[10px] leading-snug text-gray-400">
+              {ocr.raw_text}
+            </pre>
+          )}
+        </>
       )}
     </div>
   );

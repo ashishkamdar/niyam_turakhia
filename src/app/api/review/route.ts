@@ -65,7 +65,8 @@ export async function GET(req: NextRequest) {
         .all(statusParam, limit) as Record<string, unknown>[];
     }
 
-    // Parse the parse_errors JSON blob for each row
+    // Parse the parse_errors JSON blob AND the screenshot_ocr JSON blob
+    // so the client gets native arrays/objects instead of strings.
     normalised = rows.map((row) => {
       const errBlob = row.parse_errors;
       let parseErrors: string[] = [];
@@ -77,7 +78,16 @@ export async function GET(req: NextRequest) {
           parseErrors = [String(errBlob)];
         }
       }
-      return { ...row, parse_errors: parseErrors };
+      const ocrBlob = row.screenshot_ocr;
+      let screenshotOcr: Record<string, unknown> | null = null;
+      if (typeof ocrBlob === "string" && ocrBlob.length > 0) {
+        try {
+          screenshotOcr = JSON.parse(ocrBlob);
+        } catch {
+          screenshotOcr = { raw_text: String(ocrBlob), type: "unknown" };
+        }
+      }
+      return { ...row, parse_errors: parseErrors, screenshot_ocr: screenshotOcr };
     });
   }
 
