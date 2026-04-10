@@ -77,12 +77,14 @@ export default function ReviewPage() {
   const [filter, setFilter] = useState<StatusFilter>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/review?status=${filter}`);
       if (res.ok) {
         setData(await res.json());
+        setLastLoaded(new Date());
       }
     } catch {
       // swallow — next poll will retry
@@ -149,10 +151,15 @@ export default function ReviewPage() {
     <div className="min-h-screen overflow-x-hidden bg-gray-950 pb-24 lg:pb-8 lg:pl-60">
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <header className="mb-4">
-          <h1 className="text-xl font-bold text-white">Deal Review</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Maker-checker queue for WhatsApp lock codes. Approve to write to SBS (Kachha) or OroSoft (Pakka).
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-bold text-white">Deal Review</h1>
+              <p className="mt-1 text-sm text-gray-400">
+                Maker-checker queue for WhatsApp lock codes. Approve to write to SBS (Kachha) or OroSoft (Pakka).
+              </p>
+            </div>
+            <LiveIndicator lastLoaded={lastLoaded} />
+          </div>
         </header>
 
         {/* Filter tabs */}
@@ -350,6 +357,37 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProp
 }
 
 // ── Small UI bits ────────────────────────────────────────────────────────
+
+function LiveIndicator({ lastLoaded }: { lastLoaded: Date | null }) {
+  // Tick once per second so the "Xs ago" label stays current even when no new
+  // data arrives. This is purely a display clock; it does NOT trigger data fetches.
+  const [now, setNow] = useState<Date>(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const ago = lastLoaded
+    ? Math.max(0, Math.floor((now.getTime() - lastLoaded.getTime()) / 1000))
+    : null;
+  const label =
+    ago === null ? "connecting…" : ago < 2 ? "just now" : `${ago}s ago`;
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1">
+      <span className="relative flex size-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+        <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+      </span>
+      <div className="flex flex-col leading-tight">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-400">
+          Live
+        </span>
+        <span className="text-[9px] text-emerald-500/70">{label}</span>
+      </div>
+    </div>
+  );
+}
 
 function TypeBadge({ type }: { type: "K" | "P" | null }) {
   if (type === "K") {
