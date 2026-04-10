@@ -45,6 +45,98 @@
 
 ---
 
+## 🎯 CURRENT BUILD STATUS — April 10, 2026
+
+**Phase A (Maker-Checker Review Pipeline) is SHIPPED and ready to demo to Niyam.** The scope changed on April 10 after two meetings with Niyam at Matunga Gymkhana and his Matunga office. Key decisions captured below; the rest of this document reflects the earlier plan as historical context.
+
+### Scope change in one paragraph
+
+Instead of building a bot that parses free-text WhatsApp chatter and tries to infer which messages are deals (the original plan), **staff will post a structured lock code into a single internal WhatsApp group** whenever they close a deal. The bot listens to that group, parses each code line into a deal record, and routes it through a **maker-checker review screen** before the deal is written to the downstream accounting systems. There are **two downstream systems**: **SBS** for Kachha (off-the-books) deals, and **OroSoft Neo Financials** for Pakka (official/invoiced) deals. The bot decides which path a deal takes based on the trigger the maker used — or the checker picks at review time.
+
+### The lock code format (finalised)
+
+Staff post one of three trigger variants:
+
+| Trigger | Meaning |
+|---|---|
+| `#NTK` | Explicit Kachha (black / SBS) |
+| `#NTP` | Explicit Pakka (white / OroSoft) |
+| `#NT` | Unclassified — checker picks K or P in the review UI |
+
+Grammar: `<TRIGGER> <BUY\|SELL> <QTY><UNIT> <METAL> [<PURITY>] @<RATE> [<PREMIUM>] <PARTY>`
+
+Real-world examples (all tested end-to-end April 10):
+
+```
+#NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG
+#NTK BUY 50KG SILVER 999 @70.51 +1.2 SAPAN
+#NTP SELL 2KG PLATINUM 999 @979.25 -4 SHAH
+#NT SELL 1KG PALLADIUM 999 @1021.50 -15 CHANG
+#NTP BUY 5KG GOLD 22K @2556.40 -0.2% PATEL
+#NTK SELL 100 OZ SILVER 999 @71.85 +1.0 KARIM
+#NTp sell 25kg gold 24k @2567.15 -0.15 LIWEI
+```
+
+Parser is case-insensitive on the trigger, direction, purity, and metal. Unit normalisation handles KG / KGS / G / GRAMS / OZ (troy ounces → grams via 31.1035). Premium accepts absolute (`-4`) or percent (`-0.2%`). Party alias is free-form alphanumeric. Multiple deals can be **batched in one WhatsApp message** (line-separated) — the webhook splits on newlines and creates one pending row per line.
+
+### The maker-checker pipeline (live)
+
+```
+Internal staff WhatsApp group (#NTK / #NTP / #NT codes)
+        │
+  Meta Cloud API webhook → https://nt.areakpi.in/api/whatsapp/webhook
+        │
+  Parse each line → pending_deals table (status='pending')
+        │
+  /review screen shows cards in real time (3-second auto-refresh)
+  Niyam or a designated checker reviews each deal:
+    · For #NTK / #NTP: tap Approve or Reject
+    · For #NT (unclassified): tap "Approve as Kachha" or "Approve as Pakka"
+      (one-tap atomic classify + approve)
+        │
+  ┌──────────────────────┬─────────────────────┐
+  APPROVED Kachha         APPROVED Pakka       REJECTED
+  ↓                       ↓                    ↓
+  Append to SBS Excel     Push to OroSoft API  Marked, audit-logged
+  (⏳ next build chunk)   (⏳ gated on         (implicit now)
+                          Monday Apr 13
+                          OroSoft meeting)
+```
+
+### What's live at nt.areakpi.in right now
+
+| Feature | Status | URL / file |
+|---|---|---|
+| `#NTK` / `#NTP` / `#NT` deal code parser (pure function, 9 test fixtures) | ✅ Live | `src/lib/deal-code-parser.ts` |
+| Meta Cloud API webhook (inbound only) | ✅ Live | https://nt.areakpi.in/api/whatsapp/webhook |
+| Webhook handler splits batched messages on newlines → one row per deal line | ✅ Live | `src/app/api/whatsapp/webhook/route.ts` |
+| `pending_deals` table (migration v6) | ✅ Live | `src/lib/db.ts` |
+| Review API (list, counts, approve, reject, patch) | ✅ Live | `/api/review`, `/api/review/[id]` |
+| Deal Review screen — mobile-first cards, one-tap classify+approve for `#NT` | ✅ Live | https://nt.areakpi.in/review |
+| Auto-refresh polling every 3 seconds with visible "Live" indicator | ✅ Live | `/review` header |
+| End-to-end tested with real WhatsApp messages via Meta Test Number | ✅ Live | Ashish's `test2WattsApp` app (App ID `1184960910192872`, Test Number `+1 555 629 9466`, Phone Number ID `835944509608655`) |
+
+### What's NEXT
+
+| Phase | Status | Blocked on |
+|---|---|---|
+| **Kachha → SBS Excel writer** | ⏳ Next build chunk | Nothing — Bullion Sales Order.xlsx schema confirmed |
+| **Pakka → OroSoft API writer** | ⏳ In progress | **Monday April 13, 11:15 AM meeting with OroSoft** — their API is not publicly documented, so integration shape is unknown until that meeting |
+| **Screenshot OCR on review cards** | ⏳ Queued | Tesseract local is preferred for Kachha (privacy); access token required for Meta media download (will be entered in PrismX Settings UI, not chat) |
+| **Niyam's own Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Documents uploaded by Niyam + domain verification at prismx.org |
+| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | Same endpoint, different number — ~10-minute switch once verified |
+
+### What's SUPERSEDED from the original plan
+
+The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
+
+- **Free-text "lock" keyword parsing** — replaced by structured `#NT` trigger. The old `/bot` tab still exists as an archive of the 63 historical deals but is **not** the production path.
+- **Multilingual deal-keyword extraction (Chinese, Arabic)** — not needed for structured codes. Party names may still be non-English but the code syntax is ASCII.
+- **Watching all customer-facing WhatsApp chats** — replaced by listening to one internal staff group only. Customer chats are no longer parsed.
+- **Bot Phase 4 (auto-negotiator)** — still on the roadmap but **deferred** until Phase A + B + C ship and the maker-checker flow is stable.
+
+---
+
 ## What We Built: Real-Time MIS Dashboard
 
 **Live at: https://nt.areakpi.in**
@@ -63,6 +155,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Page | Route | Description |
 |------|-------|-------------|
+| **Review** | `/review` | **Maker-checker queue for WhatsApp lock codes (Phase A, April 10, 2026).** Shows pending/approved/rejected tabs with counts, card-based list of pending_deals ordered newest-first, one-tap approve/reject, atomic classify-and-approve for unclassified `#NT` cards (green "Approve as Kachha" + "Approve as Pakka" picker), parse-error panel for malformed messages, visible pulsing "Live" indicator with "Xs ago" timestamp, 3-second polling auto-refresh, mobile-first layout with overflow protection. |
 | **Dashboard** | `/` | **Portfolio bar** (total AED value + per-metal stock in hand with low stock warnings below 5kg). **Start Demo button** (seeds 50kg opening stock, runs 25 WhatsApp chats for 10 min with live stats: messages/negotiating/locked). **Hero profit card** (today's realized P&L). **Weekly P&L bar chart** (7-day Recharts). **WhatsApp Deals** section (negotiating count + locked count + deal cards). **4 stat cards** (Buys, Sales, Stock Value, Unrealized P&L). **Funds Received from HK** (HKD/USD/USDT with FX rates to AED + "Transfer to Dubai Account" button → ADCB bank receipt). **Delivery pipeline** (preparing/in transit/pending). **Recent activity** with metal colors. All auto-refreshes every 3 seconds + instant refresh on deal lock via dealTick. |
 | **Stock In Hand** | `/stock` | Per-metal summary cards (total grams, avg cost, market value, unrealized P&L, location badges). Tap any metal → drill-down to individual lots with purchase date, purity, qty, status |
 | **Purchase & Sales** | `/deals` | Two tabs: **Purchase** (metal, purity, qty, rate + refining section auto-shows for impure metals with yield%, wastage, refining cost, effective cost per oz/gram) and **Sale** (always 24K, buyer name, warns if selling at/below avg cost with red confirmation). WhatsApp Locked Deals at top. Recent Purchases (with REFINED badge) and Recent Sales below. |
@@ -80,6 +173,10 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 | `/api/deals` | GET, POST | Deal CRUD with filtering (direction, metal, status, limit). Auto-calculates pure equivalent on create |
 | `/api/payments` | GET, POST | Payment/settlement CRUD |
 | `/api/whatsapp` | GET, POST | WhatsApp messages. GET returns contacts summary or messages for a contact. POST stores message + auto-creates deal if "lock" detected |
+| `/api/whatsapp/webhook` | GET, POST | **Meta Cloud API webhook endpoint.** GET handles Meta verification handshake (challenge/response). POST receives inbound messages, splits on newlines, parses each line with `parseDealCode`, and inserts pending_deals rows. Legacy free-text "lock" keyword branch still runs as a fallback. |
+| `/api/whatsapp/config` | GET, POST | Stores Meta WhatsApp credentials (phone_number_id, access_token, app_secret, verify_token) in the `meta_config` table |
+| `/api/review` | GET | **Lists pending_deals with status filter** (`?status=pending\|approved\|rejected\|all`), returns counts per status for nav badges |
+| `/api/review/[id]` | PATCH, POST | **Maker-checker mutations.** PATCH updates writable fields (deal_type, direction, qty_grams, metal, purity, rate, premium, party, notes). POST with `{action:"approve"}` approves; POST with `{action:"approve",deal_type:"K"\|"P"}` atomically classifies + approves in one transaction (used by unclassified `#NT` cards). POST with `{action:"reject"}` rejects. |
 | `/api/simulator` | POST | Reset all data and re-seed |
 | `/api/deliveries` | GET, POST | Delivery CRUD (filter by status). Tracks shipments to HK with buyer info, weight, shipping cost, status |
 | `/api/settlements` | GET, POST | Settlement CRUD (filter by status). Tracks payment received → transfer to Dubai → seller payment |
@@ -111,7 +208,8 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Module | File | Purpose |
 |--------|------|---------|
-| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. **8 tables:** deals, payments, prices, settings, whatsapp_messages, deliveries, settlements, schema_version. **Versioned migration system** (currently v3) — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
+| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. **12 tables:** deals, payments, prices, settings, whatsapp_messages, deliveries, settlements, schema_version, parsed_deals (legacy bot), meta_config, **pending_deals (new Apr 10 — maker-checker queue with 19 columns)**, plus indexes on pending_deals(status) and pending_deals(received_at). **Versioned migration system** (currently v6) — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
+| Deal Code Parser | `deal-code-parser.ts` | **Pure function** that extracts structured fields from a WhatsApp lock-code message. Accepts `#NTK` / `#NTP` / `#NT` trigger variants (case-insensitive), parses direction (BUY/SELL), quantity + unit (kg/g/oz with normalisation to grams via 31.1035), metal (gold/silver/platinum/palladium with aliases XAU/XAG/XPT/XPD/PD/PT), purity (18K/20K/22K/24K/995/999/9999/4N with defaults), rate (USD per troy oz), premium (absolute or percent), and party alias. Returns `{is_deal_code, parsed, fields, errors}`. Validated against 9 test fixtures covering happy paths, edge cases, and a deliberately malformed input. |
 | Types | `types.ts` | All interfaces: Deal (with refining_cost, total_cost, contact_name), Payment, Price, Delivery (buyer_type, shipping_cost, status), Settlement (amount_received, currency, channel, seller_paid), WhatsAppMessage, WhatsAppContact, StockSummary. Types: BuyerType, DeliveryStatus, SettlementStatus. Constants: YIELD_TABLE, METAL_SYMBOLS, GRAMS_PER_TROY_OZ, PURE_PURITIES |
 | Prices | `prices.ts` | Demo prices (Gold $2,341.5678, Silver $30.2450, Platinum $982.3400, Palladium $1,024.7800). Live fetch via goldapi.io (toggle) |
 | Calculations | `calculations.ts` | Stock summary, weighted avg cost, daily P&L, avg buy cost per metal |
@@ -361,6 +459,8 @@ Month 3+:
 - Deployed at https://nt.areakpi.in
 
 ### WhatsApp Bot (Niyam's Priority — Quote Expected)
+
+> **⚠️ SUPERSEDED April 10, 2026.** The architecture in this section reflects the pre-April-10 plan (free-text parsing with lock keyword detection). It has been replaced by the Maker-Checker Review Pipeline — see the "CURRENT BUILD STATUS — April 10, 2026" section at the top of this document. The content below is preserved for historical context and because the Meta webhook infrastructure (Bot Phase 2) was reused wholesale by the new architecture.
 
 Niyam asked to start WhatsApp automation on April 9 (1 hour after demo). He provided 2 real WhatsApp chat exports. His business runs on **WhatsApp Business**. He expects a formal quote.
 
