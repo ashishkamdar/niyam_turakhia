@@ -301,7 +301,14 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
 
   const hasErrors = deal.parse_errors.length > 0;
   const isUnclassified = deal.deal_type === null;
-  const canEdit = deal.status === "pending";
+  // Edit + actions are available on both pending and rejected deals:
+  //  - pending: normal review flow (approve / reject / edit before deciding)
+  //  - rejected: rescue flow (fix fields and re-evaluate, or re-approve directly)
+  // Approved deals stay view-only — once approved, they'll eventually have
+  // downstream side effects (SBS Excel append, OroSoft API push) and must
+  // be immutable to prevent drift between PrismX and the accounting systems.
+  const canEdit = deal.status === "pending" || deal.status === "rejected";
+  const showActions = canEdit; // same gating — any card that can be edited can also be re-decided
   const isBusy = busy || saving;
 
   function toggleEdit() {
@@ -392,8 +399,11 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
 
       {/* ACTION BUTTONS — three mutually exclusive states:
             1. editing          → Save + Cancel
-            2. pending + unclassified + not editing → Approve-as picker + Reject
-            3. pending + classified + not editing   → Approve + Reject  */}
+            2. (pending OR rejected) + unclassified + not editing → Approve-as picker + Reject
+            3. (pending OR rejected) + classified + not editing   → Approve + Reject
+          Rejected cards also get action buttons so staff can "rescue" a
+          mistakenly-rejected deal by re-approving it. Approving a rejected
+          deal is a direct status flip (no pending intermediate). */}
       {editing ? (
         <div className="mt-4 flex gap-2">
           <button
@@ -411,11 +421,11 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
             Cancel
           </button>
         </div>
-      ) : deal.status === "pending" && isUnclassified ? (
+      ) : showActions && isUnclassified ? (
         <>
           <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-2.5">
             <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-amber-400">
-              Approve as
+              {deal.status === "rejected" ? "Reconsider as" : "Approve as"}
             </div>
             <div className="flex gap-2">
               <button
@@ -434,32 +444,36 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
               </button>
             </div>
           </div>
-          <div className="mt-3">
-            <button
-              onClick={() => onReject(deal)}
-              disabled={isBusy}
-              className="w-full rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
-            >
-              Reject
-            </button>
-          </div>
+          {deal.status === "pending" && (
+            <div className="mt-3">
+              <button
+                onClick={() => onReject(deal)}
+                disabled={isBusy}
+                className="w-full rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          )}
         </>
-      ) : deal.status === "pending" ? (
+      ) : showActions ? (
         <div className="mt-4 flex gap-2">
           <button
             onClick={() => onApprove(deal)}
             disabled={isBusy}
             className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
           >
-            {isBusy ? "…" : "Approve"}
+            {isBusy ? "…" : deal.status === "rejected" ? "Approve anyway" : "Approve"}
           </button>
-          <button
-            onClick={() => onReject(deal)}
-            disabled={isBusy}
-            className="flex-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
-          >
-            Reject
-          </button>
+          {deal.status === "pending" && (
+            <button
+              onClick={() => onReject(deal)}
+              disabled={isBusy}
+              className="flex-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          )}
         </div>
       ) : null}
 
