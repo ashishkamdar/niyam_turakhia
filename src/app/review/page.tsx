@@ -97,20 +97,6 @@ export default function ReviewPage() {
     return () => clearInterval(poll);
   }, [load]);
 
-  async function classifyAs(id: string, dealType: "K" | "P") {
-    setBusyId(id);
-    try {
-      await fetch(`/api/review/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deal_type: dealType }),
-      });
-      await load();
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   async function approve(deal: PendingDeal) {
     if (deal.deal_type !== "K" && deal.deal_type !== "P") return;
     setBusyId(deal.id);
@@ -119,6 +105,22 @@ export default function ReviewPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "approve" }),
+      });
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Atomic classify-and-approve for unclassified (#NT) cards.
+  // The server handles both field updates in a single POST /api/review/:id transaction.
+  async function approveAs(id: string, dealType: "K" | "P") {
+    setBusyId(id);
+    try {
+      await fetch(`/api/review/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve", deal_type: dealType }),
       });
       await load();
     } finally {
@@ -194,7 +196,7 @@ export default function ReviewPage() {
                 key={deal.id}
                 deal={deal}
                 busy={busyId === deal.id}
-                onClassify={classifyAs}
+                onApproveAs={approveAs}
                 onApprove={approve}
                 onReject={reject}
               />
@@ -211,15 +213,14 @@ export default function ReviewPage() {
 interface DealCardProps {
   deal: PendingDeal;
   busy: boolean;
-  onClassify: (id: string, type: "K" | "P") => void;
+  onApproveAs: (id: string, type: "K" | "P") => void;
   onApprove: (deal: PendingDeal) => void;
   onReject: (deal: PendingDeal) => void;
 }
 
-function DealCard({ deal, busy, onClassify, onApprove, onReject }: DealCardProps) {
+function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProps) {
   const hasErrors = deal.parse_errors.length > 0;
   const isUnclassified = deal.deal_type === null;
-  const canApprove = deal.status === "pending" && !isUnclassified && !busy;
 
   return (
     <div
@@ -269,38 +270,50 @@ function DealCard({ deal, busy, onClassify, onApprove, onReject }: DealCardProps
         <Field label="Party" value={deal.party_alias ?? "—"} mono />
       </div>
 
-      {/* Classify picker for unclassified #NT items */}
+      {/* Actions for UNCLASSIFIED cards: Approve-as-Kachha / Approve-as-Pakka / Reject.
+          Each picker button does classify + approve atomically in one tap. */}
       {deal.status === "pending" && isUnclassified && (
-        <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-2.5">
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-amber-400">
-            Classify before approving
+        <>
+          <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-2.5">
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-amber-400">
+              Approve as
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onApproveAs(deal.id, "K")}
+                disabled={busy}
+                className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {busy ? "…" : "Kachha (SBS)"}
+              </button>
+              <button
+                onClick={() => onApproveAs(deal.id, "P")}
+                disabled={busy}
+                className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {busy ? "…" : "Pakka (OroSoft)"}
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
+          <div className="mt-3">
             <button
-              onClick={() => onClassify(deal.id, "K")}
+              onClick={() => onReject(deal)}
               disabled={busy}
-              className="flex-1 rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+              className="w-full rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
             >
-              Kachha (SBS)
-            </button>
-            <button
-              onClick={() => onClassify(deal.id, "P")}
-              disabled={busy}
-              className="flex-1 rounded-md border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 disabled:opacity-50"
-            >
-              Pakka (OroSoft)
+              Reject
             </button>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Actions */}
-      {deal.status === "pending" && (
+      {/* Actions for ALREADY CLASSIFIED cards (explicit #NTK/#NTP triggers): simple Approve + Reject */}
+      {deal.status === "pending" && !isUnclassified && (
         <div className="mt-4 flex gap-2">
           <button
             onClick={() => onApprove(deal)}
-            disabled={!canApprove}
-            className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-600/30 disabled:text-emerald-200/40"
+            disabled={busy}
+            className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
           >
             {busy ? "…" : "Approve"}
           </button>
