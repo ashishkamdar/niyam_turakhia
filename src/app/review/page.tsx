@@ -40,6 +40,7 @@ interface PendingDeal {
   reviewed_by: string | null;
   reviewed_at: string | null;
   screenshot_ocr: ScreenshotOcr | null;
+  screenshot_url: string | null;
 }
 
 interface ReviewResponse {
@@ -383,7 +384,9 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
       {/* Screenshot OCR — placed directly under the raw message so the reviewer
           sees the payment evidence side-by-side with the deal text, before
           examining the parsed fields below. Hidden in edit mode. */}
-      {!editing && deal.screenshot_ocr && <OcrSection ocr={deal.screenshot_ocr} />}
+      {!editing && (deal.screenshot_ocr || deal.screenshot_url) && (
+        <OcrSection ocr={deal.screenshot_ocr} screenshotUrl={deal.screenshot_url} />
+      )}
 
       {/* Parse errors — only shown in view mode; editing clears the visual noise */}
       {hasErrors && !editing && (
@@ -527,18 +530,24 @@ function truncateMiddle(s: string, keepStart = 6, keepEnd = 4): string {
   return `${s.slice(0, keepStart)}…${s.slice(-keepEnd)}`;
 }
 
-function OcrSection({ ocr }: { ocr: ScreenshotOcr }) {
+function OcrSection({
+  ocr,
+  screenshotUrl,
+}: {
+  ocr: ScreenshotOcr | null;
+  screenshotUrl: string | null;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const hasPayment = ocr.amount != null && ocr.currency;
-  const hasWallets = ocr.sender_wallet || ocr.receiver_wallet;
-  const hasTx = !!ocr.transaction_id;
-  const hasWeight = ocr.weight_grams != null || ocr.bar_count != null;
+  const hasPayment = !!ocr && ocr.amount != null && ocr.currency;
+  const hasWallets = !!ocr && (ocr.sender_wallet || ocr.receiver_wallet);
+  const hasTx = !!ocr?.transaction_id;
+  const hasWeight = !!ocr && (ocr.weight_grams != null || ocr.bar_count != null);
   const kindLabel =
-    ocr.type === "payment"
+    ocr?.type === "payment"
       ? "Payment screenshot"
-      : ocr.type === "barlist"
+      : ocr?.type === "barlist"
       ? "Bar list photo"
-      : ocr.type === "receipt"
+      : ocr?.type === "receipt"
       ? "Receipt"
       : "Screenshot attached";
 
@@ -548,12 +557,29 @@ function OcrSection({ ocr }: { ocr: ScreenshotOcr }) {
         <div className="text-[10px] font-bold uppercase tracking-wide text-sky-300">
           📎 {kindLabel}
         </div>
-        {ocr.provider && (
+        {ocr?.provider && (
           <span className="text-[9px] italic text-sky-400/70">via {ocr.provider}</span>
         )}
       </div>
 
-      {hasPayment && (
+      {/* Image thumbnail — tap to open full size in a new tab */}
+      {screenshotUrl && (
+        <a
+          href={screenshotUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 block"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={screenshotUrl}
+            alt="Payment screenshot"
+            className="max-h-48 w-auto rounded border border-white/10 transition hover:border-sky-400/60"
+          />
+        </a>
+      )}
+
+      {hasPayment && ocr && (
         <div className="mt-1.5 text-sm font-semibold text-white">
           {ocr.currency}{" "}
           {typeof ocr.amount === "number" ? ocr.amount.toLocaleString() : ocr.amount}
@@ -565,7 +591,7 @@ function OcrSection({ ocr }: { ocr: ScreenshotOcr }) {
         </div>
       )}
 
-      {hasWeight && (
+      {hasWeight && ocr && (
         <div className="mt-1.5 text-sm font-semibold text-white">
           {ocr.weight_grams != null && <span>{(ocr.weight_grams / 1000).toFixed(3)} kg</span>}
           {ocr.bar_count != null && (
@@ -576,7 +602,7 @@ function OcrSection({ ocr }: { ocr: ScreenshotOcr }) {
         </div>
       )}
 
-      {hasWallets && (
+      {hasWallets && ocr && (
         <div className="mt-1.5 space-y-0.5 font-mono text-[10px] text-gray-400">
           {ocr.sender_wallet && (
             <div>
@@ -591,19 +617,19 @@ function OcrSection({ ocr }: { ocr: ScreenshotOcr }) {
         </div>
       )}
 
-      {hasTx && ocr.transaction_id && (
+      {hasTx && ocr?.transaction_id && (
         <div className="mt-1 font-mono text-[10px] text-gray-400">
           <span className="text-gray-600">Tx:</span> {truncateMiddle(ocr.transaction_id, 8, 6)}
         </div>
       )}
 
-      {ocr.date && (
+      {ocr?.date && (
         <div className="mt-1 text-[10px] text-gray-400">
           <span className="text-gray-600">Date:</span> {ocr.date}
         </div>
       )}
 
-      {ocr.raw_text && (
+      {ocr?.raw_text && (
         <>
           <button
             type="button"

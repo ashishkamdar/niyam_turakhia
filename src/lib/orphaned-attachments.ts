@@ -30,6 +30,9 @@ export interface OrphanedAttachment {
   sender_phone: string;
   sender_name: string;
   ocr: OcrResult;
+  /** Relative URL under which the saved image file is served, e.g. "/api/screenshots/<uuid>.jpg".
+      Null if the file failed to save (OCR still available). */
+  screenshot_url: string | null;
   /** ISO timestamp of when the image was received */
   received_at: string;
 }

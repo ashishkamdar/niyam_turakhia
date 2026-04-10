@@ -33,3 +33,7 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# WhatsApp payment screenshots — saved by the webhook, served via /api/screenshots
+# Contains sensitive financial data. Never commit.
+/screenshots/

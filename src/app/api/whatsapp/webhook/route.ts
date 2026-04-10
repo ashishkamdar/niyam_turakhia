@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { v4 as uuid } from "uuid";
+import fs from "fs/promises";
+import path from "path";
 import { verifyWebhookSignature, downloadMedia, getMetaConfig } from "@/lib/meta-whatsapp";
 import { analyzeImage, type OcrProvider, type OcrResult } from "@/lib/image-ocr";
 import { parseDealCode } from "@/lib/deal-code-parser";
@@ -10,6 +12,29 @@ import {
   findOrphanByWaMessageId,
   removeOrphanByWaMessageId,
 } from "@/lib/orphaned-attachments";
+
+const SCREENSHOTS_DIR = path.join(process.cwd(), "screenshots");
+
+/** Pick an image file extension from the MIME type. Falls back to jpg. */
+function extFromMime(mimeType: string): "jpg" | "png" | "webp" {
+  if (mimeType.includes("png")) return "png";
+  if (mimeType.includes("webp")) return "webp";
+  return "jpg";
+}
+
+/** Save image bytes to the screenshots directory. Returns the public URL or null on failure. */
+async function saveScreenshot(imageBuffer: Buffer, mimeType: string): Promise<string | null> {
+  try {
+    await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+    const filename = `${uuid()}.${extFromMime(mimeType)}`;
+    await fs.writeFile(path.join(SCREENSHOTS_DIR, filename), imageBuffer);
+    return `/api/screenshots/${filename}`;
+  } catch {
+    // Best-effort — if the filesystem write fails, OCR still goes through,
+    // just without a visible thumbnail on the card.
+    return null;
+  }
+}
 
 // GET — Meta webhook verification
 export async function GET(req: NextRequest) {
@@ -75,6 +100,9 @@ export async function POST(req: NextRequest) {
         // message is an image AND the Meta access_token is configured so we
         // can download the media via the Graph API).
         let ocrResult: OcrResult | null = null;
+        // Public URL under which the saved image file is served (set in the
+        // image branch below). Used to render a thumbnail on the review card.
+        let screenshotUrl: string | null = null;
 
         if (msg.type === "text") {
           messageText = msg.text?.body ?? "";
@@ -85,6 +113,11 @@ export async function POST(req: NextRequest) {
             if (accessToken) {
               const imageBuffer = await downloadMedia(msg.image.id, accessToken);
               const mimeType = msg.image.mime_type ?? "image/jpeg";
+
+              // Save the image to disk (best-effort) before running OCR so the
+              // file lands even if OCR itself takes a while.
+              screenshotUrl = await saveScreenshot(imageBuffer, mimeType);
+
               const provider = (config.ocr_provider as OcrProvider | undefined) ?? undefined;
               ocrResult = await analyzeImage(imageBuffer, mimeType, {
                 provider,
@@ -142,8 +175,8 @@ export async function POST(req: NextRequest) {
             INSERT INTO pending_deals (
               id, whatsapp_message_id, sender_phone, sender_name, raw_message, received_at,
               deal_type, direction, qty_grams, metal, purity, rate_usd_per_oz,
-              premium_type, premium_value, party_alias, parse_errors, status, screenshot_ocr
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+              premium_type, premium_value, party_alias, parse_errors, status, screenshot_ocr, screenshot_url
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
           `).run(
             pendingId,
             waMessageId || msgId, // prefer Meta's real id for reply matching; fall back to our uuid
@@ -161,7 +194,8 @@ export async function POST(req: NextRequest) {
             parseResult.fields.premium_value,
             parseResult.fields.party_alias,
             parseErrorsJson,
-            ocrJsonForNewDeals
+            ocrJsonForNewDeals,
+            screenshotUrl
           );
           dealsInsertedFromThisMessage++;
           insertedDealIds.push(pendingId);
@@ -170,7 +204,8 @@ export async function POST(req: NextRequest) {
         // ── Attachment linking cases ──
 
         // Case A: TEXT message replying to an earlier orphaned image.
-        //         Attach the orphan's OCR to the first deal created from this text.
+        //         Attach the orphan's OCR + screenshot URL to the first deal
+        //         created from this text.
         if (
           msg.type === "text" &&
           replyToWaId &&
@@ -180,14 +215,14 @@ export async function POST(req: NextRequest) {
           const orphan = findOrphanByWaMessageId(replyToWaId);
           if (orphan) {
             db.prepare(
-              "UPDATE pending_deals SET screenshot_ocr = ? WHERE id = ?"
-            ).run(JSON.stringify(orphan.ocr), insertedDealIds[0]);
+              "UPDATE pending_deals SET screenshot_ocr = ?, screenshot_url = ? WHERE id = ?"
+            ).run(JSON.stringify(orphan.ocr), orphan.screenshot_url, insertedDealIds[0]);
             removeOrphanByWaMessageId(replyToWaId);
           }
         }
 
         // Case B: IMAGE with no deal-code caption, replying to an earlier text deal.
-        //         Attach THIS image's OCR to that earlier deal.
+        //         Attach THIS image's OCR + screenshot URL to that earlier deal.
         if (
           msg.type === "image" &&
           ocrResult &&
@@ -201,8 +236,8 @@ export async function POST(req: NextRequest) {
             .get(replyToWaId) as { id: string } | undefined;
           if (existing) {
             db.prepare(
-              "UPDATE pending_deals SET screenshot_ocr = ? WHERE id = ?"
-            ).run(JSON.stringify(ocrResult), existing.id);
+              "UPDATE pending_deals SET screenshot_ocr = ?, screenshot_url = ? WHERE id = ?"
+            ).run(JSON.stringify(ocrResult), screenshotUrl, existing.id);
           } else if (waMessageId) {
             // Context target isn't a known pending deal — buffer as orphan
             pushOrphan({
@@ -210,6 +245,7 @@ export async function POST(req: NextRequest) {
               sender_phone: senderPhone,
               sender_name: senderName,
               ocr: ocrResult,
+              screenshot_url: screenshotUrl,
               received_at: timestamp,
             });
           }
@@ -228,6 +264,7 @@ export async function POST(req: NextRequest) {
             sender_phone: senderPhone,
             sender_name: senderName,
             ocr: ocrResult,
+            screenshot_url: screenshotUrl,
             received_at: timestamp,
           });
         }
