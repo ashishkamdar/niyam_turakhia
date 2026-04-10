@@ -28,10 +28,10 @@ interface PendingDeal {
 
 interface ReviewResponse {
   deals: PendingDeal[];
-  counts: { pending: number; approved: number; rejected: number };
+  counts: { pending: number; approved: number; rejected: number; ignored: number };
 }
 
-type StatusFilter = "pending" | "approved" | "rejected";
+type StatusFilter = "pending" | "approved" | "rejected" | "ignored";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -145,7 +145,7 @@ export default function ReviewPage() {
   }
 
   const deals = data?.deals ?? [];
-  const counts = data?.counts ?? { pending: 0, approved: 0, rejected: 0 };
+  const counts = data?.counts ?? { pending: 0, approved: 0, rejected: 0, ignored: 0 };
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-gray-950 pb-24 lg:pb-8 lg:pl-60">
@@ -164,20 +164,20 @@ export default function ReviewPage() {
 
         {/* Filter tabs */}
         <div className="mb-4 flex gap-1 rounded-lg border border-white/10 bg-gray-900 p-1">
-          {(["pending", "approved", "rejected"] as StatusFilter[]).map((f) => {
+          {(["pending", "approved", "rejected", "ignored"] as StatusFilter[]).map((f) => {
             const count = counts[f];
             const active = filter === f;
             return (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold capitalize transition ${
+                className={`flex-1 rounded-md px-2 py-2 text-[11px] font-semibold capitalize transition ${
                   active ? "bg-amber-500/20 text-amber-300" : "text-gray-400 hover:text-white"
                 }`}
               >
                 {f}
                 {count > 0 && (
-                  <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-amber-500/30" : "bg-white/10"}`}>
+                  <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-amber-500/30" : "bg-white/10"}`}>
                     {count}
                   </span>
                 )}
@@ -191,24 +191,37 @@ export default function ReviewPage() {
           <div className="py-16 text-center text-sm text-gray-500">Loading…</div>
         ) : deals.length === 0 ? (
           <div className="py-16 text-center">
-            <div className="text-sm text-gray-500">No {filter} deals</div>
+            <div className="text-sm text-gray-500">
+              {filter === "ignored" ? "No ignored messages" : `No ${filter} deals`}
+            </div>
             <div className="mt-2 text-xs text-gray-600">
-              Send a WhatsApp message starting with <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-amber-300">#NTP</code>, <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-amber-300">#NTK</code>, or <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-amber-300">#NT</code> to the bot.
+              {filter === "ignored" ? (
+                <>Any non-deal WhatsApp message to the bot will show up here as proof it was received.</>
+              ) : (
+                <>Send a WhatsApp message starting with <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-amber-300">#NTP</code>, <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-amber-300">#NTK</code>, or <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-amber-300">#NT</code> to the bot.</>
+              )}
             </div>
           </div>
         ) : (
           <div className="space-y-3">
-            {deals.map((deal) => (
-              <DealCard
-                key={deal.id}
-                deal={deal}
-                busy={busyId === deal.id}
-                onApproveAs={approveAs}
-                onApprove={approve}
-                onReject={reject}
-              />
-            ))}
+            {filter === "ignored"
+              ? deals.map((deal) => <IgnoredCard key={deal.id} deal={deal} />)
+              : deals.map((deal) => (
+                  <DealCard
+                    key={deal.id}
+                    deal={deal}
+                    busy={busyId === deal.id}
+                    onApproveAs={approveAs}
+                    onApprove={approve}
+                    onReject={reject}
+                  />
+                ))}
           </div>
+        )}
+        {filter === "ignored" && deals.length > 0 && (
+          <p className="mt-4 text-center text-[10px] text-gray-600">
+            Showing last {deals.length} ignored message{deals.length === 1 ? "" : "s"} · in-memory only · cleared on server restart
+          </p>
         )}
       </div>
     </div>
@@ -352,6 +365,35 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProp
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── IgnoredCard — simpler layout for non-deal messages ──────────────────
+// These come from the in-memory Ignored buffer, not the DB. They have no
+// parsed fields, no actions, no approval flow — they exist purely as proof
+// that the bot received a message that didn't match the #NT trigger.
+
+function IgnoredCard({ deal }: { deal: PendingDeal }) {
+  return (
+    <div className="w-full min-w-0 rounded-lg border border-white/5 bg-gray-900/50 p-3 opacity-70">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium text-gray-400">{deal.sender_name}</div>
+          <div className="text-[10px] text-gray-600">{formatTime(deal.received_at)}</div>
+        </div>
+        <span className="shrink-0 rounded-full border border-gray-600/40 bg-gray-600/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gray-500">
+          Ignored
+        </span>
+      </div>
+      <div className="mt-2 w-full min-w-0 rounded border border-white/5 bg-black/30 p-2">
+        <pre className="w-full whitespace-pre-wrap break-all font-mono text-[11px] leading-snug text-gray-500">
+          {deal.raw_message}
+        </pre>
+      </div>
+      <div className="mt-1.5 text-[10px] italic text-gray-600">
+        Received but not a deal code — no action required
+      </div>
     </div>
   );
 }

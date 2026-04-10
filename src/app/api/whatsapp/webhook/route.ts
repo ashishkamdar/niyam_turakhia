@@ -4,6 +4,7 @@ import { v4 as uuid } from "uuid";
 import { verifyWebhookSignature, downloadMedia, getMetaConfig } from "@/lib/meta-whatsapp";
 import { analyzeImage } from "@/lib/image-ocr";
 import { parseDealCode } from "@/lib/deal-code-parser";
+import { pushIgnored } from "@/lib/ignored-messages";
 
 // GET — Meta webhook verification
 export async function GET(req: NextRequest) {
@@ -91,12 +92,19 @@ export async function POST(req: NextRequest) {
         // Batching: staff often want to post multiple locked deals in a single
         // WhatsApp message with line breaks between them. We split the message
         // on newlines and parse each line independently, inserting one pending_deals
-        // row per valid deal line. Non-deal lines (chatter before/after the codes,
-        // empty lines, unrelated prose) are silently ignored.
+        // row per valid deal line. Non-deal lines WITHIN a deal-bearing message
+        // (chatter before/after the codes, empty lines, unrelated prose) are
+        // silently dropped — they're just context for the real deal lines.
         //
-        // Messages without any #NT line fall through to the legacy lock-keyword
-        // path below, which still works for historical free-text chats.
+        // If a message has ZERO deal lines (pure chatter / junk / "hello"),
+        // we push the whole raw message into the in-memory Ignored buffer so
+        // it shows up in the /review "Ignored" tab. This is proof to the
+        // reviewer that the bot IS listening — nothing is silently disappearing.
+        //
+        // Messages without any #NT line also fall through to the legacy
+        // lock-keyword path below, which still works for historical chats.
         const lines = messageText.split(/\r?\n/);
+        let dealsInsertedFromThisMessage = 0;
         for (const line of lines) {
           const parseResult = parseDealCode(line);
           if (!parseResult.is_deal_code) continue;
@@ -128,6 +136,20 @@ export async function POST(req: NextRequest) {
             parseResult.fields.party_alias,
             parseErrorsJson
           );
+          dealsInsertedFromThisMessage++;
+        }
+
+        // If no deal codes were found in the entire message, it's junk / chatter.
+        // Push it to the in-memory Ignored buffer so it's visible in /review for
+        // reassurance, but NOT persisted to the DB (per design — junk shouldn't survive restarts).
+        if (dealsInsertedFromThisMessage === 0 && messageText.trim().length > 0) {
+          pushIgnored({
+            id: uuid(),
+            sender_name: senderName,
+            sender_phone: senderPhone,
+            raw_message: messageText,
+            received_at: timestamp,
+          });
         }
 
         // Check for lock/deal (legacy free-text path — only fires if message contains "lock")
