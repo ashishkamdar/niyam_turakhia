@@ -54,14 +54,25 @@ export function BottomNav() {
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           const count = getBadgeCount(item.badge);
+          // Review badge stays visible even on the active /review tab so the
+          // reviewer can see the remaining count while working through the queue.
+          // Deals/Chats badges hide on their own active tab as before.
+          const showBadge =
+            count > 0 && (item.badge === "review" || !isActive);
           return (
             <Link key={item.name} href={item.href} className={`relative flex flex-col items-center gap-0.5 pb-1 pt-2 text-[10px] font-medium ${isActive ? "text-amber-400" : "text-gray-500"}`}>
               <div className="relative">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
                 </svg>
-                {count > 0 && !isActive && (
-                  <span className="absolute -right-2 -top-1.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white">
+                {showBadge && (
+                  <span
+                    className={`absolute -right-2 -top-1.5 flex size-4 items-center justify-center rounded-full text-[8px] font-bold ${
+                      item.badge === "review"
+                        ? "bg-amber-500 text-gray-950"
+                        : "bg-rose-500 text-white"
+                    }`}
+                  >
                     {count > 9 ? "9+" : count}
                   </span>
                 )}
