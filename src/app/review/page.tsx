@@ -380,6 +380,11 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
         </pre>
       </div>
 
+      {/* Screenshot OCR — placed directly under the raw message so the reviewer
+          sees the payment evidence side-by-side with the deal text, before
+          examining the parsed fields below. Hidden in edit mode. */}
+      {!editing && deal.screenshot_ocr && <OcrSection ocr={deal.screenshot_ocr} />}
+
       {/* Parse errors — only shown in view mode; editing clears the visual noise */}
       {hasErrors && !editing && (
         <div className="mt-3 rounded border border-rose-500/30 bg-rose-500/10 p-2">
@@ -413,9 +418,6 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
         </div>
       )}
 
-      {/* Screenshot OCR — shown when a payment/receipt image has been linked
-          to this deal (either via caption, reply, or orphan buffer matching) */}
-      {!editing && deal.screenshot_ocr && <OcrSection ocr={deal.screenshot_ocr} />}
 
       {/* ACTION BUTTONS — three mutually exclusive states:
             1. editing          → Save + Cancel
