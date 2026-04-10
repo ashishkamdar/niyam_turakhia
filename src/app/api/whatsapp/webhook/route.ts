@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { verifyWebhookSignature, downloadMedia, getMetaConfig } from "@/lib/meta-whatsapp";
 import { analyzeImage } from "@/lib/image-ocr";
+import { parseDealCode } from "@/lib/deal-code-parser";
 
 // GET — Meta webhook verification
 export async function GET(req: NextRequest) {
@@ -82,7 +83,43 @@ export async function POST(req: NextRequest) {
           messageText = `[${msg.type ?? "unknown"}]`;
         }
 
-        // Check for lock/deal
+        // ── NEW (Apr 10, 2026): Check for structured #NT deal code ──
+        // Staff in the internal PrismX group send messages like:
+        //   #NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG
+        // These get parsed and routed to the maker-checker review screen.
+        // Messages without the #NT trigger fall through to the old lock-keyword path below.
+        const parseResult = parseDealCode(messageText);
+        if (parseResult.is_deal_code) {
+          const pendingId = uuid();
+          const parseErrorsJson =
+            parseResult.errors.length > 0 ? JSON.stringify(parseResult.errors) : null;
+          db.prepare(`
+            INSERT INTO pending_deals (
+              id, whatsapp_message_id, sender_phone, sender_name, raw_message, received_at,
+              deal_type, direction, qty_grams, metal, purity, rate_usd_per_oz,
+              premium_type, premium_value, party_alias, parse_errors, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+          `).run(
+            pendingId,
+            msgId,
+            senderPhone,
+            senderName,
+            messageText,
+            timestamp,
+            parseResult.fields.deal_type,
+            parseResult.fields.direction,
+            parseResult.fields.qty_grams,
+            parseResult.fields.metal,
+            parseResult.fields.purity,
+            parseResult.fields.rate_usd_per_oz,
+            parseResult.fields.premium_type,
+            parseResult.fields.premium_value,
+            parseResult.fields.party_alias,
+            parseErrorsJson
+          );
+        }
+
+        // Check for lock/deal (legacy free-text path — only fires if message contains "lock")
         const isLock = /\block\b/i.test(messageText) ? 1 : 0;
         let linkedDealId: string | null = null;
 

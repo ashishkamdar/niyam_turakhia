@@ -10,9 +10,21 @@
 
 This guide walks you through connecting your WhatsApp Business number to the PrismX dashboard. Once connected, every WhatsApp message your staff sends and receives will appear in PrismX in real-time. Deals will be captured automatically.
 
-**Time required:** 15-20 minutes
+**Time required:** 15-20 minutes for Steps 1-9 (first message flowing). Business Verification (Step 10) runs in parallel and takes 2-4 weeks at Meta's end.
 **Cost:** Free (Meta Cloud API free tier)
-**What you need:** Your WhatsApp Business phone number, a Facebook account, and a computer with a web browser.
+
+**What you need:**
+
+- Your WhatsApp Business phone number (must be on WhatsApp Business, not regular WhatsApp)
+- A Facebook account
+- A computer with a web browser
+- **A business email on your own domain** (e.g., `niyam@prismx.org`) — Meta will **reject** Gmail, Yahoo, or personal addresses when verifying the account
+- **Your live business website** — `https://prismx.org` (already live)
+- **Your UAE Trade License / Certificate of Incorporation** (PDF, for Business Verification in Step 10)
+- **VAT / Tax Registration certificate** (PDF, for Business Verification in Step 10)
+- **Two-factor authentication enabled** on the WhatsApp Business number (details in Step 4.2)
+
+> **Two phases:** Steps 1-9 get messages flowing into PrismX with the unverified (sandbox) tier — good for testing and internal use. Step 10 (Business Verification) unlocks production limits, the green verified badge, and is **required before you can use the bot to talk to buyers** (the Phase 2 auto-negotiator). Start Step 10 as early as possible — it's a slow review at Meta's end, so run it in the background.
 
 ---
 
@@ -27,14 +39,18 @@ This is Meta's (Facebook's) business platform. If you already have a Meta Busine
 
 ### 1.2 Fill in business details
 
+> **IMPORTANT:** The values you enter here must exactly match your **UAE Trade License** (or Certificate of Incorporation). Meta will cross-check this against the documents you upload in Step 10 (Business Verification). A mismatch is the #1 reason verification gets rejected.
+
 | Field | What to enter |
 |-------|--------------|
-| Business name | **PrismX** |
+| Business name | **The exact legal name on your Trade License** (e.g., *PrismX Group Trading LLC* — whatever appears on the license, verbatim, with the same punctuation and suffix like LLC / FZE / DMCC) |
 | Your name | **Niyam Turakhia** |
-| Business email | Your business email address |
-| Business address | Your Dubai office address |
-| Business website | (optional — can skip) |
-| Business phone | Your business phone number |
+| Business email | **A business email on your own domain** — e.g., `niyam@prismx.org` or `admin@prismx.org`. **Do NOT use Gmail, Yahoo, or personal addresses** — Meta will reject them at the verification stage. |
+| Business address | Your Dubai office address **exactly as it appears on your Trade License** |
+| Business website | **https://prismx.org** (required — do not skip) |
+| Business phone | Your business phone number (same one as on the Trade License if possible) |
+
+> **If you don't yet have an email on prismx.org**, set one up before filling this form. Options: Zoho Mail (free tier, 5 users, takes 10 minutes), Google Workspace (paid), or your domain registrar's email forwarding. Using Gmail here means starting over after verification.
 
 ### 1.3 Verify your email
 
@@ -118,6 +134,7 @@ This page shows:
 - If it's currently on WhatsApp Business App, it will be migrated to the API
 - **Your staff can continue using WhatsApp Web** — the API works alongside it (coexistence mode)
 - All existing chats are preserved
+- **Two-factor authentication MUST be enabled** on this number before Business Verification (Step 10). Turn it on now: WhatsApp → **Settings** → **Account** → **Two-step verification** → **Turn On**. Set a 6-digit PIN you'll remember and add a recovery email. Meta will block verification if 2FA isn't active on the onboarded number.
 
 ---
 
@@ -271,18 +288,124 @@ I'll enter these in PrismX Settings → Meta WhatsApp config section.
 
 ## STEP 9: Verify Everything Works
 
-### Checklist
+### Checklist (Phase 1 — Sandbox / Test Messaging)
 
-- [ ] Meta Business Account created for PrismX
+- [ ] Meta Business Account created (with legal entity name matching Trade License)
+- [ ] Business email on the `prismx.org` domain (not Gmail)
 - [ ] Developer App created (PrismX Bot)
 - [ ] WhatsApp product added to the app
 - [ ] Business WhatsApp number connected and verified
+- [ ] Two-factor authentication enabled on the WhatsApp Business number
 - [ ] Webhook configured with PrismX URL
 - [ ] "messages" webhook field subscribed
 - [ ] Permanent access token generated
 - [ ] Tokens entered in PrismX Settings
 - [ ] Test message sent and received in PrismX
 - [ ] Ashish added as Developer (optional)
+
+At this point, you're in the **sandbox tier**: messages flow into PrismX, you can receive all incoming messages, and you can send replies to a small set of test numbers. This is enough to build and test the PrismX integration. The next step unlocks production.
+
+---
+
+## STEP 10: Business Verification & Display Name Approval
+
+This is a **separate, multi-day review by Meta** that unlocks:
+
+- Sending messages to **any customer** (not just test numbers)
+- Higher messaging rate tiers
+- The **green verified business badge** on your WhatsApp chats
+- The ability to use **"PrismX"** (or "PrismX Group") as the sender display name on every message
+- **Phase 2 of the PrismX engagement**: the buyer-facing auto-negotiator bot
+
+Start this step as soon as possible — it runs in the background at Meta's end, so you can work on Steps 1-9 in parallel. Typical timeline: **2 to 4 weeks** from submission to full approval.
+
+### 10.1 Pre-flight checklist
+
+Before you click "Start Verification", make sure you have all of these ready:
+
+| Item | Where it comes from | Status |
+|------|---------------------|--------|
+| Live business website at prismx.org branded "PrismX Group" | Already live ✓ (confirmed April 10, 2026) | ✅ Ready |
+| UAE Trade License (PDF) for the legal entity | Your UAE accountant / mainland authority / free zone | ⏳ Niyam to upload |
+| VAT / Tax Registration certificate (PDF) | FTA UAE portal | ⏳ Niyam to upload |
+| Certificate of Incorporation / Establishment Card (PDF) | Whichever document shows the legal entity name + address | ⏳ Niyam to upload |
+| Optional: Utility bill or bank statement at the business address | For address proof if Meta asks | ⏳ Keep ready |
+| Domain-matched email active | e.g., `niyam@prismx.org` | ⏳ Niyam to set up |
+| Two-factor auth on the WhatsApp Business number | Step 4.2 above | ⏳ Niyam to enable |
+| Exact match between Trade License name and Meta Business Account name (Step 1.2) | Cross-check now — edit the Business Account name if wrong | ⏳ Verify |
+
+> **The #1 cause of verification rejection** is the legal name on the documents not matching the Business Account name exactly — including LLC / FZE / DMCC suffixes, commas, spacing, and punctuation. Check this before submitting.
+
+### 10.2 Submit Business Verification
+
+1. Go to **business.facebook.com**
+2. Click the **gear icon** (Business Settings) in the left sidebar
+3. Go to **Security Center** (left sidebar → Security Center)
+4. Under **Business Verification**, click **"Start Verification"**
+5. Fill in the business information:
+   - Legal business name (must match Trade License exactly)
+   - Business address (must match Trade License exactly)
+   - Business phone number (must be reachable — Meta may call)
+   - Business website: `https://prismx.org`
+6. Upload documents:
+   - Trade License (primary)
+   - VAT / Tax Registration
+   - (Optional) Utility bill or bank statement as secondary address proof
+7. Click **Submit**
+8. Meta will review — typically **2 to 7 business days**
+
+### 10.3 Domain verification
+
+Alongside Business Verification, you'll verify that you own `prismx.org`:
+
+1. In **Business Settings** → **Brand Safety** → **Domains**, click **"Add"**
+2. Enter: `prismx.org`
+3. Meta will show you one of two options:
+   - **DNS TXT record** (recommended): Meta provides a line like `facebook-domain-verification=abc123xyz...`. Add this as a TXT record in your DNS settings at whoever hosts prismx.org DNS (likely your domain registrar — GoDaddy, Namecheap, Cloudflare, etc.). Wait 15 minutes for propagation, then click "Verify."
+   - **HTML file upload**: Meta provides an `.html` file. Upload it to the root of prismx.org so it's reachable at `https://prismx.org/the-file-name.html`. Click "Verify."
+4. If you need help with the DNS record, Ashish can walk you through it.
+
+### 10.4 Display Name approval
+
+This is a separate review specifically for the name that appears as the sender on every WhatsApp message you send through the API.
+
+1. In **business.facebook.com** → **WhatsApp Accounts** → your PrismX WhatsApp Business Account
+2. Find the phone number → **Settings** → **Profile** → **Display Name**
+3. Enter one of:
+   - **PrismX** (shorter, cleaner — preferred if prismx.org hero says "PrismX")
+   - **PrismX Group** (matches the website hero — also acceptable)
+4. Click **Submit**
+5. Meta reviews typically within **24-48 hours** once Business Verification is complete
+6. The name must match your website branding — **prismx.org already displays both "PrismX" and "PrismX Group" prominently**, so both options should be approved
+
+> **Display name rules** (to avoid rejection): Cannot contain full personal names ("Niyam Turakhia" would be rejected), generic words, geographic locations as the primary name, or slogans. "PrismX" and "PrismX Group" both pass these rules.
+
+### 10.5 Typical timeline (from submission to fully approved)
+
+| Stage | Meta's review time |
+|-------|--------------------|
+| Business Verification | 2-7 business days |
+| Domain Verification | Instant (once DNS propagates) |
+| Phone Number API approval | 1-5 business days |
+| Display Name approval | 24-48 hours (after Business Verification passes) |
+| Official Business Account (green badge) | 2-14 business days |
+| **Total end-to-end** | **2-4 weeks** |
+
+### 10.6 What to do while verification is pending
+
+- **Keep working.** Steps 1-9 get you a sandbox tier that's more than enough for PrismX to parse staff messages, OCR screenshots, and generate the Bullion Sales Order Excel during development and internal testing.
+- **Niyam's staff can keep using WhatsApp Business App on their phones** exactly as before — the API works alongside it.
+- **Do not start the buyer-facing negotiator bot** (Phase 2) until full verification is done. Replying to buyers on an unverified tier risks the account being flagged.
+
+### 10.7 Common rejection reasons and fixes
+
+| Rejection reason | Fix |
+|------------------|-----|
+| "Business name doesn't match documents" | Your Meta Business Account name must match the Trade License **exactly** — every word, every punctuation mark, LLC/FZE suffix |
+| "We couldn't verify the domain" | DNS TXT record not yet propagated — wait 30 minutes and retry, or switch to HTML file method |
+| "Business website insufficient" | prismx.org must clearly show business name, services, contact info — the current site at prismx.org already passes this bar |
+| "Unable to reach business phone" | Meta occasionally calls the listed business number — make sure it's a number someone will actually answer in business hours |
+| "Display name doesn't match branding" | Check that "PrismX" or "PrismX Group" appears visibly on prismx.org (it does) and that you picked a name that matches |
 
 ---
 

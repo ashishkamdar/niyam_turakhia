@@ -132,6 +132,38 @@ function initSchema(db: Database.Database) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS pending_deals (
+      id TEXT PRIMARY KEY,
+      whatsapp_message_id TEXT NOT NULL,
+      sender_phone TEXT NOT NULL,
+      sender_name TEXT NOT NULL,
+      raw_message TEXT NOT NULL,
+      received_at TEXT NOT NULL,
+
+      deal_type TEXT,
+      direction TEXT,
+      qty_grams REAL,
+      metal TEXT,
+      purity TEXT,
+      rate_usd_per_oz REAL,
+      premium_type TEXT,
+      premium_value REAL,
+      party_alias TEXT,
+
+      parse_errors TEXT,
+
+      status TEXT NOT NULL DEFAULT 'pending',
+      reviewed_by TEXT,
+      reviewed_at TEXT,
+      reviewer_notes TEXT,
+
+      screenshot_url TEXT,
+      screenshot_ocr TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pending_deals_status ON pending_deals(status);
+    CREATE INDEX IF NOT EXISTS idx_pending_deals_received ON pending_deals(received_at);
   `);
 }
 
@@ -182,6 +214,14 @@ function runMigrations(db: Database.Database) {
       version: 5,
       description: "Add meta_config table for WhatsApp Business API",
       up: () => {},
+    },
+    {
+      version: 6,
+      description: "Add pending_deals table for maker-checker review pipeline",
+      up: () => {
+        // Table is created by CREATE TABLE IF NOT EXISTS above.
+        // No ALTER needed — this is a new table.
+      },
     },
   ];
 
