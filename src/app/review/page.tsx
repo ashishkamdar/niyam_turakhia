@@ -146,8 +146,8 @@ export default function ReviewPage() {
   const counts = data?.counts ?? { pending: 0, approved: 0, rejected: 0 };
 
   return (
-    <div className="min-h-screen bg-gray-950 pb-24 lg:pb-8 lg:pl-60">
-      <div className="mx-auto max-w-3xl px-4 py-6">
+    <div className="min-h-screen overflow-x-hidden bg-gray-950 pb-24 lg:pb-8 lg:pl-60">
+      <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <header className="mb-4">
           <h1 className="text-xl font-bold text-white">Deal Review</h1>
           <p className="mt-1 text-sm text-gray-400">
@@ -224,7 +224,7 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProp
 
   return (
     <div
-      className={`rounded-lg border p-4 ${
+      className={`w-full min-w-0 rounded-lg border p-4 ${
         hasErrors ? "border-rose-500/30 bg-rose-950/20" : "border-white/10 bg-gray-900"
       }`}
     >
@@ -237,11 +237,12 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProp
         <TypeBadge type={deal.deal_type} />
       </div>
 
-      {/* Raw message */}
-      <div className="mt-3 overflow-x-auto rounded border border-white/5 bg-black/40 p-2">
-        <code className="whitespace-pre-wrap break-all font-mono text-[11px] text-gray-300">
+      {/* Raw message — block element with aggressive wrapping so long lines
+          never push the card wider than the viewport on mobile. */}
+      <div className="mt-3 w-full min-w-0 rounded border border-white/5 bg-black/40 p-2">
+        <pre className="w-full whitespace-pre-wrap break-all font-mono text-[11px] leading-snug text-gray-300">
           {deal.raw_message}
-        </code>
+        </pre>
       </div>
 
       {/* Parse errors */}
