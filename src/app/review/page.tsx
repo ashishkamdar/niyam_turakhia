@@ -130,6 +130,23 @@ export default function ReviewPage() {
     }
   }
 
+  // Save edited fields to a pending deal. Fields that are unchanged from the
+  // current deal state are still sent — the server updates everything in the
+  // body, which keeps the endpoint simple and idempotent.
+  async function saveEdit(id: string, updates: Record<string, unknown>) {
+    setBusyId(id);
+    try {
+      await fetch(`/api/review/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function reject(deal: PendingDeal) {
     setBusyId(deal.id);
     try {
@@ -214,6 +231,7 @@ export default function ReviewPage() {
                     onApproveAs={approveAs}
                     onApprove={approve}
                     onReject={reject}
+                    onSaveEdit={saveEdit}
                   />
                 ))}
           </div>
@@ -236,37 +254,111 @@ interface DealCardProps {
   onApproveAs: (id: string, type: "K" | "P") => void;
   onApprove: (deal: PendingDeal) => void;
   onReject: (deal: PendingDeal) => void;
+  onSaveEdit: (id: string, updates: Record<string, unknown>) => Promise<void>;
 }
 
-function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProps) {
+// Draft shape — mirrors the writable fields the PATCH endpoint accepts.
+// Kept separate from PendingDeal so we can track in-progress edits without
+// touching the polled "truth" state.
+interface DraftFields {
+  deal_type: "K" | "P" | null;
+  direction: "buy" | "sell" | null;
+  qty_grams: number | null;
+  metal: "gold" | "silver" | "platinum" | "palladium" | null;
+  purity: string | null;
+  rate_usd_per_oz: number | null;
+  premium_type: "absolute" | "percent" | null;
+  premium_value: number | null;
+  party_alias: string | null;
+}
+
+function toDraft(deal: PendingDeal): DraftFields {
+  return {
+    deal_type: deal.deal_type,
+    direction: deal.direction,
+    qty_grams: deal.qty_grams,
+    metal: (deal.metal as DraftFields["metal"]) ?? null,
+    purity: deal.purity,
+    rate_usd_per_oz: deal.rate_usd_per_oz,
+    premium_type: deal.premium_type,
+    premium_value: deal.premium_value,
+    party_alias: deal.party_alias,
+  };
+}
+
+function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: DealCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<DraftFields>(() => toDraft(deal));
+  const [saving, setSaving] = useState(false);
+
+  // Refresh the draft from the authoritative deal only when we're NOT editing.
+  // This prevents the 3-second polling loop from clobbering unsaved changes.
+  useEffect(() => {
+    if (!editing) {
+      setDraft(toDraft(deal));
+    }
+  }, [deal, editing]);
+
   const hasErrors = deal.parse_errors.length > 0;
   const isUnclassified = deal.deal_type === null;
+  const canEdit = deal.status === "pending";
+  const isBusy = busy || saving;
+
+  function toggleEdit() {
+    if (editing) {
+      // Toggling off = cancel + discard draft
+      setDraft(toDraft(deal));
+      setEditing(false);
+    } else {
+      setEditing(true);
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await onSaveEdit(deal.id, draft as unknown as Record<string, unknown>);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateDraft<K extends keyof DraftFields>(key: K, value: DraftFields[K]) {
+    setDraft((d) => ({ ...d, [key]: value }));
+  }
 
   return (
     <div
       className={`w-full min-w-0 rounded-lg border p-4 ${
-        hasErrors ? "border-rose-500/30 bg-rose-950/20" : "border-white/10 bg-gray-900"
+        editing
+          ? "border-amber-500/40 bg-amber-950/10"
+          : hasErrors
+          ? "border-rose-500/30 bg-rose-950/20"
+          : "border-white/10 bg-gray-900"
       }`}
     >
-      {/* Header: sender + type badge */}
+      {/* Header: sender + edit toggle + type badge */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-white">{deal.sender_name}</div>
           <div className="text-[11px] text-gray-500">{formatTime(deal.received_at)}</div>
         </div>
-        <TypeBadge type={deal.deal_type} />
+        <div className="flex shrink-0 items-center gap-2">
+          {canEdit && <EditToggle on={editing} disabled={saving} onToggle={toggleEdit} />}
+          <TypeBadge type={editing ? draft.deal_type : deal.deal_type} />
+        </div>
       </div>
 
-      {/* Raw message — block element with aggressive wrapping so long lines
-          never push the card wider than the viewport on mobile. */}
+      {/* Raw message — always shown even in edit mode so the user can see what was originally received */}
       <div className="mt-3 w-full min-w-0 rounded border border-white/5 bg-black/40 p-2">
         <pre className="w-full whitespace-pre-wrap break-all font-mono text-[11px] leading-snug text-gray-300">
           {deal.raw_message}
         </pre>
       </div>
 
-      {/* Parse errors */}
-      {hasErrors && (
+      {/* Parse errors — only shown in view mode; editing clears the visual noise */}
+      {hasErrors && !editing && (
         <div className="mt-3 rounded border border-rose-500/30 bg-rose-500/10 p-2">
           <div className="text-[11px] font-bold uppercase tracking-wide text-rose-400">
             Parse errors
@@ -278,22 +370,48 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProp
               </li>
             ))}
           </ul>
+          <div className="mt-1.5 text-[10px] italic text-rose-400/70">
+            Tap Edit above to fix the missing fields before approving.
+          </div>
         </div>
       )}
 
-      {/* Parsed fields grid */}
-      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-        <Field label="Direction" value={deal.direction ? deal.direction.toUpperCase() : "—"} tone={deal.direction === "buy" ? "emerald" : deal.direction === "sell" ? "amber" : "muted"} />
-        <Field label="Metal" value={deal.metal ? `${deal.metal[0].toUpperCase()}${deal.metal.slice(1)} ${deal.purity ?? ""}`.trim() : "—"} />
-        <Field label="Quantity" value={formatQty(deal.qty_grams)} />
-        <Field label="Rate" value={formatRate(deal.rate_usd_per_oz)} />
-        <Field label="Premium" value={formatPremium(deal)} />
-        <Field label="Party" value={deal.party_alias ?? "—"} mono />
-      </div>
+      {/* Fields: read-only view or edit form */}
+      {editing ? (
+        <DealEditForm draft={draft} onChange={updateDraft} />
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+          <Field label="Direction" value={deal.direction ? deal.direction.toUpperCase() : "—"} tone={deal.direction === "buy" ? "emerald" : deal.direction === "sell" ? "amber" : "muted"} />
+          <Field label="Metal" value={deal.metal ? `${deal.metal[0].toUpperCase()}${deal.metal.slice(1)} ${deal.purity ?? ""}`.trim() : "—"} />
+          <Field label="Quantity" value={formatQty(deal.qty_grams)} />
+          <Field label="Rate" value={formatRate(deal.rate_usd_per_oz)} />
+          <Field label="Premium" value={formatPremium(deal)} />
+          <Field label="Party" value={deal.party_alias ?? "—"} mono />
+        </div>
+      )}
 
-      {/* Actions for UNCLASSIFIED cards: Approve-as-Kachha / Approve-as-Pakka / Reject.
-          Each picker button does classify + approve atomically in one tap. */}
-      {deal.status === "pending" && isUnclassified && (
+      {/* ACTION BUTTONS — three mutually exclusive states:
+            1. editing          → Save + Cancel
+            2. pending + unclassified + not editing → Approve-as picker + Reject
+            3. pending + classified + not editing   → Approve + Reject  */}
+      {editing ? (
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={isBusy}
+            className="flex-1 rounded-md bg-amber-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-500 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+          <button
+            onClick={toggleEdit}
+            disabled={isBusy}
+            className="flex-1 rounded-md border border-white/10 bg-gray-800 px-3 py-2.5 text-xs font-semibold text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : deal.status === "pending" && isUnclassified ? (
         <>
           <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-2.5">
             <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-amber-400">
@@ -302,53 +420,50 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProp
             <div className="flex gap-2">
               <button
                 onClick={() => onApproveAs(deal.id, "K")}
-                disabled={busy}
+                disabled={isBusy}
                 className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
               >
-                {busy ? "…" : "Kachha (SBS)"}
+                {isBusy ? "…" : "Kachha (SBS)"}
               </button>
               <button
                 onClick={() => onApproveAs(deal.id, "P")}
-                disabled={busy}
+                disabled={isBusy}
                 className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
               >
-                {busy ? "…" : "Pakka (OroSoft)"}
+                {isBusy ? "…" : "Pakka (OroSoft)"}
               </button>
             </div>
           </div>
           <div className="mt-3">
             <button
               onClick={() => onReject(deal)}
-              disabled={busy}
+              disabled={isBusy}
               className="w-full rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
             >
               Reject
             </button>
           </div>
         </>
-      )}
-
-      {/* Actions for ALREADY CLASSIFIED cards (explicit #NTK/#NTP triggers): simple Approve + Reject */}
-      {deal.status === "pending" && !isUnclassified && (
+      ) : deal.status === "pending" ? (
         <div className="mt-4 flex gap-2">
           <button
             onClick={() => onApprove(deal)}
-            disabled={busy}
+            disabled={isBusy}
             className="flex-1 rounded-md bg-emerald-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50"
           >
-            {busy ? "…" : "Approve"}
+            {isBusy ? "…" : "Approve"}
           </button>
           <button
             onClick={() => onReject(deal)}
-            disabled={busy}
+            disabled={isBusy}
             className="flex-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50"
           >
             Reject
           </button>
         </div>
-      )}
+      ) : null}
 
-      {/* Reviewed meta */}
+      {/* Reviewed meta — for approved/rejected cards only */}
       {deal.status !== "pending" && (
         <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
           <span
@@ -365,6 +480,287 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject }: DealCardProp
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Edit mode UI ─────────────────────────────────────────────────────────
+
+function EditToggle({
+  on,
+  disabled,
+  onToggle,
+}: {
+  on: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={on}
+      className="flex items-center gap-1.5 disabled:opacity-50"
+    >
+      <span
+        className={`text-[10px] font-bold uppercase tracking-wide ${
+          on ? "text-amber-400" : "text-gray-500"
+        }`}
+      >
+        Edit
+      </span>
+      <div
+        className={`relative inline-flex h-4 w-7 items-center rounded-full transition ${
+          on ? "bg-amber-500" : "bg-gray-700"
+        }`}
+      >
+        <span
+          className={`inline-block size-3 transform rounded-full bg-white shadow transition ${
+            on ? "translate-x-3.5" : "translate-x-0.5"
+          }`}
+        />
+      </div>
+    </button>
+  );
+}
+
+function DealEditForm({
+  draft,
+  onChange,
+}: {
+  draft: DraftFields;
+  onChange: <K extends keyof DraftFields>(key: K, value: DraftFields[K]) => void;
+}) {
+  const qtyKg = draft.qty_grams != null ? draft.qty_grams / 1000 : null;
+
+  return (
+    <div className="mt-3 space-y-3">
+      {/* Type (K/P) + Direction (BUY/SELL) */}
+      <div className="grid grid-cols-2 gap-2">
+        <PillSelect
+          label="Type"
+          value={draft.deal_type}
+          options={[
+            { value: "K", label: "Kachha" },
+            { value: "P", label: "Pakka" },
+          ]}
+          onChange={(v) => onChange("deal_type", v as DraftFields["deal_type"])}
+        />
+        <PillSelect
+          label="Direction"
+          value={draft.direction}
+          options={[
+            { value: "buy", label: "BUY" },
+            { value: "sell", label: "SELL" },
+          ]}
+          onChange={(v) => onChange("direction", v as DraftFields["direction"])}
+        />
+      </div>
+
+      {/* Metal + Purity */}
+      <div className="grid grid-cols-2 gap-2">
+        <SelectField
+          label="Metal"
+          value={draft.metal ?? ""}
+          options={[
+            { value: "gold", label: "Gold" },
+            { value: "silver", label: "Silver" },
+            { value: "platinum", label: "Platinum" },
+            { value: "palladium", label: "Palladium" },
+          ]}
+          onChange={(v) => onChange("metal", (v as DraftFields["metal"]) || null)}
+        />
+        <TextField
+          label="Purity"
+          value={draft.purity ?? ""}
+          placeholder="24K / 999"
+          onChange={(v) => onChange("purity", v.toUpperCase() || null)}
+        />
+      </div>
+
+      {/* Quantity in kg */}
+      <NumberField
+        label="Quantity (kg)"
+        value={qtyKg}
+        step="0.001"
+        placeholder="10"
+        onChange={(v) => onChange("qty_grams", v != null ? v * 1000 : null)}
+      />
+
+      {/* Rate USD/oz */}
+      <NumberField
+        label="Rate (USD / troy oz)"
+        value={draft.rate_usd_per_oz}
+        step="0.01"
+        placeholder="2566.80"
+        onChange={(v) => onChange("rate_usd_per_oz", v)}
+      />
+
+      {/* Premium value + type */}
+      <div className="grid grid-cols-2 gap-2">
+        <NumberField
+          label="Premium"
+          value={draft.premium_value}
+          step="0.01"
+          placeholder="-0.1"
+          onChange={(v) => onChange("premium_value", v)}
+        />
+        <PillSelect
+          label="Prem. type"
+          value={draft.premium_type}
+          options={[
+            { value: "absolute", label: "Abs" },
+            { value: "percent", label: "%" },
+          ]}
+          onChange={(v) => onChange("premium_type", v as DraftFields["premium_type"])}
+        />
+      </div>
+
+      {/* Party alias */}
+      <TextField
+        label="Party"
+        value={draft.party_alias ?? ""}
+        placeholder="TAKFUNG"
+        mono
+        onChange={(v) => onChange("party_alias", v.toUpperCase() || null)}
+      />
+    </div>
+  );
+}
+
+function PillSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T | null;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </div>
+      <div className="flex gap-1">
+        {options.map((opt) => {
+          const active = value === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              className={`flex-1 rounded-md border px-1.5 py-1.5 text-[11px] font-semibold transition ${
+                active
+                  ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                  : "border-white/10 bg-gray-800 text-gray-400 hover:text-white"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-md border border-white/10 bg-gray-800 px-2 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none"
+      >
+        <option value="">—</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  placeholder,
+  mono,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  mono?: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full rounded-md border border-white/10 bg-gray-800 px-2 py-1.5 text-xs text-white placeholder:text-gray-600 focus:border-amber-500 focus:outline-none ${
+          mono ? "font-mono" : ""
+        }`}
+      />
+    </div>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  step,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  step?: string;
+  placeholder?: string;
+  onChange: (v: number | null) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </div>
+      <input
+        type="number"
+        inputMode="decimal"
+        value={value ?? ""}
+        step={step}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange(v === "" ? null : Number(v));
+        }}
+        className="w-full rounded-md border border-white/10 bg-gray-800 px-2 py-1.5 text-xs text-white placeholder:text-gray-600 focus:border-amber-500 focus:outline-none"
+      />
     </div>
   );
 }
