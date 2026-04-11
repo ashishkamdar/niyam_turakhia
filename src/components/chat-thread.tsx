@@ -49,7 +49,11 @@ export function ChatThread({
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {messages.map((m) => {
           const isIncoming = m.direction === "incoming";
-          const hasLock = m.is_lock;
+          // IMPORTANT: coerce to boolean. SQLite stores is_lock as an
+          // INTEGER (0/1), not a bool — left as-is it rendered literal
+          // "0" characters next to every timestamp via React's `&&`
+          // short-circuit evaluation.
+          const hasLock = Boolean(m.is_lock);
           return (
             <div key={m.id} className={`flex ${isIncoming ? "justify-start" : "justify-end"}`}>
               <div
@@ -64,9 +68,15 @@ export function ChatThread({
                 <p>
                   {hasLock ? highlightLock(m.message) : m.message}
                 </p>
-                <p className={`mt-1 text-[10px] ${hasLock ? "text-amber-400/70" : isIncoming ? "text-gray-500" : "text-emerald-300/70"}`}>
-                  {new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  {hasLock && " — DEAL LOCKED"}
+                <p className={`mt-1 flex items-center gap-1 text-[10px] ${hasLock ? "text-amber-400/70" : isIncoming ? "text-gray-500" : "text-emerald-300/70"}`}>
+                  <span>
+                    {new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  {hasLock ? <span>· DEAL LOCKED</span> : null}
+                  {/* WhatsApp-style double-tick delivery indicator on
+                      outgoing messages. Simulator demo messages persist
+                      immediately so they're "delivered" by definition. */}
+                  {!isIncoming ? <DeliveryTicks className={hasLock ? "text-amber-300" : "text-emerald-200"} /> : null}
                 </p>
               </div>
             </div>
@@ -108,5 +118,39 @@ function highlightLock(text: string): React.ReactNode {
     ) : (
       part
     )
+  );
+}
+
+/**
+ * WhatsApp-style double-tick delivery indicator for outgoing bubbles.
+ * In the real app these would flip through sent → delivered → read
+ * states; for the demo simulator every outgoing message is "delivered"
+ * the moment it persists, so the ticks render once and stay put.
+ */
+function DeliveryTicks({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 11"
+      fill="none"
+      aria-label="Delivered"
+      className={`ml-0.5 inline-block h-2.5 w-auto ${className}`}
+    >
+      {/* Back tick */}
+      <path
+        d="M1 5.5 L4.2 8.7 L10.5 2.3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Front tick, offset to the right */}
+      <path
+        d="M5.5 5.5 L8.7 8.7 L15 2.3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
