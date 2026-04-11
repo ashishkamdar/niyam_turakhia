@@ -37,7 +37,7 @@ export function PriceTicker() {
   }
 
   return (
-    <div className="sticky top-0 z-50 border-b border-white/10 bg-gray-900/95 backdrop-blur">
+    <div className="sticky top-0 z-50 border-b border-white/10 bg-gray-900/95 backdrop-blur print:hidden">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 sm:px-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

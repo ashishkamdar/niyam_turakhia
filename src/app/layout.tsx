@@ -35,9 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <DealToast />
             <DemoIndicator />
             <SidebarNav />
-            <div className="overflow-x-hidden lg:pl-60">
+            <div className="overflow-x-hidden lg:pl-60 print:lg:pl-0">
               <PriceTicker />
-              <main className="px-3 py-4 pb-20 sm:px-6 lg:px-8 lg:pb-6">{children}</main>
+              <main className="px-3 py-4 pb-20 sm:px-6 lg:px-8 lg:pb-6 print:px-0 print:py-0 print:pb-0">{children}</main>
             </div>
             <BottomNav />
           </DemoProvider>

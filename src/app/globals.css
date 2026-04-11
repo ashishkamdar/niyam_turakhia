@@ -21,3 +21,47 @@ body {
 .animate-slide-down {
   animation: slide-down 0.3s ease-out;
 }
+
+/* ── Print styles ──────────────────────────────────────────────────────────
+   When a PrismX page is printed (or saved as PDF via the browser's print
+   dialog), flip the dark-theme background to white paper and ensure key
+   visual elements (borders, logo accents) still render. Tailwind's print:
+   variants handle most of the per-component work; these rules fix the
+   global layout and ensure backgrounds/borders print correctly.
+   ──────────────────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4;
+    margin: 1.5cm 2cm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    overflow: visible !important;
+    max-width: none !important;
+  }
+
+  /* Preserve colours the user explicitly set via print: variants.
+     Without this, browsers strip backgrounds and some borders to save ink. */
+  .report-letterhead,
+  .report-letterhead img,
+  .report-letterhead .border-amber-700 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Cards inside the reports page get a visible border on paper,
+     regardless of browser "don't print backgrounds" defaults. */
+  .rounded-lg.bg-gray-900 {
+    background: #f9fafb !important;
+    border: 1px solid #d1d5db !important;
+    outline: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* Tighten spacing for paper */
+  main {
+    padding: 0 !important;
+  }
+}

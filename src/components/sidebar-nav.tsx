@@ -57,7 +57,7 @@ export function SidebarNav() {
   }
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-60 lg:flex-col">
+    <div className="hidden print:lg:hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-60 lg:flex-col">
       <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-white/10 bg-gray-900 px-6">
         <div className="flex h-16 shrink-0 items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}

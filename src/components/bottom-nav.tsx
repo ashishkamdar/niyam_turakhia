@@ -49,7 +49,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-[100vw] border-t border-white/10 bg-gray-900/95 backdrop-blur lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-[100vw] border-t border-white/10 bg-gray-900/95 backdrop-blur lg:hidden print:hidden">
       <div className="grid grid-cols-5">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
