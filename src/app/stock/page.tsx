@@ -34,7 +34,10 @@ type MetalFilter = "all" | "gold" | "silver" | "platinum" | "palladium" | "other
 // ─── Page root ────────────────────────────────────────────────────────
 
 export default function StockPage() {
-  const [mode, setMode] = useState<Mode>("demo");
+  // Default to Live — the Live register (Opening + Stock In Hand +
+  // all-time table) is the production surface Niyam will actually use.
+  // Demo mode is a fallback for the Home "Start Demo" button flow.
+  const [mode, setMode] = useState<Mode>("live");
 
   return (
     <div className="mx-auto w-full max-w-[1800px] space-y-6">

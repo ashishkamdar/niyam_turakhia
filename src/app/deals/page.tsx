@@ -131,7 +131,9 @@ function formatDateTime(iso: string | null): string {
 // ─── Page root ─────────────────────────────────────────────────────────
 
 export default function DealsPage() {
-  const [mode, setMode] = useState<Mode>("demo");
+  // Default to Live — the Live register is the production surface.
+  // Demo mode is a fallback for the Home "Start Demo" button flow.
+  const [mode, setMode] = useState<Mode>("live");
 
   return (
     <div className="mx-auto w-full max-w-[1800px] space-y-6">
