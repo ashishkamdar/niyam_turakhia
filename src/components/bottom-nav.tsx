@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDemo } from "./demo-engine";
+import { initialsFromLabel, roleAccentClass, roleLabel } from "@/lib/user-display";
 
 const NAV_ITEMS = [
   { name: "Home", href: "/", icon: "M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25", badge: "" },
@@ -32,6 +33,23 @@ export function BottomNav() {
   const [lockedCount, setLockedCount] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Current user card in the More sheet header. Fetched once on mount
+  // via /api/auth — same source as the desktop sidebar card.
+  const [currentUser, setCurrentUser] = useState<{
+    label: string;
+    role: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.authenticated && d.label) {
+          setCurrentUser({ label: d.label, role: d.role ?? "staff" });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Close the sheet whenever the route changes (e.g. after tapping an item).
   // This covers both client-side Link navigations and the programmatic
@@ -159,6 +177,28 @@ export function BottomNav() {
           />
           <div className="absolute inset-x-0 bottom-14 rounded-t-2xl border-t border-white/10 bg-gray-900 pb-3 shadow-2xl">
             <div className="mx-auto mb-2 mt-2 h-1 w-10 rounded-full bg-white/20" aria-hidden />
+            {/* Current user card — sits just below the drag handle so
+                "who am I" is immediately visible when the sheet opens,
+                even before the user scans the menu items. */}
+            {currentUser && (
+              <div className="mx-2 mb-2 flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5">
+                <div
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ${roleAccentClass(
+                    currentUser.role
+                  )}`}
+                >
+                  {initialsFromLabel(currentUser.label)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-white">
+                    {currentUser.label}
+                  </div>
+                  <div className="truncate text-[10px] uppercase tracking-wider text-gray-500">
+                    {roleLabel(currentUser.role)}
+                  </div>
+                </div>
+              </div>
+            )}
             <ul className="divide-y divide-white/5 px-2">
               {MORE_ITEMS.map((item) => {
                 const isActive = pathname === item.href;
