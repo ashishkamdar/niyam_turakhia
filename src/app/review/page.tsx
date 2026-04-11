@@ -1,5 +1,14 @@
 "use client";
 
+// Opt out of Next.js 16's aggressive server-render caching for this page.
+// /review shows live pending_deals from the database and must never be
+// served from a stale cache — every visit should re-render fresh.
+// Without this, Next.js sets cache-control: s-maxage=31536000 (365 days)
+// by default, causing deploys to appear "not to work" until PM2 restarts
+// invalidate the in-memory render cache. Forces dynamic rendering on
+// every request so changes propagate immediately after deploy.
+export const dynamic = "force-dynamic";
+
 import { useCallback, useEffect, useState } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────
