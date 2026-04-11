@@ -35,14 +35,59 @@ type Session = {
   is_active: boolean;
 };
 
+type Role = "super_admin" | "admin" | "staff";
+
 type Pin = {
   id: string;
   label: string;
   pin: string;
-  role: string;
+  role: Role;
   locked: boolean;
   created_at: string;
   active_sessions: number;
+};
+
+/**
+ * Normalize whatever the API returns into the strict Role union. Any
+ * unknown value falls back to "staff" (least privilege) — matches the
+ * server-side normalizeRole in lib/auth-context.ts.
+ */
+function coerceRole(raw: string | null | undefined): Role {
+  if (raw === "super_admin") return "super_admin";
+  if (raw === "admin") return "admin";
+  return "staff";
+}
+
+// Role permission helpers mirrored from lib/auth-context so the UI can
+// pre-emptively disable controls the server would also reject. Server
+// is still the source of truth — these helpers only decide what to show.
+function canCreateRoleUi(actor: Role, target: Role): boolean {
+  if (actor === "super_admin") return true;
+  if (actor === "admin") return target === "admin" || target === "staff";
+  return false;
+}
+function canModifyPinUi(actor: Role, target: Role): boolean {
+  if (actor === "super_admin") return true;
+  if (actor === "admin") return target === "admin" || target === "staff";
+  return false;
+}
+
+// Role display labels + pill colors. Super admin gets a violet accent
+// so it stands out against the existing amber/gray roles without
+// clashing with any business metric colour (emerald, rose, amber).
+const ROLE_META: Record<Role, { label: string; pillClass: string }> = {
+  super_admin: {
+    label: "Super Admin",
+    pillClass: "bg-violet-500/15 text-violet-300",
+  },
+  admin: {
+    label: "Admin",
+    pillClass: "bg-amber-500/15 text-amber-300",
+  },
+  staff: {
+    label: "Staff",
+    pillClass: "bg-gray-500/20 text-gray-400",
+  },
 };
 
 /**
@@ -104,18 +149,35 @@ export default function UsersPage() {
   const [managePinsOpen, setManagePinsOpen] = useState(false);
   const [shareFeedback, setShareFeedback] = useState("");
 
+  // Current user's role drives what buttons are enabled and which
+  // role options show in the add/edit dropdowns. Server is still the
+  // source of truth — this is only for optimistic UI gating.
+  const [currentRole, setCurrentRole] = useState<Role>("staff");
+
   const load = useCallback(async () => {
     try {
-      const [sRes, pRes] = await Promise.all([
+      const [sRes, pRes, meRes] = await Promise.all([
         fetch("/api/sessions"),
         fetch("/api/pins"),
+        fetch("/api/auth"),
       ]);
       const sJson = await sRes.json();
       const pJson = await pRes.json();
+      const meJson = await meRes.json();
       setSessions(sJson.sessions ?? []);
       setActiveCount(sJson.active_count ?? 0);
       setGeneratedAt(sJson.generated_at ?? "");
-      setPins(pJson.pins ?? []);
+      // Coerce the raw API role strings to the strict Role union so
+      // downstream consumers can rely on a narrow type.
+      setPins(
+        (pJson.pins ?? []).map((p: Pin & { role: string }) => ({
+          ...p,
+          role: coerceRole(p.role),
+        }))
+      );
+      if (meJson?.authenticated) {
+        setCurrentRole(coerceRole(meJson.role));
+      }
     } catch {
       // Silent — just keep showing the last known state.
     }
@@ -289,57 +351,67 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 print:divide-gray-200">
-                {activeGroups.map((g) => (
-                  <tr key={`${g.label}-${g.ip}`}>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white print:text-black">
-                          {g.label}
-                        </span>
+                {activeGroups.map((g) => {
+                  const groupRole = coerceRole(g.role);
+                  const roleMeta = ROLE_META[groupRole];
+                  // An admin cannot kick a super_admin session. The
+                  // server also enforces this — the UI disable is the
+                  // first line of defense.
+                  const canKick = canModifyPinUi(currentRole, groupRole);
+                  return (
+                    <tr key={`${g.label}-${g.ip}`}>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-white print:text-black">
+                            {g.label}
+                          </span>
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase ${roleMeta.pillClass}`}
+                          >
+                            {roleMeta.label}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-top font-mono text-xs text-gray-300 print:text-gray-700">
+                        {g.ip}
+                      </td>
+                      <td className="px-4 py-3 align-top">
                         <span
-                          className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
-                            g.role === "admin"
-                              ? "bg-amber-500/20 text-amber-300 print:bg-amber-100 print:text-amber-800"
-                              : "bg-gray-500/20 text-gray-400 print:bg-gray-200 print:text-gray-700"
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            g.count > 1
+                              ? "bg-rose-500/10 text-rose-300 print:bg-rose-100 print:text-rose-800"
+                              : "bg-emerald-500/10 text-emerald-300 print:bg-emerald-100 print:text-emerald-800"
                           }`}
                         >
-                          {g.role}
+                          {g.count}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top font-mono text-xs text-gray-300 print:text-gray-700">
-                      {g.ip}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          g.count > 1
-                            ? "bg-rose-500/10 text-rose-300 print:bg-rose-100 print:text-rose-800"
-                            : "bg-emerald-500/10 text-emerald-300 print:bg-emerald-100 print:text-emerald-800"
-                        }`}
-                      >
-                        {g.count}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-top text-xs text-gray-400 print:text-gray-600">
-                      {g.userAgents.join(" + ")}
-                    </td>
-                    <td className="px-4 py-3 align-top text-xs text-gray-400 print:text-gray-600">
-                      {formatTime(g.oldestCreatedAt)}
-                    </td>
-                    <td className="px-4 py-3 align-top text-xs text-emerald-400 print:text-emerald-700">
-                      {timeAgo(g.newestLastSeen)}
-                    </td>
-                    <td className="px-4 py-3 align-top text-right print:hidden">
-                      <button
-                        onClick={() => kickGroup(g.label, g.ip, g.count)}
-                        className="rounded border border-rose-500/30 px-2 py-1 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/10"
-                      >
-                        {g.count > 1 ? `Kick all ${g.count}` : "Kick"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 align-top text-xs text-gray-400 print:text-gray-600">
+                        {g.userAgents.join(" + ")}
+                      </td>
+                      <td className="px-4 py-3 align-top text-xs text-gray-400 print:text-gray-600">
+                        {formatTime(g.oldestCreatedAt)}
+                      </td>
+                      <td className="px-4 py-3 align-top text-xs text-emerald-400 print:text-emerald-700">
+                        {timeAgo(g.newestLastSeen)}
+                      </td>
+                      <td className="px-4 py-3 align-top text-right print:hidden">
+                        <button
+                          onClick={() => canKick && kickGroup(g.label, g.ip, g.count)}
+                          disabled={!canKick}
+                          title={canKick ? undefined : "Only a Super Admin can kick a Super Admin"}
+                          className={`rounded border px-2 py-1 text-[11px] font-semibold transition ${
+                            canKick
+                              ? "border-rose-500/30 text-rose-300 hover:bg-rose-500/10"
+                              : "cursor-not-allowed border-white/5 text-gray-600"
+                          }`}
+                        >
+                          {g.count > 1 ? `Kick all ${g.count}` : "Kick"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -368,33 +440,43 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 print:divide-gray-200">
-                {recentSessions.map((s) => (
-                  <tr key={s.id}>
-                    <td className="px-4 py-2 align-top font-semibold text-gray-300 print:text-gray-700">
-                      {s.label}
-                    </td>
-                    <td className="px-4 py-2 align-top font-mono text-xs text-gray-400 print:text-gray-600">
-                      {s.ip}
-                    </td>
-                    <td className="px-4 py-2 align-top text-xs text-gray-400 print:text-gray-600">
-                      {shortenUA(s.user_agent)}
-                    </td>
-                    <td className="px-4 py-2 align-top text-xs text-gray-400 print:text-gray-600">
-                      {formatTime(s.created_at)}
-                    </td>
-                    <td className="px-4 py-2 align-top text-xs text-gray-500 print:text-gray-600">
-                      {timeAgo(s.last_seen)}
-                    </td>
-                    <td className="px-4 py-2 align-top text-right print:hidden">
-                      <button
-                        onClick={() => kickSession(s.id, s.label)}
-                        className="rounded border border-white/10 px-2 py-1 text-[11px] font-semibold text-gray-400 transition hover:border-rose-500/30 hover:text-rose-300"
-                      >
-                        Revoke
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {recentSessions.map((s) => {
+                  const sessionRole = coerceRole(s.role);
+                  const canRevoke = canModifyPinUi(currentRole, sessionRole);
+                  return (
+                    <tr key={s.id}>
+                      <td className="px-4 py-2 align-top font-semibold text-gray-300 print:text-gray-700">
+                        {s.label}
+                      </td>
+                      <td className="px-4 py-2 align-top font-mono text-xs text-gray-400 print:text-gray-600">
+                        {s.ip}
+                      </td>
+                      <td className="px-4 py-2 align-top text-xs text-gray-400 print:text-gray-600">
+                        {shortenUA(s.user_agent)}
+                      </td>
+                      <td className="px-4 py-2 align-top text-xs text-gray-400 print:text-gray-600">
+                        {formatTime(s.created_at)}
+                      </td>
+                      <td className="px-4 py-2 align-top text-xs text-gray-500 print:text-gray-600">
+                        {timeAgo(s.last_seen)}
+                      </td>
+                      <td className="px-4 py-2 align-top text-right print:hidden">
+                        <button
+                          onClick={() => canRevoke && kickSession(s.id, s.label)}
+                          disabled={!canRevoke}
+                          title={canRevoke ? undefined : "Only a Super Admin can revoke a Super Admin session"}
+                          className={`rounded border px-2 py-1 text-[11px] font-semibold transition ${
+                            canRevoke
+                              ? "border-white/10 text-gray-400 hover:border-rose-500/30 hover:text-rose-300"
+                              : "cursor-not-allowed border-white/5 text-gray-600"
+                          }`}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -423,7 +505,7 @@ export default function UsersPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
           </svg>
         </button>
-        {managePinsOpen && <PinManager pins={pins} onChange={load} />}
+        {managePinsOpen && <PinManager pins={pins} currentRole={currentRole} onChange={load} />}
       </section>
     </div>
   );
@@ -431,10 +513,35 @@ export default function UsersPage() {
 
 // ─── PinManager ──────────────────────────────────────────────────────────
 
-function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
+/**
+ * The list of roles the current user is allowed to CREATE via the
+ * Add-PIN form or assign via the Edit dropdown. Filtering here (plus
+ * server-side enforcement in /api/pins) gives a consistent experience:
+ * admins never even see "Super Admin" as an option, and the server
+ * rejects any attempt to bypass the UI.
+ */
+function roleOptionsFor(actor: Role): Role[] {
+  if (actor === "super_admin") return ["super_admin", "admin", "staff"];
+  if (actor === "admin") return ["admin", "staff"];
+  return [];
+}
+
+function PinManager({
+  pins,
+  currentRole,
+  onChange,
+}: {
+  pins: Pin[];
+  currentRole: Role;
+  onChange: () => void;
+}) {
+  const creatableRoles = roleOptionsFor(currentRole);
+  const canManage = currentRole === "super_admin" || currentRole === "admin";
   const [newLabel, setNewLabel] = useState("");
   const [newPin, setNewPin] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "staff">("staff");
+  const [newRole, setNewRole] = useState<Role>(
+    creatableRoles.includes("staff") ? "staff" : creatableRoles[0] ?? "staff"
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -493,6 +600,14 @@ function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
     }
   }
 
+  if (!canManage) {
+    return (
+      <div className="mt-3 rounded-lg border border-white/5 bg-gray-900 p-4 text-center text-xs text-gray-500">
+        PIN management is restricted to Admin and Super Admin roles.
+      </div>
+    );
+  }
+
   return (
     <div className="mt-3 space-y-4 rounded-lg border border-white/5 bg-gray-900 p-4">
       {/* Add PIN form */}
@@ -524,17 +639,21 @@ function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
               className="w-full rounded border border-white/10 bg-gray-900 px-2 py-1.5 font-mono text-sm text-white placeholder:text-gray-600 focus:border-amber-500/50 focus:outline-none"
             />
           </div>
-          <div className="w-28">
+          <div className="w-36">
             <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">
               Role
             </label>
             <select
               value={newRole}
-              onChange={(e) => setNewRole(e.target.value as "admin" | "staff")}
-              className="w-full rounded border border-white/10 bg-gray-900 px-2 py-1.5 text-sm text-white focus:border-amber-500/50 focus:outline-none"
+              onChange={(e) => setNewRole(coerceRole(e.target.value))}
+              disabled={creatableRoles.length === 0}
+              className="w-full rounded border border-white/10 bg-gray-900 px-2 py-1.5 text-sm text-white focus:border-amber-500/50 focus:outline-none disabled:opacity-40"
             >
-              <option value="staff">Staff</option>
-              <option value="admin">Admin</option>
+              {creatableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_META[r].label}
+                </option>
+              ))}
             </select>
           </div>
           <button
@@ -566,6 +685,7 @@ function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
               <PinRow
                 key={p.id}
                 pin={p}
+                currentRole={currentRole}
                 busy={busy}
                 onUpdate={updatePin}
                 onDelete={deletePin}
@@ -585,11 +705,13 @@ function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
 
 function PinRow({
   pin,
+  currentRole,
   busy,
   onUpdate,
   onDelete,
 }: {
   pin: Pin;
+  currentRole: Role;
   busy: boolean;
   onUpdate: (
     id: string,
@@ -597,10 +719,21 @@ function PinRow({
   ) => void;
   onDelete: (id: string, label: string) => void;
 }) {
+  // Gate everything on whether the current user is actually allowed
+  // to touch this row. Admin cannot modify super_admin rows at all.
+  // Server will also refuse, but disabling the buttons avoids the
+  // user clicking into an error dialog.
+  const canModify = canModifyPinUi(currentRole, pin.role);
+  const creatableRoles = roleOptionsFor(currentRole);
+  const roleMeta = ROLE_META[pin.role];
+  const lockLabelDisabled = !canModify
+    ? "Only a Super Admin can lock/unlock this PIN"
+    : undefined;
+
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(pin.label);
   const [value, setValue] = useState(pin.pin);
-  const [role, setRole] = useState<"admin" | "staff">(pin.role as "admin" | "staff");
+  const [role, setRole] = useState<Role>(pin.role);
 
   function save() {
     onUpdate(pin.id, { label, pin: value, role });
@@ -610,7 +743,7 @@ function PinRow({
   function cancel() {
     setLabel(pin.label);
     setValue(pin.pin);
-    setRole(pin.role as "admin" | "staff");
+    setRole(pin.role);
     setEditing(false);
   }
 
@@ -647,21 +780,20 @@ function PinRow({
         {editing ? (
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value as "admin" | "staff")}
+            onChange={(e) => setRole(coerceRole(e.target.value))}
             className="rounded border border-white/10 bg-gray-950 px-2 py-1 text-sm text-white focus:border-amber-500/50 focus:outline-none"
           >
-            <option value="staff">Staff</option>
-            <option value="admin">Admin</option>
+            {creatableRoles.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_META[r].label}
+              </option>
+            ))}
           </select>
         ) : (
           <span
-            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
-              pin.role === "admin"
-                ? "bg-amber-500/20 text-amber-300"
-                : "bg-gray-500/20 text-gray-400"
-            }`}
+            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${roleMeta.pillClass}`}
           >
-            {pin.role}
+            {roleMeta.label}
           </span>
         )}
       </td>
@@ -708,10 +840,13 @@ function PinRow({
         ) : (
           <div className="flex flex-wrap justify-end gap-1">
             <button
-              onClick={() => onUpdate(pin.id, { locked: !pin.locked })}
-              disabled={busy}
-              className={`rounded border px-2 py-1 text-xs font-semibold transition disabled:opacity-40 ${
-                pin.locked
+              onClick={() => canModify && onUpdate(pin.id, { locked: !pin.locked })}
+              disabled={busy || !canModify}
+              title={lockLabelDisabled}
+              className={`rounded border px-2 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                !canModify
+                  ? "border-white/5 text-gray-600"
+                  : pin.locked
                   ? "border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
                   : "border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
               }`}
@@ -719,14 +854,26 @@ function PinRow({
               {pin.locked ? "Unlock" : "Lock"}
             </button>
             <button
-              onClick={() => setEditing(true)}
-              className="rounded border border-white/10 px-2 py-1 text-xs font-semibold text-gray-300 hover:bg-white/5"
+              onClick={() => canModify && setEditing(true)}
+              disabled={!canModify}
+              title={canModify ? undefined : "Only a Super Admin can edit this PIN"}
+              className={`rounded border px-2 py-1 text-xs font-semibold transition ${
+                canModify
+                  ? "border-white/10 text-gray-300 hover:bg-white/5"
+                  : "cursor-not-allowed border-white/5 text-gray-600"
+              }`}
             >
               Edit
             </button>
             <button
-              onClick={() => onDelete(pin.id, pin.label)}
-              className="rounded border border-rose-500/30 px-2 py-1 text-xs font-semibold text-rose-300 hover:bg-rose-500/10"
+              onClick={() => canModify && onDelete(pin.id, pin.label)}
+              disabled={!canModify}
+              title={canModify ? undefined : "Only a Super Admin can delete this PIN"}
+              className={`rounded border px-2 py-1 text-xs font-semibold transition ${
+                canModify
+                  ? "border-rose-500/30 text-rose-300 hover:bg-rose-500/10"
+                  : "cursor-not-allowed border-white/5 text-gray-600"
+              }`}
             >
               Delete
             </button>

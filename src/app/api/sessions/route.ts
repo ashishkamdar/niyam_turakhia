@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { canKickRole, getCurrentUser, normalizeRole } from "@/lib/auth-context";
 
 // A session is considered "active" if its last_seen is within the last
 // 2 minutes. The AuthGate heartbeats every 30 seconds, so 2 minutes gives
@@ -84,17 +85,65 @@ export async function GET(_req: NextRequest) {
  * the victim's browser with no extra plumbing.
  */
 export async function DELETE(req: NextRequest) {
+  const actor = getCurrentUser(req);
+  if (!actor) {
+    return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
+  }
+  if (actor.role === "staff") {
+    return NextResponse.json(
+      { ok: false, error: "Staff cannot kick sessions" },
+      { status: 403 }
+    );
+  }
+
   const db = getDb();
   const id = req.nextUrl.searchParams.get("id");
   const label = req.nextUrl.searchParams.get("label");
   const ip = req.nextUrl.searchParams.get("ip");
 
   if (id) {
+    // Resolve the target session → its PIN → the PIN's role, so we can
+    // enforce the same "admin can't touch super_admin" rule here that
+    // /api/pins enforces. If the session doesn't exist, treat it as
+    // already-kicked and report 0 rows affected (idempotent).
+    const target = db
+      .prepare(
+        `SELECT p.role AS role
+           FROM auth_sessions s
+           JOIN auth_pins p ON p.id = s.pin_id
+           WHERE s.id = ?
+           LIMIT 1`
+      )
+      .get(id) as { role: string } | undefined;
+    if (target) {
+      const targetRole = normalizeRole(target.role);
+      if (!canKickRole(actor.role, targetRole)) {
+        return NextResponse.json(
+          { ok: false, error: "Only a Super Admin can kick a Super Admin session" },
+          { status: 403 }
+        );
+      }
+    }
     const result = db.prepare("DELETE FROM auth_sessions WHERE id = ?").run(id);
     return NextResponse.json({ ok: true, kicked: result.changes });
   }
 
   if (label && ip) {
+    // Check EVERY pin with this label — if any of them are super_admin
+    // and the caller isn't super_admin, block the whole group-kick.
+    // Using the label as a primary key is intentionally fuzzy (two
+    // pins can share a label), so a conservative "any super_admin
+    // blocks the batch" is the right rule.
+    const pins = db
+      .prepare("SELECT role FROM auth_pins WHERE label = ?")
+      .all(label) as { role: string }[];
+    const anySuperAdmin = pins.some((p) => normalizeRole(p.role) === "super_admin");
+    if (anySuperAdmin && actor.role !== "super_admin") {
+      return NextResponse.json(
+        { ok: false, error: "Only a Super Admin can kick a Super Admin session" },
+        { status: 403 }
+      );
+    }
     // Delete by (label, ip) — joins through auth_pins because label lives
     // on the pins table. Using a subquery keeps this portable vs. DELETE
     // with a JOIN (SQLite doesn't support that syntax directly).

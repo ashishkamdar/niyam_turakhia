@@ -329,6 +329,19 @@ function runMigrations(db: Database.Database) {
         // This migration exists so existing DBs bump their version.
       },
     },
+    {
+      version: 11,
+      description: "Promote seeded Niyam PIN to super_admin role",
+      up: () => {
+        // Idempotent: if pin_niyam doesn't exist (fresh DB where a
+        // user manually wiped the seed) or is already super_admin,
+        // this is a no-op. The role column is already TEXT so no
+        // schema change is needed — super_admin is just a new value.
+        db.prepare(
+          "UPDATE auth_pins SET role = 'super_admin' WHERE id = 'pin_niyam'"
+        ).run();
+      },
+    },
   ];
 
   for (const migration of migrations) {
