@@ -1,28 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export function PinPad({ onSuccess }: { onSuccess: () => void }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  async function checkPin(fullPin: string) {
-    setChecking(true);
-    setError(false);
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin: fullPin }),
-    });
-    if (res.ok) {
-      onSuccess();
-    } else {
-      setError(true);
-      setPin("");
-    }
-    setChecking(false);
-  }
+  // useCallback so the keyboard listener effect has a stable reference
+  // to call on each numeric key. Using the functional setPin form
+  // inside ensures we never close over stale state when a burst of
+  // keydowns arrives faster than React re-renders.
+  const checkPin = useCallback(
+    async (fullPin: string) => {
+      setChecking(true);
+      setError(false);
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: fullPin }),
+      });
+      if (res.ok) {
+        onSuccess();
+      } else {
+        setError(true);
+        setPin("");
+      }
+      setChecking(false);
+    },
+    [onSuccess]
+  );
 
   function handleDigit(digit: string) {
     if (checking) return;
@@ -39,6 +46,44 @@ export function PinPad({ onSuccess }: { onSuccess: () => void }) {
     setPin((p) => p.slice(0, -1));
     setError(false);
   }
+
+  // Desktop keyboard support — map physical key presses to the same
+  // handlers as the on-screen buttons. Digits 0-9 push a character,
+  // Backspace/Delete pops the last, Escape clears the whole PIN.
+  // Only numeric keys are consumed — anything else passes through so
+  // browser shortcuts (⌘R, ⌘W, etc.) keep working.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (checking) return;
+      // Numeric keys — both the top row and numpad produce single-char
+      // e.key values matching /^[0-9]$/.
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        setError(false);
+        setPin((prev) => {
+          if (prev.length >= 6) return prev;
+          const next = prev + e.key;
+          if (next.length === 6) {
+            // Defer the network call to after the state commit so
+            // the dot indicator renders the last digit before the
+            // spinner kicks in.
+            queueMicrotask(() => checkPin(next));
+          }
+          return next;
+        });
+      } else if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        setError(false);
+        setPin((prev) => prev.slice(0, -1));
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setError(false);
+        setPin("");
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [checking, checkPin]);
 
   const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "del"];
 
