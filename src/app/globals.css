@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Enable class-based dark variant so `dark:` utilities flip on the
+   .dark class applied to <html>. Paired with ThemeProvider below. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: dark;
 }
@@ -11,6 +15,69 @@ html, body {
 
 body {
   @apply bg-gray-950 text-white antialiased;
+}
+
+/* ─── LIGHT THEME PALETTE INVERSION ───────────────────────────────────
+   The app was designed dark-first: every surface uses `bg-gray-950`,
+   `bg-gray-900`, `text-white`, `text-gray-400`, `border-white/10`,
+   etc. as semantic tokens rather than literal colors. Instead of
+   rewriting all of that for light mode, we override Tailwind v4's
+   CSS variables inside a `.light` scope so the EXISTING classes
+   automatically resolve to light-theme values.
+
+   Why this works: Tailwind v4 compiles color utilities to
+   `var(--color-gray-950)` etc., which are live CSS custom properties.
+   Overriding them in a cascading scope flips every usage without
+   touching any component.
+
+   Caveats:
+   • `text-white` means "primary foreground text" in this codebase —
+     overriding --color-white to near-black is intentional so those
+     titles flip. Colored buttons (bg-amber-600 text-white) will get
+     near-black text too; that actually looks fine because amber-600
+     is vivid enough to carry dark text.
+   • `bg-white/10` overlays become `dark/10` overlays in light mode,
+     which is the correct semantic (subtle dark wash on light bg).
+   • Any component genuinely needing literal white in light mode can
+     escape with `text-[#fff]` / `bg-[#fff]`.
+
+   Anchor values are tuned by eye to match Tailwind's stock gray
+   palette inverted end-for-end, with the mid-range (gray-500/400)
+   bending slightly toward real gray so muted text on a light bg
+   still reads as muted.
+   ──────────────────────────────────────────────────────────────── */
+.light {
+  color-scheme: light;
+
+  /* Surface scale: 950 = body background, descending toward elevated
+     panels. Mirror of Tailwind's dark defaults. */
+  --color-gray-950: #ffffff;
+  --color-gray-900: #f9fafb;
+  --color-gray-800: #f3f4f6;
+  --color-gray-700: #e5e7eb;
+  --color-gray-600: #d1d5db;
+
+  /* Mid-tone muted text. In dark mode gray-500 is medium-light so it
+     reads as muted on dark bg; in light mode we want the same
+     perceptual muteness, which is a medium-dark gray on white. */
+  --color-gray-500: #9ca3af;
+  --color-gray-400: #6b7280;
+  --color-gray-300: #4b5563;
+  --color-gray-200: #374151;
+  --color-gray-100: #1f2937;
+  --color-gray-50:  #111827;
+
+  /* "white" in this codebase = primary text color. Flip to a near-
+     black so page titles, bold labels, and form values read against
+     the now-white body. */
+  --color-white: #0f172a;
+}
+
+/* When BOTH classes are inadvertently absent (first paint before
+   ThemeProvider runs) fall back to dark — matches the
+   layout.tsx default className and avoids a light-mode flash. */
+html:not(.light) {
+  color-scheme: dark;
 }
 
 @keyframes slide-down {
