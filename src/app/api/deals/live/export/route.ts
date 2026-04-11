@@ -99,6 +99,7 @@ export async function GET(req: NextRequest) {
   const to = req.nextUrl.searchParams.get("to");
   const label = req.nextUrl.searchParams.get("label") ?? "range";
 
+  const type = req.nextUrl.searchParams.get("type");
   const clauses: string[] = ["status = 'approved'"];
   const params: (string | number)[] = [];
   if (from) {
@@ -108,6 +109,13 @@ export async function GET(req: NextRequest) {
   if (to) {
     clauses.push("COALESCE(reviewed_at, received_at) < ?");
     params.push(to);
+  }
+  // Optional Kachha/Pakka filter — mirrors the client-side pill group.
+  // Anything other than exactly 'K' or 'P' is treated as "no filter"
+  // so a stale URL with ?type=foo doesn't silently return zero rows.
+  if (type === "K" || type === "P") {
+    clauses.push("deal_type = ?");
+    params.push(type);
   }
 
   const rows = db

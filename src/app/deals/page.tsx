@@ -35,6 +35,7 @@ const METAL_COLORS: Record<string, string> = {
 type Tab = "purchase" | "sale";
 type Mode = "demo" | "live";
 type Period = "today" | "monthly" | "quarterly" | "yearly" | "custom";
+type TypeFilter = "all" | "K" | "P";
 
 // ─── Date range helper ─────────────────────────────────────────────────
 //
@@ -294,6 +295,7 @@ function LiveView() {
   const [period, setPeriod] = useState<Period>("monthly");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [data, setData] = useState<LiveResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [shareFeedback, setShareFeedback] = useState("");
@@ -302,6 +304,31 @@ function LiveView() {
     () => periodRange(period, customFrom, customTo),
     [period, customFrom, customTo]
   );
+
+  // Type filter is applied client-side: the server already returned
+  // every approved deal in the window, so filtering by deal_type is a
+  // trivial array.filter that avoids a second round-trip on every pill
+  // click. Totals are recomputed so the stat cards always match what
+  // the table is showing.
+  const { visibleDeals, visibleTotals } = useMemo(() => {
+    const all = data?.deals ?? [];
+    const filtered =
+      typeFilter === "all" ? all : all.filter((d) => d.deal_type === typeFilter);
+    const totals = filtered.reduce(
+      (acc, d) => {
+        if (d.direction === "buy") {
+          acc.buy_count += 1;
+          acc.buy_usd += d.amount_usd;
+        } else if (d.direction === "sell") {
+          acc.sell_count += 1;
+          acc.sell_usd += d.amount_usd;
+        }
+        return acc;
+      },
+      { buy_count: 0, sell_count: 0, buy_usd: 0, sell_usd: 0 }
+    );
+    return { visibleDeals: filtered, visibleTotals: totals };
+  }, [data, typeFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -333,18 +360,21 @@ function LiveView() {
     const params = new URLSearchParams();
     if (range.from) params.set("from", range.from);
     if (range.to) params.set("to", range.to);
-    params.set("label", period);
+    params.set("label", typeFilter === "all" ? period : `${period}-${typeFilter.toLowerCase()}`);
+    if (typeFilter !== "all") params.set("type", typeFilter);
     return `/api/deals/live/export?${params.toString()}`;
   }
 
   async function handleShare() {
     if (!data) return;
+    const typeLabel =
+      typeFilter === "K" ? " · Kachha only" : typeFilter === "P" ? " · Pakka only" : "";
     const text = [
       `PrismX — Live Trades`,
-      `${range.label} · ${data.count} deal${data.count === 1 ? "" : "s"}`,
-      `Bought: ${data.totals.buy_count} · ${formatUsd(data.totals.buy_usd)}`,
-      `Sold: ${data.totals.sell_count} · ${formatUsd(data.totals.sell_usd)}`,
-      `Net P&L: ${formatUsd(data.totals.sell_usd - data.totals.buy_usd)}`,
+      `${range.label}${typeLabel} · ${visibleDeals.length} deal${visibleDeals.length === 1 ? "" : "s"}`,
+      `Bought: ${visibleTotals.buy_count} · ${formatUsd(visibleTotals.buy_usd)}`,
+      `Sold: ${visibleTotals.sell_count} · ${formatUsd(visibleTotals.sell_usd)}`,
+      `Net P&L: ${formatUsd(visibleTotals.sell_usd - visibleTotals.buy_usd)}`,
     ].join("\n");
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
@@ -371,23 +401,58 @@ function LiveView() {
       {/* Letterhead — visible on screen AND in print. */}
       <ReportLetterhead
         title="Live Trades"
-        subtitle={`${range.label} · ${data?.count ?? 0} deal${(data?.count ?? 0) === 1 ? "" : "s"}`}
+        subtitle={`${range.label}${
+          typeFilter === "K" ? " · Kachha" : typeFilter === "P" ? " · Pakka" : ""
+        } · ${visibleDeals.length} deal${visibleDeals.length === 1 ? "" : "s"}`}
       />
 
       {/* Filter bar — hidden in print */}
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div className="flex flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-gray-900 p-1">
-          {(["today", "monthly", "quarterly", "yearly", "custom"] as Period[]).map((p) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Period pills */}
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-gray-900 p-1">
+            {(["today", "monthly", "quarterly", "yearly", "custom"] as Period[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition ${
+                  period === p ? "bg-emerald-600 text-white" : "text-gray-400 hover:text-white"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+
+          {/* Kachha / Pakka filter — separate group so it reads as a
+              distinct axis, not another period. Colour-coded to match
+              the type pills in the table body (sky=Kachha, emerald=Pakka). */}
+          <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-gray-900 p-1">
             <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                period === p ? "bg-emerald-600 text-white" : "text-gray-400 hover:text-white"
+              onClick={() => setTypeFilter("all")}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                typeFilter === "all" ? "bg-gray-700 text-white" : "text-gray-400 hover:text-white"
               }`}
             >
-              {p}
+              All
             </button>
-          ))}
+            <button
+              onClick={() => setTypeFilter("K")}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                typeFilter === "K" ? "bg-sky-600 text-white" : "text-sky-300/70 hover:text-sky-200"
+              }`}
+            >
+              Kachha
+            </button>
+            <button
+              onClick={() => setTypeFilter("P")}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                typeFilter === "P" ? "bg-emerald-600 text-white" : "text-emerald-300/70 hover:text-emerald-200"
+              }`}
+            >
+              Pakka
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {shareFeedback && (
@@ -462,27 +527,28 @@ function LiveView() {
         </div>
       )}
 
-      {/* Summary stat cards */}
+      {/* Summary stat cards — derived from the filtered set so they
+          always match what the table is showing. */}
       {data && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Total Deals" value={data.count.toString()} />
+          <StatCard label="Total Deals" value={visibleDeals.length.toString()} />
           <StatCard
             label="Bought"
-            value={formatUsd(data.totals.buy_usd)}
-            sublabel={`${data.totals.buy_count} deals`}
+            value={formatUsd(visibleTotals.buy_usd)}
+            sublabel={`${visibleTotals.buy_count} deals`}
             tone="amber"
           />
           <StatCard
             label="Sold"
-            value={formatUsd(data.totals.sell_usd)}
-            sublabel={`${data.totals.sell_count} deals`}
+            value={formatUsd(visibleTotals.sell_usd)}
+            sublabel={`${visibleTotals.sell_count} deals`}
             tone="emerald"
           />
           <StatCard
             label="Net"
-            value={formatUsd(data.totals.sell_usd - data.totals.buy_usd)}
+            value={formatUsd(visibleTotals.sell_usd - visibleTotals.buy_usd)}
             tone={
-              data.totals.sell_usd - data.totals.buy_usd >= 0 ? "emerald" : "rose"
+              visibleTotals.sell_usd - visibleTotals.buy_usd >= 0 ? "emerald" : "rose"
             }
           />
         </div>
@@ -513,14 +579,16 @@ function LiveView() {
                 </td>
               </tr>
             )}
-            {!loading && data?.deals.length === 0 && (
+            {!loading && visibleDeals.length === 0 && (
               <tr>
                 <td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-500">
-                  No approved deals in this range.
+                  {typeFilter === "all"
+                    ? "No approved deals in this range."
+                    : `No ${typeFilter === "K" ? "Kachha" : "Pakka"} deals in this range.`}
                 </td>
               </tr>
             )}
-            {data?.deals.map((d) => (
+            {visibleDeals.map((d) => (
               <tr key={d.id}>
                 <td className="px-3 py-2 text-gray-400 print:text-gray-600">
                   {formatDateTime(d.reviewed_at)}
