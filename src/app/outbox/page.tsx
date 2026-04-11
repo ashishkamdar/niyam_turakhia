@@ -148,32 +148,15 @@ export default function OutboxPage() {
     <div className="mx-auto w-full max-w-[1800px] space-y-6">
       {/* ── Header ───────────────────────────────────────────────────── */}
       <header className="border-b border-white/10 pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Outbox</h1>
-            <p className="mt-1 max-w-2xl text-sm text-gray-400">
-              Approved trades waiting to be pushed to{" "}
-              <span className="font-semibold text-emerald-300">OroSoft</span> (Pakka · API) or
-              exported to{" "}
-              <span className="font-semibold text-sky-300">SBS</span> (Kachha · Excel).
-              This is where the lifecycle ends — once a trade lands here,
-              it&apos;s a quotable, invoice-ready line item.
-            </p>
-          </div>
-          <div className="flex items-center gap-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200/80">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="size-5 shrink-0 text-amber-400">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M12 17.25h.008v.008H12v-.008zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <div className="font-semibold text-amber-200">Why this page matters</div>
-              <div className="mt-0.5 text-[11px] leading-relaxed">
-                Indian customers rarely release payment until they can literally see
-                their trade on the destination system. The outbox gives your desk
-                proof-of-delivery — the exact moment to ask for money against a quote.
-              </div>
-            </div>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold text-white">Outbox</h1>
+        <p className="mt-1 max-w-2xl text-sm text-gray-400">
+          Approved trades waiting to be pushed to{" "}
+          <span className="font-semibold text-emerald-300">OroSoft</span> (Pakka · API) or
+          exported to{" "}
+          <span className="font-semibold text-sky-300">SBS</span> (Kachha · Excel).
+          This is where the lifecycle ends — once a trade lands here,
+          it&apos;s a quotable, invoice-ready line item.
+        </p>
       </header>
 
       {/* ── Two destination panels ───────────────────────────────────── */}
