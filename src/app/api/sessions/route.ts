@@ -6,10 +6,15 @@ import { getDb } from "@/lib/db";
 // us 3 missed pings of tolerance for flaky networks / background tabs.
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
-// How far back to include in the "recent sessions" history list on the
-// Users page. Anything older than this is considered archived and not
-// returned. 24 hours is enough to answer "who logged in today?".
-const HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
+// How far back the Users page's "Recent Sessions" table shows. Anything
+// older is still a valid logged-in session (cookie MAX_AGE is 365 days
+// and we never auto-expire sessions) — it just isn't shown in the recent
+// list. 24 hours is enough to answer "who logged in today?".
+//
+// CRITICAL: this is a DISPLAY filter only. We do NOT delete old rows.
+// Deleting a session row orphans the user's cookie and forces them to
+// re-enter their PIN, which would break the "unlimited login" guarantee.
+const DISPLAY_HISTORY_MS = 24 * 60 * 60 * 1000;
 
 type SessionRow = {
   id: string;
@@ -35,20 +40,21 @@ type SessionRow = {
 export async function GET(_req: NextRequest) {
   const db = getDb();
   const now = Date.now();
-  const cutoff = new Date(now - HISTORY_WINDOW_MS).toISOString();
+  const displayCutoff = new Date(now - DISPLAY_HISTORY_MS).toISOString();
 
-  // Sweep: delete any session whose last_seen is older than the history
-  // window. Keeps the table bounded and the Users page snappy.
-  db.prepare("DELETE FROM auth_sessions WHERE last_seen < ?").run(cutoff);
-
+  // Read-only: pull only sessions within the display window. Older rows
+  // stay in the table untouched so the user's cookie remains valid
+  // forever (unlimited login requirement). The "old and huge" scenario
+  // is handled by not loading them into the UI, not by deleting them.
   const rows = db
     .prepare(
       `SELECT s.id, s.pin_id, p.label, p.role, s.ip, s.user_agent, s.created_at, s.last_seen
          FROM auth_sessions s
          JOIN auth_pins p ON p.id = s.pin_id
+         WHERE s.last_seen >= ?
          ORDER BY s.last_seen DESC`
     )
-    .all() as SessionRow[];
+    .all(displayCutoff) as SessionRow[];
 
   const activeCutoff = now - ACTIVE_WINDOW_MS;
   const sessions = rows.map((r) => ({
