@@ -134,11 +134,18 @@ export async function GET(_req: NextRequest) {
 
   const metals = Array.from(buckets.values())
     .map((b) => {
-      const netFineGrams = b.bought_fine_grams - b.sold_fine_grams;
+      // Clamp net at zero: you can't actually hold negative stock.
+      // If approved sells exceed approved buys (common when the demo
+      // deals table has matched-sell entries without matching buys),
+      // report the position as flat rather than emit a misleading
+      // negative number. Matches the Math.max(0, ...) clamp in the
+      // Demo /stock page so both views behave identically.
+      const netFineGrams = Math.max(0, b.bought_fine_grams - b.sold_fine_grams);
       const netFineOz = netFineGrams / GRAMS_PER_TROY_OZ;
       // Cost basis of the REMAINING stock: scale the total bought cost
       // by (net / bought) so partial sells reduce the cost basis
-      // proportionally. Matches the Demo /stock page's costRatio math.
+      // proportionally. With the clamp above, costRatio is always in
+      // [0, 1] so scaledCost can never go negative.
       const costRatio =
         b.bought_fine_grams > 0 ? netFineGrams / b.bought_fine_grams : 0;
       const scaledCostUsd = b.bought_cost_usd * costRatio;

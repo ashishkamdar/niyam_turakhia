@@ -172,7 +172,9 @@ export async function GET(req: NextRequest) {
 
   for (const b of sorted) {
     if (!passesFilter(b.metal, filter)) continue;
-    const netFineGrams = b.bought_fine_grams - b.sold_fine_grams;
+    // Clamp net at zero — matches /api/stock/live so the CSV and the
+    // on-screen table never disagree. See the comment there for why.
+    const netFineGrams = Math.max(0, b.bought_fine_grams - b.sold_fine_grams);
     const netFineOz = netFineGrams / GRAMS_PER_TROY_OZ;
     const costRatio =
       b.bought_fine_grams > 0 ? netFineGrams / b.bought_fine_grams : 0;
