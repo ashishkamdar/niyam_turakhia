@@ -122,6 +122,12 @@ export interface WhatsAppMessage {
   is_lock: boolean;
   linked_deal_id: string | null;
   timestamp: string;
+  // Outbound send tracking (populated by /api/whatsapp POST when
+  // direction === "outgoing"). null on incoming messages and on
+  // legacy outgoing rows that pre-date migration v12.
+  wamid?: string | null;
+  send_status?: "sent" | "failed" | null;
+  send_error?: string | null;
 }
 
 export interface WhatsAppContact {

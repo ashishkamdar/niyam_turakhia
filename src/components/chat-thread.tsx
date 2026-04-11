@@ -54,30 +54,57 @@ export function ChatThread({
           // "0" characters next to every timestamp via React's `&&`
           // short-circuit evaluation.
           const hasLock = Boolean(m.is_lock);
+          // Three outbound states now: real send succeeded (wamid +
+          // send_status = 'sent'), real send failed (send_status =
+          // 'failed', error captured), or legacy row (no send_status
+          // at all). Legacy rows predate the Meta wire-up and still
+          // show double ticks so the existing simulator history isn't
+          // suddenly flagged as broken.
+          const sendFailed = !isIncoming && m.send_status === "failed";
           return (
             <div key={m.id} className={`flex ${isIncoming ? "justify-start" : "justify-end"}`}>
               <div
                 className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                  hasLock
-                    ? "bg-amber-600/20 outline outline-1 outline-amber-500/50"
-                    : isIncoming
-                      ? "bg-gray-800 text-gray-100"
-                      : "bg-emerald-700 text-white"
+                  sendFailed
+                    ? "bg-rose-900/40 outline outline-1 outline-rose-500/50"
+                    : hasLock
+                      ? "bg-amber-600/20 outline outline-1 outline-amber-500/50"
+                      : isIncoming
+                        ? "bg-gray-800 text-gray-100"
+                        : "bg-emerald-700 text-white"
                 }`}
               >
                 <p>
                   {hasLock ? highlightLock(m.message) : m.message}
                 </p>
-                <p className={`mt-1 flex items-center gap-1 text-[10px] ${hasLock ? "text-amber-400/70" : isIncoming ? "text-gray-500" : "text-emerald-300/70"}`}>
+                <p className={`mt-1 flex items-center gap-1 text-[10px] ${
+                  sendFailed
+                    ? "text-rose-300"
+                    : hasLock
+                      ? "text-amber-400/70"
+                      : isIncoming
+                        ? "text-gray-500"
+                        : "text-emerald-300/70"
+                }`}>
                   <span>
                     {new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
                   {hasLock ? <span>· DEAL LOCKED</span> : null}
-                  {/* WhatsApp-style double-tick delivery indicator on
-                      outgoing messages. Simulator demo messages persist
-                      immediately so they're "delivered" by definition. */}
-                  {!isIncoming ? <DeliveryTicks className={hasLock ? "text-amber-300" : "text-emerald-200"} /> : null}
+                  {/* Outbound status indicator. Failed = red exclamation
+                      with the raw Meta error as a tooltip so users can
+                      diagnose 24h-window / not-in-allow-list issues
+                      without opening devtools. Otherwise double ticks. */}
+                  {!isIncoming
+                    ? sendFailed
+                      ? <FailedIndicator error={m.send_error ?? "Send failed"} />
+                      : <DeliveryTicks className={hasLock ? "text-amber-300" : "text-emerald-200"} />
+                    : null}
                 </p>
+                {sendFailed && m.send_error ? (
+                  <p className="mt-1 max-w-full break-words text-[10px] text-rose-300/80">
+                    {m.send_error}
+                  </p>
+                ) : null}
               </div>
             </div>
           );
@@ -118,6 +145,25 @@ function highlightLock(text: string): React.ReactNode {
     ) : (
       part
     )
+  );
+}
+
+/**
+ * Red exclamation shown when a real outbound send was rejected by
+ * Meta (e.g. 24-hour customer-service window expired, recipient not
+ * in the test allow-list, missing credentials). The raw error string
+ * is surfaced both as a tooltip and as a second subtitle line below
+ * the timestamp so users can diagnose without opening devtools.
+ */
+function FailedIndicator({ error }: { error: string }) {
+  return (
+    <span
+      title={error}
+      aria-label="Send failed"
+      className="ml-0.5 inline-flex size-3 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white"
+    >
+      !
+    </span>
   );
 }
 

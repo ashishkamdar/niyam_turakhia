@@ -77,7 +77,14 @@ function initSchema(db: Database.Database) {
       message TEXT NOT NULL,
       is_lock INTEGER NOT NULL DEFAULT 0,
       linked_deal_id TEXT,
-      timestamp TEXT NOT NULL
+      timestamp TEXT NOT NULL,
+      -- Outbound send tracking (migration v12). wamid = Meta's message
+      -- id returned by /messages endpoint; send_status = 'sent' | 'failed'
+      -- | NULL (legacy rows before the wire-up). send_error captures
+      -- Meta's error message when status='failed'.
+      wamid TEXT,
+      send_status TEXT,
+      send_error TEXT
     );
 
     CREATE TABLE IF NOT EXISTS deliveries (
@@ -340,6 +347,15 @@ function runMigrations(db: Database.Database) {
         db.prepare(
           "UPDATE auth_pins SET role = 'super_admin' WHERE id = 'pin_niyam'"
         ).run();
+      },
+    },
+    {
+      version: 12,
+      description: "Add send-tracking columns to whatsapp_messages",
+      up: () => {
+        addColumnIfNotExists(db, "whatsapp_messages", "wamid", "TEXT");
+        addColumnIfNotExists(db, "whatsapp_messages", "send_status", "TEXT");
+        addColumnIfNotExists(db, "whatsapp_messages", "send_error", "TEXT");
       },
     },
   ];

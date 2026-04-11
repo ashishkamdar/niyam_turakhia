@@ -2,6 +2,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { PURE_PURITIES, YIELD_TABLE, type Purity } from "@/lib/types";
+import { getMetaConfig, sendTextMessage } from "@/lib/meta-whatsapp";
+
+/**
+ * Resolve a contact's phone number from the pending_deals table.
+ *
+ * The /whatsapp page lists contacts derived from the whatsapp_messages
+ * table (which has no phone column). For outbound sends we need E.164,
+ * so we look up the most-recent pending_deal where sender_name matches
+ * and pull sender_phone. If the contact has never sent a lock code
+ * through the real webhook, we can't know their phone and return null.
+ *
+ * Match is case-insensitive and trimmed — "Ashish Kamdar" in the chat
+ * list should hit a pending_deal with sender_name = "Ashish Kamdar"
+ * even if whitespace or case drifted.
+ */
+function resolveContactPhone(
+  db: ReturnType<typeof getDb>,
+  contactName: string
+): string | null {
+  const row = db
+    .prepare(
+      `SELECT sender_phone
+         FROM pending_deals
+         WHERE LOWER(TRIM(sender_name)) = LOWER(TRIM(?))
+           AND sender_phone IS NOT NULL
+           AND sender_phone != ''
+         ORDER BY received_at DESC
+         LIMIT 1`
+    )
+    .get(contactName) as { sender_phone: string } | undefined;
+  return row?.sender_phone ?? null;
+}
 
 export async function GET(req: NextRequest) {
   const db = getDb();
@@ -130,12 +162,74 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  db.prepare(`
-    INSERT INTO whatsapp_messages (id, contact_name, contact_location, direction, message, is_lock, linked_deal_id, timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, body.contact_name, body.contact_location, body.direction, messageText, isLock, linkedDealId, timestamp);
+  // For outbound messages, attempt a real Meta Cloud API send BEFORE
+  // persisting the row, so the DB reflects the true send status on
+  // every reload. The row is still written on failure — the UI shows
+  // it with a "failed" indicator so the user can retry or investigate
+  // rather than silently losing the attempt.
+  let wamid: string | null = null;
+  let sendStatus: "sent" | "failed" | null = null;
+  let sendError: string | null = null;
 
-  return NextResponse.json({ id, is_lock: isLock, linked_deal_id: linkedDealId }, { status: 201 });
+  if (body.direction === "outgoing") {
+    const config = getMetaConfig(db);
+    const phoneNumberId = config.phone_number_id;
+    const accessToken = config.access_token;
+    const recipientPhone = resolveContactPhone(db, body.contact_name);
+
+    if (!phoneNumberId || !accessToken) {
+      sendStatus = "failed";
+      sendError =
+        "Meta credentials not configured. Set phone_number_id + access_token in Settings → Meta WhatsApp Business API.";
+    } else if (!recipientPhone) {
+      sendStatus = "failed";
+      sendError =
+        `No phone number on file for "${body.contact_name}". Real sends only work for contacts whose inbound messages have hit the webhook.`;
+    } else {
+      const result = await sendTextMessage(
+        phoneNumberId,
+        accessToken,
+        recipientPhone,
+        messageText
+      );
+      if (result.ok) {
+        wamid = result.wamid;
+        sendStatus = "sent";
+      } else {
+        sendStatus = "failed";
+        sendError = result.error;
+      }
+    }
+  }
+
+  db.prepare(`
+    INSERT INTO whatsapp_messages (id, contact_name, contact_location, direction, message, is_lock, linked_deal_id, timestamp, wamid, send_status, send_error)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    body.contact_name,
+    body.contact_location,
+    body.direction,
+    messageText,
+    isLock,
+    linkedDealId,
+    timestamp,
+    wamid,
+    sendStatus,
+    sendError
+  );
+
+  return NextResponse.json(
+    {
+      id,
+      is_lock: isLock,
+      linked_deal_id: linkedDealId,
+      wamid,
+      send_status: sendStatus,
+      send_error: sendError,
+    },
+    { status: 201 }
+  );
 }
 
 /**
