@@ -183,7 +183,12 @@ export default function ReviewPage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-gray-950 pb-24 lg:pb-8 lg:pl-60">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      {/* Desktop-first: fill the full width after the sidebar so staff can
+          scan the queue at a glance on a laptop. Mobile falls back to edge-
+          padded single column (max-w-none doesn't constrain at narrow widths).
+          Capped at max-w-[1800px] on ultra-wide monitors so cards never
+          sprawl to absurd widths on 4K+ displays. */}
+      <div className="mx-auto w-full max-w-[1800px] px-4 py-6 lg:px-6">
         <header className="mb-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -407,11 +412,14 @@ function DealCard({ deal, busy, onApproveAs, onApprove, onReject, onSaveEdit }: 
         </div>
       )}
 
-      {/* Fields: read-only view or edit form */}
+      {/* Fields: read-only view or edit form.
+          Mobile: 2-column grid (6 fields in 3 rows). Desktop (lg+): 3-column
+          grid (6 fields in 2 rows) — uses the extra horizontal space on
+          wider cards instead of leaving whitespace between columns. */}
       {editing ? (
         <DealEditForm draft={draft} onChange={updateDraft} />
       ) : (
-        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs lg:grid-cols-3 lg:gap-x-6">
           <Field label="Direction" value={deal.direction ? deal.direction.toUpperCase() : "—"} tone={deal.direction === "buy" ? "emerald" : deal.direction === "sell" ? "amber" : "muted"} />
           <Field label="Metal" value={deal.metal ? `${deal.metal[0].toUpperCase()}${deal.metal.slice(1)} ${deal.purity ?? ""}`.trim() : "—"} />
           <Field label="Quantity" value={formatQty(deal.qty_grams)} />
