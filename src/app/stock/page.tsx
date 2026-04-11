@@ -265,6 +265,33 @@ type LiveResponse = {
   generated_at: string;
 };
 
+type OpeningMetal = {
+  metal: string;
+  opening_grams: number;
+  bought_grams: number;
+  sold_grams: number;
+  in_hand_grams: number;
+  delta_grams: number;
+  market_rate_usd_per_oz: number;
+  opening_value_usd: number;
+  in_hand_value_usd: number;
+  delta_value_usd: number;
+};
+
+type OpeningResponse = {
+  date: string;
+  auto_rolled: boolean;
+  set_by: string | null;
+  set_at: string | null;
+  metals: OpeningMetal[];
+  totals: {
+    opening_value_usd: number;
+    in_hand_value_usd: number;
+    delta_value_usd: number;
+  };
+  generated_at: string;
+};
+
 function formatUsd(n: number): string {
   return (
     "$" +
@@ -291,15 +318,26 @@ function passesFilter(metal: string, filter: MetalFilter): boolean {
 function LiveView() {
   const [metalFilter, setMetalFilter] = useState<MetalFilter>("all");
   const [data, setData] = useState<LiveResponse | null>(null);
+  const [opening, setOpening] = useState<OpeningResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [shareFeedback, setShareFeedback] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/stock/live");
-      const json = await res.json();
-      setData(json);
+      // Fetch both endpoints in parallel. The opening-stock endpoint
+      // drives the top bar (today's opening + today's activity), the
+      // live-stock endpoint drives the all-time register below.
+      const [liveRes, openingRes] = await Promise.all([
+        fetch("/api/stock/live"),
+        fetch("/api/stock/opening"),
+      ]);
+      const [liveJson, openingJson] = await Promise.all([
+        liveRes.json(),
+        openingRes.json(),
+      ]);
+      setData(liveJson);
+      setOpening(openingJson);
     } catch {
       // Keep stale data on network error.
     } finally {
@@ -394,6 +432,17 @@ function LiveView() {
         title="Stock In Hand — Live"
         subtitle={`${filterLabel} · as of ${data ? new Date(data.generated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "now"}`}
       />
+
+      {/* ── Daily register: Opening editor + Stock In Hand bar ────────
+          This block answers "where did we start today and where are we
+          right now?" Sits above the all-time filter pills and register
+          table so Niyam's eye lands on it first. */}
+      {opening && (
+        <>
+          <OpeningStockPanel opening={opening} onSaved={load} />
+          <StockInHandBar opening={opening} />
+        </>
+      )}
 
       {/* Filter + action bar — hidden in print */}
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -585,6 +634,340 @@ function LiveView() {
         PrismX · Stock In Hand Register · Confidential
       </div>
     </div>
+  );
+}
+
+// ─── Stock In Hand bar ─────────────────────────────────────────────────
+//
+// Horizontal strip of per-metal cards always visible above the filter
+// pills. Each card shows the current in-hand grams + delta from the
+// morning's opening + current market value. At end of day this entire
+// row becomes the closing stock that rolls forward to tomorrow's opening.
+
+const METAL_COLORS: Record<string, string> = {
+  gold: "text-amber-300",
+  silver: "text-gray-200",
+  platinum: "text-blue-300",
+  palladium: "text-purple-300",
+};
+
+function formatGramsCompact(g: number): string {
+  if (Math.abs(g) >= 1000) return `${(g / 1000).toFixed(2)} kg`;
+  if (Math.abs(g) < 0.01) return "0 g";
+  return `${g.toFixed(0)} g`;
+}
+
+function formatDeltaGrams(g: number): string {
+  const sign = g > 0 ? "+" : g < 0 ? "−" : "±";
+  const abs = Math.abs(g);
+  if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(2)} kg`;
+  if (abs < 0.01) return "±0 g";
+  return `${sign}${abs.toFixed(0)} g`;
+}
+
+function StockInHandBar({ opening }: { opening: OpeningResponse }) {
+  // Only show canonical metals in the bar — they fit comfortably on
+  // one line across most desktop widths. Non-canonical metals still
+  // show in the all-time table below if they exist.
+  const displayMetals = opening.metals.filter((m) =>
+    ["gold", "silver", "platinum", "palladium"].includes(m.metal)
+  );
+
+  return (
+    <section className="rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-transparent p-4">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-block size-2 animate-pulse rounded-full bg-emerald-400" />
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">
+            Stock In Hand
+          </h2>
+          <span className="text-[10px] text-gray-500">
+            live · becomes today&apos;s closing at EOD
+          </span>
+        </div>
+        <div className="text-[10px] uppercase tracking-wider text-gray-500">
+          Total Value:{" "}
+          <span className="font-mono text-sm font-semibold text-white">
+            {formatUsd(opening.totals.in_hand_value_usd)}
+          </span>
+          {opening.totals.delta_value_usd !== 0 && (
+            <span
+              className={`ml-2 font-mono text-xs ${
+                opening.totals.delta_value_usd >= 0
+                  ? "text-emerald-400"
+                  : "text-rose-400"
+              }`}
+            >
+              {opening.totals.delta_value_usd >= 0 ? "+" : ""}
+              {formatUsd(opening.totals.delta_value_usd)}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {displayMetals.map((m) => {
+          const deltaUp = m.delta_grams > 0.01;
+          const deltaDown = m.delta_grams < -0.01;
+          return (
+            <div
+              key={m.metal}
+              className="rounded-lg border border-white/5 bg-gray-950/60 px-3 py-2.5"
+            >
+              <div className="flex items-baseline justify-between">
+                <span
+                  className={`text-[11px] font-bold uppercase tracking-wider ${
+                    METAL_COLORS[m.metal] ?? "text-gray-300"
+                  }`}
+                >
+                  {m.metal}
+                </span>
+                {deltaUp && (
+                  <span className="text-[9px] font-bold uppercase text-emerald-400">
+                    ↑
+                  </span>
+                )}
+                {deltaDown && (
+                  <span className="text-[9px] font-bold uppercase text-rose-400">
+                    ↓
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 font-mono text-base font-semibold tabular-nums text-white">
+                {formatGramsCompact(m.in_hand_grams)}
+              </div>
+              <div className="mt-0.5 flex items-baseline justify-between gap-1">
+                <span
+                  className={`font-mono text-[10px] tabular-nums ${
+                    deltaUp
+                      ? "text-emerald-400"
+                      : deltaDown
+                      ? "text-rose-400"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {formatDeltaGrams(m.delta_grams)}
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {m.market_rate_usd_per_oz > 0
+                    ? formatUsd(m.in_hand_value_usd)
+                    : "—"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ─── Opening Stock editor (collapsible) ────────────────────────────────
+//
+// Starts collapsed because most days the user just wants the
+// auto-rolled opening. Expanded it shows one input per canonical metal
+// pre-filled with the current opening grams, and a "Save" button that
+// POSTs the whole form back to /api/stock/opening.
+
+function OpeningStockPanel({
+  opening,
+  onSaved,
+}: {
+  opening: OpeningResponse;
+  onSaved: () => void;
+}) {
+  // Auto-expand on first load ONLY if today's opening was auto-rolled,
+  // so Niyam is prompted to verify the rolled-forward numbers before
+  // trusting them. Once the user manually saves, subsequent loads
+  // stay collapsed.
+  const [expanded, setExpanded] = useState(opening.auto_rolled);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  // Draft state keyed by metal slug so the <input> is uncontrolled per
+  // row. Seeded from the current opening on mount; reset whenever the
+  // underlying opening response changes (e.g. after a successful save
+  // reloads the parent's state).
+  const canonical = useMemo(
+    () =>
+      opening.metals.filter((m) =>
+        ["gold", "silver", "platinum", "palladium"].includes(m.metal)
+      ),
+    [opening.metals]
+  );
+  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(canonical.map((m) => [m.metal, m.opening_grams.toString()]))
+  );
+
+  // If the parent re-fetches and the opening changes (e.g. after
+  // save), re-seed the draft so the inputs reflect the canonical
+  // server value. The deps use opening_grams directly so we don't
+  // stomp on in-flight user edits unless the numbers actually moved.
+  useEffect(() => {
+    setDrafts(
+      Object.fromEntries(canonical.map((m) => [m.metal, m.opening_grams.toString()]))
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opening.date, canonical.map((m) => m.opening_grams).join("|")]);
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    try {
+      const metals = canonical.map((m) => {
+        const raw = drafts[m.metal] ?? "0";
+        const grams = parseFloat(raw);
+        return { metal: m.metal, grams: Number.isFinite(grams) ? grams : 0 };
+      });
+      const res = await fetch("/api/stock/opening", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metals }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(json.error || "Failed to save opening stock");
+        return;
+      }
+      onSaved();
+      setExpanded(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const setAtLabel = opening.set_at
+    ? new Date(opening.set_at).toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : null;
+
+  return (
+    <section className="rounded-xl border border-white/10 bg-gray-900 print:hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 rounded-t-xl px-4 py-3 text-left transition hover:bg-white/5"
+      >
+        <div className="flex items-center gap-3">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            className="size-5 text-amber-400"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75"
+            />
+          </svg>
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              Opening Stock
+              <span className="font-mono text-[10px] text-gray-500">
+                {opening.date}
+              </span>
+              {opening.auto_rolled ? (
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+                  Auto-rolled · verify
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-300">
+                  Confirmed
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11px] text-gray-500">
+              {opening.set_by
+                ? `Set by ${opening.set_by}${setAtLabel ? " at " + setAtLabel : ""}`
+                : "Carried forward from yesterday's closing — click to edit"}
+            </div>
+          </div>
+        </div>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={`size-4 text-gray-400 transition-transform ${
+            expanded ? "rotate-180" : ""
+          }`}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-white/5 p-4">
+          <div className="mb-3 text-[11px] text-gray-500">
+            Enter today&apos;s opening stock in <span className="font-mono">fine grams</span>{" "}
+            (pure equivalent). Every approved trade updates the Stock In Hand bar
+            above in real-time. At end of day this rolls forward as tomorrow&apos;s
+            opening automatically.
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {canonical.map((m) => (
+              <div
+                key={m.metal}
+                className="rounded-lg border border-white/5 bg-gray-950 p-3"
+              >
+                <label className="mb-1 flex items-baseline justify-between">
+                  <span
+                    className={`text-[11px] font-bold uppercase tracking-wider ${
+                      METAL_COLORS[m.metal] ?? "text-gray-300"
+                    }`}
+                  >
+                    {m.metal}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wider text-gray-600">
+                    fine grams
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={drafts[m.metal] ?? ""}
+                  onChange={(e) =>
+                    setDrafts((prev) => ({ ...prev, [m.metal]: e.target.value }))
+                  }
+                  className="w-full rounded border border-white/10 bg-gray-900 px-2 py-1.5 font-mono text-sm text-white focus:border-amber-500/50 focus:outline-none"
+                />
+                <div className="mt-1 text-[10px] text-gray-500">
+                  ≈ {(parseFloat(drafts[m.metal] ?? "0") / 1000).toFixed(3)} kg
+                </div>
+              </div>
+            ))}
+          </div>
+          {error && <p className="mt-3 text-xs text-rose-400">{error}</p>}
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              onClick={save}
+              disabled={busy}
+              className="rounded-md bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? "Saving…" : "Save Opening Stock"}
+            </button>
+            <button
+              onClick={() => {
+                setDrafts(
+                  Object.fromEntries(
+                    canonical.map((m) => [m.metal, m.opening_grams.toString()])
+                  )
+                );
+                setExpanded(false);
+              }}
+              disabled={busy}
+              className="rounded-md border border-white/10 bg-gray-800 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

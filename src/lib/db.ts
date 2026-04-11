@@ -201,6 +201,21 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_auth_sessions_last_seen ON auth_sessions(last_seen);
     CREATE INDEX IF NOT EXISTS idx_auth_sessions_pin_id ON auth_sessions(pin_id);
     CREATE INDEX IF NOT EXISTS idx_auth_pins_pin ON auth_pins(pin);
+
+    -- Daily opening stock per metal. date is a YYYY-MM-DD string in IST
+    -- (business day boundary). Each row is the opening position for
+    -- that metal at the start of that business day. Roll-forward from
+    -- yesterday's closing happens lazily on GET /api/stock/opening.
+    CREATE TABLE IF NOT EXISTS stock_opening (
+      date TEXT NOT NULL,
+      metal TEXT NOT NULL,
+      grams REAL NOT NULL,
+      set_by TEXT,
+      set_at TEXT NOT NULL,
+      auto_rolled INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (date, metal)
+    );
+    CREATE INDEX IF NOT EXISTS idx_stock_opening_date ON stock_opening(date);
   `);
 }
 
@@ -304,6 +319,14 @@ function runMigrations(db: Database.Database) {
         addColumnIfNotExists(db, "pending_deals", "dispatched_to", "TEXT");
         addColumnIfNotExists(db, "pending_deals", "dispatch_response", "TEXT");
         addColumnIfNotExists(db, "pending_deals", "dispatch_batch_id", "TEXT");
+      },
+    },
+    {
+      version: 10,
+      description: "Add stock_opening table for daily opening/closing register",
+      up: () => {
+        // Table is created by CREATE TABLE IF NOT EXISTS above.
+        // This migration exists so existing DBs bump their version.
       },
     },
   ];
