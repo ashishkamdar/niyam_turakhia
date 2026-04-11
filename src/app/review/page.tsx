@@ -191,13 +191,15 @@ export default function ReviewPage() {
   const counts = data?.counts ?? { pending: 0, approved: 0, rejected: 0, ignored: 0 };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gray-950 pb-24 lg:pb-8 lg:pl-60">
-      {/* Desktop-first: fill the full width after the sidebar so staff can
-          scan the queue at a glance on a laptop. Mobile falls back to edge-
-          padded single column (max-w-none doesn't constrain at narrow widths).
-          Capped at max-w-[1800px] on ultra-wide monitors so cards never
-          sprawl to absurd widths on 4K+ displays. */}
-      <div className="mx-auto w-full max-w-[1800px] px-4 py-6 lg:px-6">
+    // Root layout.tsx already provides: sidebar offset (lg:pl-60), main
+    // padding (px-3 py-4 pb-20 sm:px-6 lg:px-8 lg:pb-6), body background,
+    // and min-h-screen via body. Do NOT re-apply those here — doing so
+    // caused a double 240px sidebar offset that made the desktop layout
+    // look cramped regardless of max-w changes.
+    //
+    // Cap at max-w-[1800px] on ultra-wide monitors so cards never sprawl
+    // to absurd widths on 4K+ displays.
+    <div className="mx-auto w-full max-w-[1800px]">
         <header className="mb-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -273,7 +275,6 @@ export default function ReviewPage() {
           </p>
         )}
       </div>
-    </div>
   );
 }
 
