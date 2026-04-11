@@ -7,7 +7,7 @@
 - **HQ:** Dubai (staff connects via FortiGate VPN from Mumbai)
 - **Mumbai office:** Matunga
 - **Contact:** WhatsApp (connected via Ashish's Gymkhana network)
-- **Status:** Demo shown April 9, 2026. Positive response. App link + PIN shared. Dubai visit invited. Awaiting next meeting at Gymkhana.
+- **Status:** Demo shown April 9, 2026. Positive response. App link + PIN shared. Dubai visit invited. Awaiting next meeting at Gymkhana. **Phase A (maker-checker pipeline) + Phase B (full trade lifecycle, named users, daily opening stock, outbox dispatch, financial-year scoping) shipped by April 11, 2026.**
 
 ## Business Context
 
@@ -45,9 +45,9 @@
 
 ---
 
-## 🎯 CURRENT BUILD STATUS — April 10, 2026
+## 🎯 CURRENT BUILD STATUS — April 11, 2026
 
-**Phase A (Maker-Checker Review Pipeline) is SHIPPED and ready to demo to Niyam.** The scope changed on April 10 after two meetings with Niyam at Matunga Gymkhana and his Matunga office. Key decisions captured below; the rest of this document reflects the earlier plan as historical context.
+**Phase A (Maker-Checker Review Pipeline) and Phase B (Lifecycle Completion + Financial Year) are both SHIPPED and ready to demo to Niyam.** Phase A landed Apr 10 after two meetings at Matunga Gymkhana and his Matunga office. Phase B landed Apr 11 as a continuous iteration session covering named users, the outbox dispatch page, daily opening/closing stock, Demo↔Live mode toggles across Deals and Stock, and a global financial-year concept. Key decisions captured below; the rest of this document reflects the earlier plan as historical context.
 
 ### Scope change in one paragraph
 
@@ -157,17 +157,19 @@ Internal staff WhatsApp group (#NTK / #NTP / #NT codes)
 | `ocr_provider` | `tesseract` | Local, free, unlimited |
 | `app_secret` | **CLEARED** (see Known Issues) | HMAC signature verification currently disabled |
 
-### What's NEXT
+### What's NEXT (as of April 10, planned — mostly superseded by Phase B below)
+
+> **Note:** this table was written at the end of Phase A. Most items have since shipped in Phase B or been re-scoped. The current roadmap is in **"What's NEXT (Apr 11 → Apr 13 meeting)"** inside the Phase B section further down. This table is kept as historical context.
 
 | Phase | Status | Blocked on |
 |---|---|---|
-| **Kachha → SBS Excel writer** | ⏳ Next build chunk | Nothing — `Bullion Sales Order.xlsx` schema confirmed. Kachha approvals will append rows to a daily Excel file downloadable from a new `/excel` page. |
-| **Pakka → OroSoft API writer** | ⏳ Blocked on Monday meeting | **Monday April 13, 11:15 AM meeting with OroSoft** — their API is not publicly documented. Integration shape unknown until that meeting. See `project_orosoft_monday_meeting.md` in memory. |
-| **HMAC signature verification fix** (see Known Issues below) | ⏳ Investigation needed | Requires re-entering App Secret or debugging why the saved value didn't match Meta's signed output |
-| **Niyam's own Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Niyam uploads Trade License + Business Verification documents; domain verification at prismx.org is already configured |
-| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | Same endpoint (`nt.areakpi.in/api/whatsapp/webhook`), different number ID — ~10-minute swap once Niyam's WABA is live |
-| **Claude / GPT-4o-mini Vision OCR** (upgrade from Tesseract) | 💡 Optional polish | For higher accuracy on stylized bank app screenshots. Requires API key in `meta_config`. Tesseract works well enough for text-heavy payment screenshots. |
-| **Bot Phase 4 — Auto-negotiator** | 🔒 Deferred | Requires Phase A + B + C stable AND Niyam's Meta verification complete. Multi-week build. |
+| **Kachha → SBS Excel writer** | ✅ Simulated in Phase B `/outbox` with a real CSV export; real XLSX writer still deferred until SBS template blockers are settled | `Bullion Sales Order.xlsx` — 9 open blockers on column schema |
+| **Pakka → OroSoft API writer** | ⏳ Still blocked on Monday April 13 meeting | Simulated in Phase B `/outbox`; real HTTP swap is ~50 lines |
+| **HMAC signature verification fix** | ⏳ Still outstanding | Requires re-populating App Secret with temporary logging |
+| **Niyam's own Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Trade License + Business Verification documents |
+| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | ~10-minute endpoint swap |
+| **Claude / GPT-4o-mini Vision OCR** (upgrade from Tesseract) | 💡 Optional polish | Tesseract works well enough for text-heavy payment screenshots |
+| **Bot Phase 4 — Auto-negotiator** | 🔒 Deferred | Requires Phase A + B stable AND Niyam's Meta verification complete |
 
 ### Known Issues / Pending Fixes (Apr 10, 2026)
 
@@ -177,6 +179,199 @@ Internal staff WhatsApp group (#NTK / #NTP / #NT codes)
 | 2 | Access token has a **60-day expiry** instead of "never expires" | Token will stop working around **mid-June 2026** without action. Webhook + inbound still work (inbound doesn't need token), but image OCR stops until token is regenerated. | Regenerate via the same Playwright flow used on Apr 10 (`business.facebook.com → System Users → ashishkamdar → Generate token`). Takes ~2 minutes. | Next time the System User token wizard opens, explicitly click "Never" in the expiry step before the wizard auto-advances. |
 | 3 | `whatsapp_messages` legacy log still uses our UUID as primary key instead of Meta's wamid | Old free-text bot path can't be used for reply-linking. Not relevant to new structured-code path. | None needed — the new pipeline uses `pending_deals.whatsapp_message_id` with Meta's real wamid. | Leave as-is; legacy table can be dropped later if needed. |
 | 4 | Old test data in `pending_deals` | Earlier test rows (pre-screenshot feature) have `screenshot_url = null` even though their `screenshot_ocr` may be populated. Thumbnails won't render on those cards. | None — new messages populate both fields correctly. | Optional: backfill old rows manually or just let them age out of the demo queue. |
+
+---
+
+## 🚀 PHASE B — Lifecycle Completion + Financial Year (Apr 11, 2026)
+
+Phase A left the story at "approved deals sit in `pending_deals.status='approved'` and nothing happens next." Phase B closes that loop end-to-end and also answers the meta-questions Niyam asked when he saw Phase A working: "Who's logged in?", "How do I see a proper trades register?", "How do I set opening stock?", "Where's my financial year?".
+
+### One-sentence summary per page
+
+- **`/review`** — fixed a double `lg:pl-60` wrapper bug that cramped desktop layout. No functional change otherwise.
+- **`/deals`** — top pill toggle **Demo ↔ Live**. Demo keeps the original purchase/sale entry forms. **Live** is a wide tabular register of every approved WhatsApp trade with period pills (Today/Monthly/Quarterly/Yearly/Custom), Kachha/Pakka filter, summary stat cards, and a Share/Export CSV/Print action bar. Filters combine with the global FY window.
+- **`/stock`** — same Demo↔Live toggle. Demo keeps the original per-metal cards. **Live** is split into three sections: a collapsible **Opening Stock editor** (per-metal fine grams), a horizontal **Stock In Hand bar** (4 cards with delta-from-opening and market value), and the existing all-time register table below. Opening stock rolls forward from yesterday's closing automatically on first page view of each day.
+- **`/outbox`** — brand new page. Shows approved trades waiting to ship to OroSoft (Pakka, via simulated REST API) or SBS (Kachha, via Excel export). Two side-by-side destination panels with animated flow visuals (traveling particles + 4-stage checklist for OroSoft, live-updating Excel sheet for SBS), a unified dispatch history timeline, and a real CSV download sized to the SBS Bullion Sales Order 14-column template.
+- **`/users`** — brand new page. Live list of currently logged-in sessions grouped by (PIN label, IP) with session counts, device fingerprint, and Kick/Revoke buttons. Collapsible PIN management panel with add/rename/rotate/**Lock**/delete per row. Print/Share/CSV export with `ReportLetterhead`.
+- **`/reports`** — unchanged functionally but gained the FY filter + letterhead subtitle.
+- **`/settings`** — new **Financial Year** section with month/day pickers, live preview of the derived FY window, and a Save button that updates the global provider in place.
+- **Top bar** — new global **FY dropdown** (current + 5 prior years, newest first, "Current" badge) visible on every page. Mobile shows it in the PriceTicker strip; desktop gets a new thin strip above the price grid (replacing the mobile-only chrome that used to sit there).
+
+### Feature table — everything shipped in Phase B
+
+**Named users + sessions (was: single hardcoded PIN `639263`)**
+
+| Feature | Status | Details |
+|---|---|---|
+| `auth_pins` table (id, label, pin, role, locked, created_at) | ✅ Live | Migration v7 seeds 4 defaults: Niyam `639263` (admin), Ashish `520125` (admin), Admin `999999` (admin), Staff `111111` (staff) |
+| `auth_sessions` table (id, pin_id, ip, user_agent, created_at, last_seen) | ✅ Live | Session id is the cookie value; ON DELETE CASCADE from auth_pins |
+| `POST /api/auth` with `{pin}` → validates against auth_pins, creates session row, sets UUID cookie | ✅ Live | Records client IP via `x-forwarded-for` / `x-real-ip` (nginx-set headers only) and `user-agent` |
+| `GET /api/auth` heartbeat — updates `last_seen` every request | ✅ Live | Invalid / orphaned cookies are cleared silently and flip the AuthGate to PIN pad |
+| `AuthGate` heartbeat (30 s interval) | ✅ Live | Kicked sessions flip to PIN pad within 30 s of revoke — no WebSocket plumbing required |
+| `/api/sessions` — GET returns active + last-24h sessions with PIN label | ✅ Live | Display filter only — session rows are NEVER auto-deleted. Past bug: a 24h sweep was causing unexpected logouts; fixed by moving the window to a SELECT clause. |
+| `/api/sessions` — `DELETE ?id=...` kicks one session, `DELETE ?label=...&ip=...` kicks a whole group | ✅ Live | Group kick used by the "Kick all N" button when multiple staff share a PIN from the same WiFi |
+| `/api/pins` — GET list, POST create, PUT update, DELETE | ✅ Live | PIN CRUD for the Users page admin panel |
+| `locked` column on `auth_pins` (migration v8) | ✅ Live | When true, login returns the same "Wrong PIN" error as a missing PIN — no info leak about which labels exist. Locking does NOT revoke existing sessions; admins use Kick separately. |
+| `/users` page with ReportLetterhead, grouped active table, recent sessions, collapsible PIN manager, Print/Share | ✅ Live | Auto-polls every 5 s |
+| Unlimited login guarantee | ✅ Live | Cookie MAX_AGE = 365 days, sessions never auto-expire, no idle timeout. Only explicit logout / kick / PIN delete ends a session. |
+
+**Outbox dispatch (was: approved deals had no next step)**
+
+| Feature | Status | Details |
+|---|---|---|
+| Dispatch lifecycle columns on `pending_deals` | ✅ Live | Migration v9: `dispatched_at`, `dispatched_to` (`orosoft`/`sbs`), `dispatch_response`, `dispatch_batch_id` |
+| `GET /api/dispatch` — split by target (pakka_outbox / kachha_outbox) + last 50 history | ✅ Live | Only approved, not-yet-dispatched rows appear in the outbox |
+| `POST /api/dispatch { target, ids? }` — atomically stamps selected deals as dispatched | ✅ Live | `ids` optional so "Send all" works without enumerating. Server re-filters eligibility in SQL — a stale UI tab cannot double-dispatch. |
+| `GET /api/dispatch/export?batch=...&target=sbs` — CSV sized to the SBS Bullion Sales Order 14-column template | ✅ Live | Gross-to-fine via purity factor, `SALES`/`PURCHASE` bill type from direction, `Remarks` tagged with `PrismX #<id>` for reconciliation |
+| `/outbox` page with two destination panels side-by-side | ✅ Live | OroSoft emerald accent, SBS sky accent |
+| Animated OroSoft flow visual (PrismX → REST API → OroSoft Neo) | ✅ Live | Traveling particles with staggered delays, pulsing source/destination rings, 4-stage pipeline checklist (Authenticate → Format → POST /sales → Confirm) — keyframes in `globals.css` |
+| Animated SBS Excel visual (mini spreadsheet with rows sliding in) | ✅ Live | Bullion Sales Order.xlsx window chrome, column headers, rows fade in with 180 ms stagger, success state shows batch ID and Download CSV button |
+| Unified **Recent Dispatches** timeline | ✅ Live | Cross-destination history with target pill, deal summary, amount, party, response string, timestamp |
+| Dispatch is **simulated** for the demo | ✅ Live | OroSoft API doesn't exist yet (Monday Apr 13 meeting gates that). SBS column schema has 9 open blockers, so the real writer is pending. The simulated pipeline uses the exact UI + DB flow the real wire-up will use — swap is ~50 lines. |
+
+**Deals Live register**
+
+| Feature | Status | Details |
+|---|---|---|
+| Demo ↔ Live pill toggle at the top of `/deals` | ✅ Live | Demo keeps the original purchase/sale forms + recent cards. Live is the new tabular register. |
+| `GET /api/deals/live?from=&to=&limit=` | ✅ Live | Returns approved pending_deals in the window with precomputed `amount_usd` per row and aggregate totals (buy/sell count + USD). Filter is on `COALESCE(reviewed_at, received_at)` because "today's deals" means "finalized today". |
+| `GET /api/deals/live/export?from=&to=&label=&type=K|P` | ✅ Live | 13-column CSV tuned for PrismX's own audit trail (party first, reviewer, dispatch status). Distinct from the SBS-shaped `/api/dispatch/export`. |
+| Period filter pills: Today / Monthly / Quarterly / Yearly / Custom From–To | ✅ Live | Custom opens `<input type="date">` fields |
+| Kachha / Pakka filter pills (All / Kachha / Pakka) | ✅ Live | Client-side filter over the already-fetched window — instant, no re-fetch. Totals recompute via `useMemo` so stat cards always match what the table shows. Export respects the filter server-side. |
+| Auto-refresh every 10 seconds | ✅ Live | Long demos show newly approved trades without manual reload |
+| ReportLetterhead + Share / Export CSV / Print action bar | ✅ Live | Share uses `navigator.share` on mobile, clipboard fallback on desktop |
+
+**Stock Live + Opening/Closing register**
+
+| Feature | Status | Details |
+|---|---|---|
+| Demo ↔ Live pill toggle at the top of `/stock` | ✅ Live | Demo keeps the original per-metal cards with drill-down lots |
+| `GET /api/stock/live?from=&to=` — all-time register aggregated by metal | ✅ Live | One row per metal with buy/sell counts, bought/sold fine grams, net-in-hand, avg cost, market rate, market value, unrealized P&L. Clamped at zero (you can't hold negative bullion). |
+| `GET /api/stock/live/export?filter=&from=&to=` | ✅ Live | 13-column CSV for accountants |
+| Metal filter pills: All / Gold / Silver / Platinum / Palladium / Other | ✅ Live | Client-side filter + totals recomputation |
+| **Daily opening stock** — `stock_opening` table (date, metal, grams, set_by, set_at, auto_rolled) | ✅ Live | Migration v10. PK `(date, metal)`. Date is YYYY-MM-DD in **IST** so business-day boundaries land at 00:00 Mumbai time, not UTC. |
+| `GET /api/stock/opening` — returns today's opening + today's bought/sold per metal + live in-hand + market value | ✅ Live | Lazy roll-forward walks from the latest stored opening to today computing each intervening day's closing. `INSERT OR IGNORE` means user-set opening can never be overwritten. No cron — a multi-day gap catches up on first page view. |
+| `POST /api/stock/opening` — upserts today's opening per metal | ✅ Live | Records `set_by` (from the current session's PIN label), `set_at`, clears `auto_rolled` |
+| **Opening Stock panel** (collapsible) on `/stock` Live | ✅ Live | Auto-expands when today's opening was auto-rolled so Niyam verifies the numbers. 4 per-metal inputs in fine grams with live kg preview, atomic batch save. |
+| **Stock In Hand bar** (always visible) on `/stock` Live | ✅ Live | Horizontal strip of 4 metal cards above the filter pills. Each card: in-hand grams, delta from opening with up/down arrows, market value. Total value + delta in the header. |
+| Copy subtitle: "becomes today's closing at EOD" | ✅ Live | In-hand IS the projected closing — same number, two framings, so we don't render it twice |
+| Single-scan day bucketing returns net/bought/sold in one DB query | ✅ Live | No N+1 per-metal re-queries |
+
+**Reports**
+
+| Feature | Status | Details |
+|---|---|---|
+| ReportLetterhead component | ✅ Live | Reusable branded header: PrismX logo, "Precious Metals Trading" tagline, Confidential stamp, date/time, title, subtitle. Dark on screen, white paper in print. |
+| Print variants across all report-like pages | ✅ Live | `@media print` rules in `globals.css` flip dark → white, preserve colors via `-webkit-print-color-adjust`, tighten spacing, A4 sizing |
+| Reports page print output overflow fix | ✅ Live | StatCard values shrink from `text-3xl` → `print:text-lg` with `tabular-nums`, tighter print padding so 7-figure amounts fit the 3-column grid on A4 |
+
+**Financial Year (global)**
+
+| Feature | Status | Details |
+|---|---|---|
+| `src/lib/financial-year.ts` — pure functions, server + client share | ✅ Live | `parseFyStart`, `deriveFy`, `listFinancialYears`, `intersectFy`. IST-aligned midnight boundaries (`istMidnightIso`). |
+| `GET /api/settings` — generic key/value store backed by existing `settings` table | ✅ Live | Returns defaults so the client never sees a loading dance |
+| `PUT /api/settings` — per-key validation | ✅ Live | `financial_year_start` must round-trip parse as MM-DD |
+| `FyProvider` React context mounted in root layout | ✅ Live | Fetches `/api/settings` once, derives 6 FYs (current + 5 prior), persists selection to `localStorage` (`prismx_selected_fy_v1`), exposes `{fy, fys, fyStart, setFy, refresh}` via `useFy()` |
+| `FySelector` dropdown component | ✅ Live | Compact button with outside-click dismiss, Escape-to-close, "Current" badge on FY[0], `print:hidden` |
+| Top-bar integration | ✅ Live | Mobile: next to Settings/Logout in the PriceTicker top strip. Desktop: new thin strip above the price grid (restores an always-visible header row). |
+| **Deals Live** FY integration | ✅ Live | `intersectFy` clamps period-pill window to selected FY; letterhead subtitle, share text, CSV export label all carry the FY name |
+| **Stock Live** FY integration | ✅ Live | All-time register + export filter by FY window on `COALESCE(reviewed_at, received_at)`. Daily Opening/In-Hand section deliberately NOT FY-filtered (today is always in the current FY). |
+| **Reports** FY integration | ✅ Live | `intersectFy` clamps period dates; letterhead shows FY |
+| **Settings** editor — month + day `<select>`s with live preview | ✅ Live | Save PUTs `/api/settings` and calls `refreshFy()` so the top-bar dropdown rebuilds without a reload |
+
+**UX / layout fixes (Apr 11)**
+
+| Fix | Status | What it was |
+|---|---|---|
+| `/review` desktop double-wrap | ✅ Live | Page had its own `lg:pl-60 min-h-screen bg-gray-950` wrapper on top of what `layout.tsx` already provides, producing a 480 px sidebar offset on desktop. Fixed by removing the duplicate outer wrapper. |
+| Mobile More overflow menu | ✅ Live | Bottom nav only had 5 tabs (Home/Review/Stock/Deals/Chats). Reports/Users/Money Flow/Bot/Settings were unreachable from phone. Added a 6th "More" tab that opens a bottom-sheet overlay with the overflow items + Logout. |
+| Desktop top bar cleanup | ✅ Live | Mobile header chrome (PrismX logo + Settings/Logout icons) was rendering on desktop even though the sidebar already has all three. Wrapped the whole top bar in `lg:hidden`. |
+| Sessions never auto-expire | ✅ Live | `GET /api/sessions` used to `DELETE` rows older than 24 h, silently logging out anyone who closed their tab for a day. Moved the window to a SELECT-clause display filter; session rows are now only deleted by logout / kick / PIN delete. |
+
+### New / changed files (Phase B)
+
+**New files**
+
+```
+src/lib/financial-year.ts                          (pure FY math)
+src/components/fy-provider.tsx                     (context + localStorage persistence)
+src/components/fy-selector.tsx                     (dropdown)
+src/components/report-letterhead.tsx               (shared branded header)
+src/app/api/settings/route.ts                      (key/value settings store)
+src/app/api/sessions/route.ts                      (active/recent sessions + kick)
+src/app/api/pins/route.ts                          (PIN CRUD + lock)
+src/app/api/dispatch/route.ts                      (outbox GET/POST)
+src/app/api/dispatch/export/route.ts               (SBS-shaped CSV)
+src/app/api/deals/live/route.ts                    (approved register + aggregates)
+src/app/api/deals/live/export/route.ts             (PrismX-shaped CSV)
+src/app/api/stock/live/route.ts                    (all-time per-metal register)
+src/app/api/stock/live/export/route.ts             (accountant CSV)
+src/app/api/stock/opening/route.ts                 (daily opening + in-hand + roll-forward)
+src/app/outbox/page.tsx                            (dispatch page)
+src/app/users/page.tsx                             (logged-in users + PIN manager)
+```
+
+**Touched files**
+
+```
+src/lib/db.ts                                      (migrations v7 / v8 / v9 / v10)
+src/app/api/auth/route.ts                          (rewritten to use sessions)
+src/app/layout.tsx                                 (FyProvider wrap)
+src/app/deals/page.tsx                             (Demo/Live toggle + Live register)
+src/app/stock/page.tsx                             (Demo/Live toggle + Opening/In-Hand + Live register)
+src/app/reports/page.tsx                           (FY filter + letterhead)
+src/app/settings/page.tsx                          (Financial Year section)
+src/components/auth-gate.tsx                       (heartbeat ping)
+src/components/price-ticker.tsx                    (lg:hidden mobile chrome + FY selector strip)
+src/components/sidebar-nav.tsx                     (Users + Outbox nav items)
+src/components/bottom-nav.tsx                      (6-tab + More overflow sheet + nav items)
+src/app/globals.css                                (dispatch animation keyframes + print rules)
+```
+
+### Database migrations (current version: **10**)
+
+| Version | Description | Ship date |
+|---|---|---|
+| 1 | Add `contact_name` to `deals` | earlier |
+| 2 | Add `refining_cost_per_gram` + `total_cost_usd` to `deals` | earlier |
+| 3 | Add `deliveries` + `settlements` tables | earlier |
+| 4 | Add `parsed_deals` (legacy bot) | earlier |
+| 5 | Add `meta_config` | earlier |
+| 6 | Add `pending_deals` (maker-checker queue) | Apr 10 |
+| **7** | Add `auth_pins` + `auth_sessions` and seed 4 default PINs | Apr 11 |
+| **8** | Add `locked` column to `auth_pins` | Apr 11 |
+| **9** | Add dispatch columns to `pending_deals` (`dispatched_at`, `dispatched_to`, `dispatch_response`, `dispatch_batch_id`) | Apr 11 |
+| **10** | Add `stock_opening` table (daily opening/closing register) | Apr 11 |
+
+### Phase B technical notes
+
+- **Timezone consistency**: every new feature that bucketed a date (FY boundaries, stock_opening business days, Deals Live "today" pill) uses IST (+05:30) midnight, never UTC. A trade at 11:55 PM March 31 IST stays in FY X-Y; 12:01 AM April 1 IST moves to FY Y-Z. Single constant (`IST_OFFSET_MS`) duplicated across files for clarity rather than imported, which makes each endpoint self-contained.
+- **Lazy roll-forward over cron**: the daily opening-stock roll isn't on a cron. Instead, `GET /api/stock/opening` walks forward from the latest stored opening to today computing each intervening day's closing and inserting it as the next day's opening, all in one SQLite transaction. A server that was down over a long weekend catches up on first page view. `INSERT OR IGNORE` makes the walk idempotent so concurrent requests can't duplicate rows.
+- **Client-side filter, server-side export**: Deals Live and Stock Live both filter in-memory for pill UX (instant, no round-trip) but push filters to SQL for CSV export (scales to thousands of rows). Client and server share the same predicate function so they can't drift.
+- **Unlimited login**: the 24h sweep in `/api/sessions` was the single biggest footgun in Phase A — it silently logged users out after a day of inactivity. Phase B moved the 24h window to a display filter (`WHERE last_seen >= cutoff` in the SELECT) so session rows are only deleted by explicit logout / admin kick / PIN delete / cascade on PIN deletion. Cookies remain valid for 365 days.
+- **Force-logout without push**: kicking a session just deletes the DB row. The victim's `AuthGate` heartbeat (30 s interval) gets `authenticated: false` on the next tick and flips to the PIN pad. No WebSocket, no SSE — the existing polling is the push channel.
+- **Locked PIN returns "Wrong PIN"**: deliberate. An attacker who tried `111111` and got a "locked" response would learn 111111 is a real PIN. Same response as a truly wrong PIN preserves zero information.
+- **Grouped active table on `/users`**: sessions are grouped client-side by `(label, ip)` so 15 staff sharing the "Staff" PIN on the same office WiFi collapse to one row with `2 sessions` instead of 15 noisy lines. Grouping happens in the browser (over the already-fetched list); the `/api/sessions` endpoint stays a flat list for easy testing and future reuse.
+- **Dispatch simulation is honest**: both destinations stamp `dispatched_at` on the DB row and return a fake-but-plausible response string. When OroSoft's API and the SBS template are finalized, the swap is literally "replace the `setTimeout` choreography with `await fetch(orosoftUrl, {...})` and pipe the response into `dispatch_response`." The DB schema, the UI states, the audit trail all survive untouched.
+
+---
+
+### What's NEXT (Apr 11 → Apr 13 meeting)
+
+| Phase | Status | Blocked on |
+|---|---|---|
+| **Monday Apr 13, 11:15 AM meeting with OroSoft** | ⏳ Gating item | Everything Pakka-output is blocked on this. See `project_orosoft_monday_meeting.md` in memory for the 26 prepared questions and integration brief. |
+| **Kachha → SBS Excel writer (real XLSX, not CSV)** | ⏳ Deferred | 9 open blockers on the Bullion Sales Order template (party master IDs, RATE_TYPE enum, GROSSWT unit, etc). CSV works for demo; real XLSX writer lands once Niyam confirms the template. |
+| **Pakka → OroSoft API writer (real HTTP, not simulated)** | ⏳ Blocked on Monday meeting | Swap is ~50 lines once we have API credentials |
+| **HMAC signature verification fix** | ⏳ Investigation needed | Requires re-populating `meta_config.app_secret` with temporary logging of expected-vs-received HMAC |
+| **Niyam's Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Trade License + Business Verification documents |
+| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | ~10-minute endpoint swap |
+| **Reports page switch from Demo deals → Live (approved pending_deals)** | 💡 Optional next chunk | Would make Reports' FY filter reflect real WhatsApp-sourced data instead of the demo `deals` table. Deals Live register already does this — Reports can reuse the same math. |
+| **Money Flow FY integration** | 💡 Optional next chunk | The page doesn't currently scope by FY. Low priority until real money-movement data lands. |
+| **Bot Phase 4 — Auto-negotiator** | 🔒 Deferred | Requires Phase A + B stable AND Niyam's Meta verification complete. Multi-week build. |
+
+---
 
 ### What's SUPERSEDED from the original plan
 
@@ -305,7 +500,7 @@ Messages arrive every 3-8 seconds (random via setTimeout chain). Multiple conver
 | **Framework** | Next.js 16.2.2 | App Router, TypeScript, Turbopack |
 | **UI Components** | Catalyst Tailwind CSS UI Blocks | 634 React components, dark theme. Used: stats-with-trending (KPI cards), sidebar-navigation (nav), tables (deal lists), form-layouts (deal entry), badges (status indicators) |
 | **Styling** | Tailwind CSS v4 | Dark theme (`bg-gray-950`), amber accent (`text-amber-400`), emerald for positive, rose for negative |
-| **Database** | SQLite via better-sqlite3 | WAL mode, 5 tables (deals, payments, prices, settings, whatsapp_messages). File: `data.db` |
+| **Database** | SQLite via better-sqlite3 | WAL mode, **16 tables** at schema v10: `deals`, `payments`, `prices`, `settings`, `whatsapp_messages`, `deliveries`, `settlements`, `schema_version`, `parsed_deals` (legacy bot), `meta_config`, `pending_deals` (maker-checker queue, with dispatch lifecycle columns), `auth_pins`, `auth_sessions` (named users), `stock_opening` (daily opening/closing register). File: `data.db` |
 | **Charts** | Recharts | Installed but charts not yet implemented in demo |
 | **Auth** | Cookie-based PIN | `nt_session` cookie, httpOnly, secure, 365-day expiry |
 | **IDs** | uuid v4 | All primary keys are UUIDs |
