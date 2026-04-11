@@ -22,6 +22,57 @@ body {
   animation: slide-down 0.3s ease-out;
 }
 
+/* ── Dispatch animations ────────────────────────────────────────────────
+   Used by the /outbox page to visualize trades flowing out of PrismX.
+   Kept here (not inline) so the same classes can be reused for any
+   future "send to external system" visual.
+   ──────────────────────────────────────────────────────────────────── */
+
+/* A dot/particle that travels left-to-right along a flow line. The
+   parent element should be position: relative so the dot has something
+   to anchor against. */
+@keyframes flow-travel {
+  0%   { transform: translateX(0); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(var(--flow-distance, 200px)); opacity: 0; }
+}
+.animate-flow {
+  animation: flow-travel 1.6s linear infinite;
+}
+
+/* Pulsing ring used to highlight the source (PrismX) or destination
+   (OroSoft / SBS) nodes during an active dispatch. */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.9); opacity: 0.7; }
+  70%  { transform: scale(1.5); opacity: 0;   }
+  100% { transform: scale(1.5); opacity: 0;   }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Row slide-in used by the SBS Excel visual when a new deal lands in
+   the spreadsheet. Rows come in fast so the whole batch feels snappy. */
+@keyframes sheet-row-in {
+  from { transform: translateX(-8px); opacity: 0; background-color: rgba(16, 185, 129, 0.15); }
+  50%  { background-color: rgba(16, 185, 129, 0.15); }
+  to   { transform: translateX(0); opacity: 1; background-color: transparent; }
+}
+.animate-sheet-row {
+  animation: sheet-row-in 0.7s ease-out;
+}
+
+/* Checkmark pop used at the end of a dispatch cycle to confirm success. */
+@keyframes check-pop {
+  0%   { transform: scale(0);   opacity: 0; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+.animate-check-pop {
+  animation: check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 /* ── Print styles ──────────────────────────────────────────────────────────
    When a PrismX page is printed (or saved as PDF via the browser's print
    dialog), flip the dark-theme background to white paper and ensure key

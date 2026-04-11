@@ -159,7 +159,15 @@ function initSchema(db: Database.Database) {
       reviewer_notes TEXT,
 
       screenshot_url TEXT,
-      screenshot_ocr TEXT
+      screenshot_ocr TEXT,
+
+      -- Dispatch lifecycle (migration v9). When an approved deal is
+      -- pushed out to OroSoft (Pakka) or SBS Excel (Kachha), these
+      -- columns record when + where + any response string for the UI.
+      dispatched_at TEXT,
+      dispatched_to TEXT,
+      dispatch_response TEXT,
+      dispatch_batch_id TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_pending_deals_status ON pending_deals(status);
@@ -286,6 +294,16 @@ function runMigrations(db: Database.Database) {
         // column happens to already exist (e.g. freshly created DB that
         // got the column via CREATE TABLE above).
         addColumnIfNotExists(db, "auth_pins", "locked", "INTEGER NOT NULL DEFAULT 0");
+      },
+    },
+    {
+      version: 9,
+      description: "Add dispatch lifecycle columns to pending_deals",
+      up: () => {
+        addColumnIfNotExists(db, "pending_deals", "dispatched_at", "TEXT");
+        addColumnIfNotExists(db, "pending_deals", "dispatched_to", "TEXT");
+        addColumnIfNotExists(db, "pending_deals", "dispatch_response", "TEXT");
+        addColumnIfNotExists(db, "pending_deals", "dispatch_batch_id", "TEXT");
       },
     },
   ];
