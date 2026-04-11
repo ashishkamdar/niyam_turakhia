@@ -164,6 +164,34 @@ function initSchema(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_pending_deals_status ON pending_deals(status);
     CREATE INDEX IF NOT EXISTS idx_pending_deals_received ON pending_deals(received_at);
+
+    -- Named PINs for the maker-checker app. Multiple physical users can
+    -- share a single PIN (e.g. "Staff" is used by 15+ people). Individual
+    -- staff are distinguished by their session row (IP + user agent).
+    CREATE TABLE IF NOT EXISTS auth_pins (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      pin TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'staff',
+      created_at TEXT NOT NULL
+    );
+
+    -- Active and historical login sessions. Cookie value = sessions.id.
+    -- last_seen is updated on every GET /api/auth heartbeat so the /users
+    -- page can show who's online right now.
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      id TEXT PRIMARY KEY,
+      pin_id TEXT NOT NULL,
+      ip TEXT NOT NULL,
+      user_agent TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      last_seen TEXT NOT NULL,
+      FOREIGN KEY (pin_id) REFERENCES auth_pins(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_last_seen ON auth_sessions(last_seen);
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_pin_id ON auth_sessions(pin_id);
+    CREATE INDEX IF NOT EXISTS idx_auth_pins_pin ON auth_pins(pin);
   `);
 }
 
@@ -221,6 +249,31 @@ function runMigrations(db: Database.Database) {
       up: () => {
         // Table is created by CREATE TABLE IF NOT EXISTS above.
         // No ALTER needed — this is a new table.
+      },
+    },
+    {
+      version: 7,
+      description: "Add auth_pins and auth_sessions + seed default PINs",
+      up: () => {
+        // Tables are created by CREATE TABLE IF NOT EXISTS above.
+        // Seed the default PINs only if auth_pins is empty so we don't
+        // clobber customized PINs on re-deploy.
+        const count = (
+          db.prepare("SELECT COUNT(*) as c FROM auth_pins").get() as { c: number }
+        ).c;
+        if (count === 0) {
+          const now = new Date().toISOString();
+          const insert = db.prepare(
+            "INSERT INTO auth_pins (id, label, pin, role, created_at) VALUES (?, ?, ?, ?, ?)"
+          );
+          // Keep 639263 as Niyam's PIN so currently-logged-in users aren't
+          // suddenly locked out when this migration runs. The other three
+          // are placeholders Niyam can edit from the Users page.
+          insert.run("pin_niyam", "Niyam", "639263", "admin", now);
+          insert.run("pin_ashish", "Ashish", "520125", "admin", now);
+          insert.run("pin_admin", "Admin", "999999", "admin", now);
+          insert.run("pin_staff", "Staff", "111111", "staff", now);
+        }
       },
     },
   ];
