@@ -49,13 +49,17 @@ body {
 .light {
   color-scheme: light;
 
-  /* Surface scale: 950 = body background, descending toward elevated
-     panels. Mirror of Tailwind's dark defaults. */
-  --color-gray-950: #ffffff;
-  --color-gray-900: #f9fafb;
-  --color-gray-800: #f3f4f6;
-  --color-gray-700: #e5e7eb;
-  --color-gray-600: #d1d5db;
+  /* Surface scale.
+     Design intent: body is a SOFT off-white (warm-neutral), cards
+     are PURE white so they pop above the body — same trick GitHub,
+     Linear, Stripe, and Notion use for their light modes. Stark
+     #ffffff on the body felt clinical and harsh next to colored
+     gradients like the Total Portfolio card. */
+  --color-gray-950: #f4f5f7;  /* body — soft off-white, cool-neutral */
+  --color-gray-900: #ffffff;  /* CARDS — pure white, pop above body */
+  --color-gray-800: #f0f1f4;  /* elevated / hover (slightly darker than body — correct for light mode where hovers darken, not lighten) */
+  --color-gray-700: #e4e6ea;  /* stronger hover */
+  --color-gray-600: #d1d5db;  /* accent border */
 
   /* Mid-tone muted text. In dark mode gray-500 is medium-light so it
      reads as muted on dark bg; in light mode we want the same
@@ -69,7 +73,9 @@ body {
 
   /* "white" in this codebase = primary text color. Flip to a near-
      black so page titles, bold labels, and form values read against
-     the now-white body. */
+     the now-off-white body. Colored buttons (bg-amber-600 text-white
+     etc.) inherit the same flip and carry dark text — amber-600 is
+     vivid enough that it still reads as a primary CTA. */
   --color-white: #0f172a;
 }
 
