@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { StockDetail } from "@/components/stock-detail";
 import { ReportLetterhead } from "@/components/report-letterhead";
 import { useDemo } from "@/components/demo-engine";
+import { useFy } from "@/components/fy-provider";
 import type { Deal, Price, Metal, MetalSymbol } from "@/lib/types";
 
 const GRAMS_PER_OZ = 31.1035;
@@ -316,6 +317,7 @@ function passesFilter(metal: string, filter: MetalFilter): boolean {
 }
 
 function LiveView() {
+  const { fy } = useFy();
   const [metalFilter, setMetalFilter] = useState<MetalFilter>("all");
   const [data, setData] = useState<LiveResponse | null>(null);
   const [opening, setOpening] = useState<OpeningResponse | null>(null);
@@ -326,10 +328,16 @@ function LiveView() {
     setLoading(true);
     try {
       // Fetch both endpoints in parallel. The opening-stock endpoint
-      // drives the top bar (today's opening + today's activity), the
-      // live-stock endpoint drives the all-time register below.
+      // drives the top bar (today's opening + today's activity — FY
+      // doesn't apply, today is always in the current FY window), the
+      // live-stock endpoint drives the all-time register below and
+      // IS FY-filtered so past-FY views show that year's register.
+      const liveParams = new URLSearchParams({
+        from: fy.fromIso,
+        to: fy.toIso,
+      });
       const [liveRes, openingRes] = await Promise.all([
-        fetch("/api/stock/live"),
+        fetch(`/api/stock/live?${liveParams.toString()}`),
         fetch("/api/stock/opening"),
       ]);
       const [liveJson, openingJson] = await Promise.all([
@@ -343,7 +351,7 @@ function LiveView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fy.fromIso, fy.toIso]);
 
   useEffect(() => {
     load();
@@ -385,7 +393,11 @@ function LiveView() {
       : metalFilter.charAt(0).toUpperCase() + metalFilter.slice(1);
 
   function exportUrl(): string {
-    const params = new URLSearchParams({ filter: metalFilter });
+    const params = new URLSearchParams({
+      filter: metalFilter,
+      from: fy.fromIso,
+      to: fy.toIso,
+    });
     return `/api/stock/live/export?${params.toString()}`;
   }
 
@@ -430,7 +442,7 @@ function LiveView() {
     <div className="space-y-4">
       <ReportLetterhead
         title="Stock In Hand — Live"
-        subtitle={`${filterLabel} · as of ${data ? new Date(data.generated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "now"}`}
+        subtitle={`${fy.label} · ${filterLabel} · as of ${data ? new Date(data.generated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "now"}`}
       />
 
       {/* ── Daily register: Opening editor + Stock In Hand bar ────────

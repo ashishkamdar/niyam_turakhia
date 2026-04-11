@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useFy } from "@/components/fy-provider";
+import { deriveFy, parseFyStart } from "@/lib/financial-year";
 
 const DATA_SOURCES = [
   {
@@ -54,10 +56,60 @@ const DATA_SOURCES = [
 ];
 
 export default function SettingsPage() {
+  const { fyStart, refresh: refreshFy } = useFy();
   const [liveApi, setLiveApi] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [resetting, setResetting] = useState(false);
   const [selectedSource, setSelectedSource] = useState("bridge");
+
+  // Financial-year editor state. fyStartMonth/Day are <select> values;
+  // on save we format them back to a MM-DD string and PUT to
+  // /api/settings. The provider refreshes afterwards so the top-bar
+  // dropdown picks up the new window without a page reload.
+  const parsedFy = parseFyStart(fyStart);
+  const [fyStartMonth, setFyStartMonth] = useState(parsedFy.month);
+  const [fyStartDay, setFyStartDay] = useState(parsedFy.day);
+  const [fySaveStatus, setFySaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  // Keep the local form in sync if the provider reloads (e.g. another
+  // tab saved a different FY). Deliberate dependency on fyStart so we
+  // don't clobber in-flight edits when the form matches the server.
+  useEffect(() => {
+    const p = parseFyStart(fyStart);
+    setFyStartMonth(p.month);
+    setFyStartDay(p.day);
+  }, [fyStart]);
+
+  async function handleFySave() {
+    setFySaveStatus("saving");
+    const mm = String(fyStartMonth).padStart(2, "0");
+    const dd = String(fyStartDay).padStart(2, "0");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "financial_year_start", value: `${mm}-${dd}` }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setFySaveStatus("error");
+        return;
+      }
+      // Pull the new value back into the global context so the top-bar
+      // dropdown rebuilds its FY list against the new start date.
+      refreshFy();
+      setFySaveStatus("saved");
+      setTimeout(() => setFySaveStatus("idle"), 2500);
+    } catch {
+      setFySaveStatus("error");
+      setTimeout(() => setFySaveStatus("idle"), 2500);
+    }
+  }
+
+  // Preview of which FY window the current form would produce.
+  const previewFy = deriveFy(
+    `${String(fyStartMonth).padStart(2, "0")}-${String(fyStartDay).padStart(2, "0")}`
+  );
 
   // Meta WhatsApp config state
   const [metaVerifyToken, setMetaVerifyToken] = useState("prismx_webhook_verify");
@@ -140,6 +192,83 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-lg font-semibold text-white">Settings</h1>
         <p className="text-sm text-gray-400">Configure data sources and system behavior.</p>
+      </div>
+
+      {/* Financial Year */}
+      <div>
+        <h2 className="mb-1 text-sm font-semibold text-white">Financial Year</h2>
+        <p className="mb-4 text-xs text-gray-400">
+          The start date of your financial year. Every page with a date filter
+          (Deals, Stock, Reports) will show data in this year&apos;s window.
+          Default is 1 April, matching the Indian fiscal calendar.
+        </p>
+        <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10">
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">
+                Start Month
+              </label>
+              <select
+                value={fyStartMonth}
+                onChange={(e) => setFyStartMonth(parseInt(e.target.value, 10))}
+                className="rounded border border-white/10 bg-gray-950 px-3 py-2 text-sm text-white focus:border-amber-500/50 focus:outline-none"
+              >
+                {[
+                  "January", "February", "March", "April", "May", "June",
+                  "July", "August", "September", "October", "November", "December",
+                ].map((name, i) => (
+                  <option key={name} value={i + 1}>
+                    {String(i + 1).padStart(2, "0")} — {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">
+                Start Day
+              </label>
+              <select
+                value={fyStartDay}
+                onChange={(e) => setFyStartDay(parseInt(e.target.value, 10))}
+                className="rounded border border-white/10 bg-gray-950 px-3 py-2 text-sm text-white focus:border-amber-500/50 focus:outline-none"
+              >
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>
+                    {String(d).padStart(2, "0")}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleFySave}
+              disabled={fySaveStatus === "saving"}
+              className="rounded-md bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-amber-500 disabled:opacity-40"
+            >
+              {fySaveStatus === "saving" ? "Saving…" : "Save"}
+            </button>
+            {fySaveStatus === "saved" && (
+              <span className="text-xs text-emerald-400">Saved</span>
+            )}
+            {fySaveStatus === "error" && (
+              <span className="text-xs text-rose-400">
+                Please pick a valid date
+              </span>
+            )}
+          </div>
+          <div className="mt-3 rounded-md bg-white/5 px-3 py-2 text-xs text-gray-400">
+            Current FY preview:{" "}
+            <span className="font-semibold text-amber-300">{previewFy.label}</span>{" "}
+            · {new Date(previewFy.fromIso).toLocaleDateString("en-IN")} →{" "}
+            {new Date(
+              new Date(previewFy.toIso).getTime() - 86_400_000
+            ).toLocaleDateString("en-IN")}
+          </div>
+          <p className="mt-2 text-[10px] text-gray-500">
+            Tip: the FY boundary is a half-open window on the IST calendar —
+            trades at 11:59 PM on the last day of FY X-Y stay in FY X-Y, and
+            trades at 12:01 AM on the next day move to FY Y-Z.
+          </p>
+        </div>
       </div>
 
       {/* Data Source Selection */}

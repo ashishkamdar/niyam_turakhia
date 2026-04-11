@@ -87,16 +87,33 @@ function passesFilter(metal: string, filter: string): boolean {
 export async function GET(req: NextRequest) {
   const db = getDb();
   const filter = (req.nextUrl.searchParams.get("filter") ?? "all").toLowerCase();
+  const from = req.nextUrl.searchParams.get("from");
+  const to = req.nextUrl.searchParams.get("to");
+
+  // Same window semantics as /api/stock/live — ensures the downloaded
+  // CSV matches whatever the on-screen table is showing.
+  const clauses: string[] = [
+    "status = 'approved'",
+    "qty_grams IS NOT NULL",
+    "rate_usd_per_oz IS NOT NULL",
+  ];
+  const params: (string | number)[] = [];
+  if (from) {
+    clauses.push("COALESCE(reviewed_at, received_at) >= ?");
+    params.push(from);
+  }
+  if (to) {
+    clauses.push("COALESCE(reviewed_at, received_at) < ?");
+    params.push(to);
+  }
 
   const rows = db
     .prepare(
       `SELECT metal, direction, qty_grams, rate_usd_per_oz, purity
          FROM pending_deals
-         WHERE status = 'approved'
-           AND qty_grams IS NOT NULL
-           AND rate_usd_per_oz IS NOT NULL`
+         WHERE ${clauses.join(" AND ")}`
     )
-    .all() as DealRow[];
+    .all(...params) as DealRow[];
 
   const priceRows = db
     .prepare("SELECT metal, price_usd FROM prices")

@@ -23,6 +23,8 @@ import { SaleForm } from "@/components/sale-form";
 import { LockedDeals } from "@/components/locked-deals";
 import { ReportLetterhead } from "@/components/report-letterhead";
 import { useDemo } from "@/components/demo-engine";
+import { useFy } from "@/components/fy-provider";
+import { intersectFy } from "@/lib/financial-year";
 import type { Deal } from "@/lib/types";
 
 const METAL_COLORS: Record<string, string> = {
@@ -292,6 +294,7 @@ function DemoView() {
 // ─── Live view (approved WhatsApp deals register) ──────────────────────
 
 function LiveView() {
+  const { fy } = useFy();
   const [period, setPeriod] = useState<Period>("monthly");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -300,10 +303,19 @@ function LiveView() {
   const [loading, setLoading] = useState(false);
   const [shareFeedback, setShareFeedback] = useState("");
 
-  const range = useMemo(
+  // The period pills produce a raw [from, to] window. We intersect
+  // it with the selected FY so no query can ever return deals outside
+  // the FY the user picked. When the FY and period point at totally
+  // disjoint windows (e.g. "Today" while viewing a past FY), intersect
+  // returns an empty window and the table legitimately shows zero rows.
+  const rawRange = useMemo(
     () => periodRange(period, customFrom, customTo),
     [period, customFrom, customTo]
   );
+  const range = useMemo(() => {
+    const clamped = intersectFy(fy, rawRange.from, rawRange.to);
+    return { from: clamped.from, to: clamped.to, label: rawRange.label };
+  }, [fy, rawRange]);
 
   // Type filter is applied client-side: the server already returned
   // every approved deal in the window, so filtering by deal_type is a
@@ -371,7 +383,7 @@ function LiveView() {
       typeFilter === "K" ? " · Kachha only" : typeFilter === "P" ? " · Pakka only" : "";
     const text = [
       `PrismX — Live Trades`,
-      `${range.label}${typeLabel} · ${visibleDeals.length} deal${visibleDeals.length === 1 ? "" : "s"}`,
+      `${fy.label} · ${range.label}${typeLabel} · ${visibleDeals.length} deal${visibleDeals.length === 1 ? "" : "s"}`,
       `Bought: ${visibleTotals.buy_count} · ${formatUsd(visibleTotals.buy_usd)}`,
       `Sold: ${visibleTotals.sell_count} · ${formatUsd(visibleTotals.sell_usd)}`,
       `Net P&L: ${formatUsd(visibleTotals.sell_usd - visibleTotals.buy_usd)}`,
@@ -401,7 +413,7 @@ function LiveView() {
       {/* Letterhead — visible on screen AND in print. */}
       <ReportLetterhead
         title="Live Trades"
-        subtitle={`${range.label}${
+        subtitle={`${fy.label} · ${range.label}${
           typeFilter === "K" ? " · Kachha" : typeFilter === "P" ? " · Pakka" : ""
         } · ${visibleDeals.length} deal${visibleDeals.length === 1 ? "" : "s"}`}
       />

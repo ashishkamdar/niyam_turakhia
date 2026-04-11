@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { StatCard } from "@/components/stat-card";
 import { useDemo } from "@/components/demo-engine";
+import { useFy } from "@/components/fy-provider";
+import { intersectFy } from "@/lib/financial-year";
 import { ReportLetterhead } from "@/components/report-letterhead";
 import type { Deal, Metal } from "@/lib/types";
 
@@ -24,6 +26,7 @@ function getDateRange(period: Period) {
 
 export default function ReportsPage() {
   const { dealTick } = useDemo();
+  const { fy } = useFy();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [period, setPeriod] = useState<Period>("daily");
   useEffect(() => {
@@ -33,8 +36,14 @@ export default function ReportsPage() {
     return () => clearInterval(poll);
   }, [dealTick]);
 
-  const { start, end, label } = getDateRange(period);
-  const filtered = deals.filter((d) => d.date >= start && d.date <= end);
+  // Period pills produce a raw window relative to "now"; intersect
+  // with the selected FY so "Weekly" while viewing a past FY never
+  // shows trades outside that FY. When the intersection is empty
+  // (future period selected inside a past FY), the filtered list
+  // just comes back zero, which is the correct behaviour.
+  const { start: rawStart, end: rawEnd, label } = getDateRange(period);
+  const { from: start, to: end } = intersectFy(fy, rawStart, rawEnd);
+  const filtered = deals.filter((d) => d.date >= start && d.date < end);
   const buys = filtered.filter((d) => d.direction === "buy");
   const sells = filtered.filter((d) => d.direction === "sell");
   const totalBought = buys.reduce((s, d) => s + (d.pure_equivalent_grams / GRAMS_PER_OZ) * d.price_per_oz, 0);
@@ -59,7 +68,7 @@ export default function ReportsPage() {
           dark-theme to white-paper via print: variants. */}
       <ReportLetterhead
         title="Trading P&L Report"
-        subtitle={`${label} · ${filtered.length} deal${filtered.length === 1 ? "" : "s"}`}
+        subtitle={`${fy.label} · ${label} · ${filtered.length} deal${filtered.length === 1 ? "" : "s"}`}
       />
 
       {/* Period selector + Print button — hidden in print view */}

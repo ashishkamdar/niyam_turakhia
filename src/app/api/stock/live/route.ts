@@ -58,18 +58,36 @@ function purityFactor(purity: string | null): number {
   return 1;
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const db = getDb();
+
+  // Optional [from, to) window on COALESCE(reviewed_at, received_at).
+  // The /stock Live view passes the currently-selected FY here so the
+  // all-time register table actually means "register for this FY".
+  const from = req.nextUrl.searchParams.get("from");
+  const to = req.nextUrl.searchParams.get("to");
+  const clauses: string[] = [
+    "status = 'approved'",
+    "qty_grams IS NOT NULL",
+    "rate_usd_per_oz IS NOT NULL",
+  ];
+  const params: (string | number)[] = [];
+  if (from) {
+    clauses.push("COALESCE(reviewed_at, received_at) >= ?");
+    params.push(from);
+  }
+  if (to) {
+    clauses.push("COALESCE(reviewed_at, received_at) < ?");
+    params.push(to);
+  }
 
   const rows = db
     .prepare(
       `SELECT metal, direction, qty_grams, rate_usd_per_oz, purity
          FROM pending_deals
-         WHERE status = 'approved'
-           AND qty_grams IS NOT NULL
-           AND rate_usd_per_oz IS NOT NULL`
+         WHERE ${clauses.join(" AND ")}`
     )
-    .all() as DealRow[];
+    .all(...params) as DealRow[];
 
   const priceRows = db
     .prepare("SELECT metal, price_usd FROM prices")
