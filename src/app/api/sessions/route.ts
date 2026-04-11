@@ -63,3 +63,47 @@ export async function GET(_req: NextRequest) {
     active_window_seconds: ACTIVE_WINDOW_MS / 1000,
   });
 }
+
+/**
+ * DELETE /api/sessions?id=xxx                → kick one session by id
+ * DELETE /api/sessions?label=xxx&ip=xxx      → kick every session matching
+ *                                              a (PIN label, IP) pair — used
+ *                                              by the grouped "Kick all"
+ *                                              button on the active table
+ *
+ * Either form returns { ok: true, kicked: N }. A kicked session cookie is
+ * orphaned: the next GET /api/auth will find no matching row and respond
+ * with authenticated: false, which AuthGate's 30-second heartbeat flips
+ * into the PIN pad — so the kick takes effect in at most 30 seconds on
+ * the victim's browser with no extra plumbing.
+ */
+export async function DELETE(req: NextRequest) {
+  const db = getDb();
+  const id = req.nextUrl.searchParams.get("id");
+  const label = req.nextUrl.searchParams.get("label");
+  const ip = req.nextUrl.searchParams.get("ip");
+
+  if (id) {
+    const result = db.prepare("DELETE FROM auth_sessions WHERE id = ?").run(id);
+    return NextResponse.json({ ok: true, kicked: result.changes });
+  }
+
+  if (label && ip) {
+    // Delete by (label, ip) — joins through auth_pins because label lives
+    // on the pins table. Using a subquery keeps this portable vs. DELETE
+    // with a JOIN (SQLite doesn't support that syntax directly).
+    const result = db
+      .prepare(
+        `DELETE FROM auth_sessions
+           WHERE ip = ?
+             AND pin_id IN (SELECT id FROM auth_pins WHERE label = ?)`
+      )
+      .run(ip, label);
+    return NextResponse.json({ ok: true, kicked: result.changes });
+  }
+
+  return NextResponse.json(
+    { ok: false, error: "Provide either ?id=... or ?label=...&ip=..." },
+    { status: 400 }
+  );
+}

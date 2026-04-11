@@ -40,6 +40,7 @@ type Pin = {
   label: string;
   pin: string;
   role: string;
+  locked: boolean;
   created_at: string;
   active_sessions: number;
 };
@@ -173,6 +174,29 @@ export default function UsersPage() {
   // trimmed by the API sweep).
   const recentSessions = sessions.filter((s) => !s.is_active);
 
+  async function kickGroup(label: string, ip: string, count: number) {
+    if (!confirm(`Force logout ${count} session${count === 1 ? "" : "s"} for ${label} at ${ip}?`)) return;
+    try {
+      await fetch(
+        `/api/sessions?label=${encodeURIComponent(label)}&ip=${encodeURIComponent(ip)}`,
+        { method: "DELETE" }
+      );
+      load();
+    } catch {
+      // Silent — next poll will reflect whatever actually happened.
+    }
+  }
+
+  async function kickSession(id: string, label: string) {
+    if (!confirm(`Revoke this session for ${label}?`)) return;
+    try {
+      await fetch(`/api/sessions?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      load();
+    } catch {
+      // Silent — next poll will reflect whatever actually happened.
+    }
+  }
+
   async function handleShare() {
     const lines = [
       "PrismX — Currently Logged In Users",
@@ -261,6 +285,7 @@ export default function UsersPage() {
                   <th className="px-4 py-2 text-left font-semibold">Device</th>
                   <th className="px-4 py-2 text-left font-semibold">Logged in</th>
                   <th className="px-4 py-2 text-left font-semibold">Last active</th>
+                  <th className="px-4 py-2 text-right font-semibold print:hidden">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 print:divide-gray-200">
@@ -305,6 +330,14 @@ export default function UsersPage() {
                     <td className="px-4 py-3 align-top text-xs text-emerald-400 print:text-emerald-700">
                       {timeAgo(g.newestLastSeen)}
                     </td>
+                    <td className="px-4 py-3 align-top text-right print:hidden">
+                      <button
+                        onClick={() => kickGroup(g.label, g.ip, g.count)}
+                        className="rounded border border-rose-500/30 px-2 py-1 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-500/10"
+                      >
+                        {g.count > 1 ? `Kick all ${g.count}` : "Kick"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -331,6 +364,7 @@ export default function UsersPage() {
                   <th className="px-4 py-2 text-left font-semibold">Device</th>
                   <th className="px-4 py-2 text-left font-semibold">Logged in</th>
                   <th className="px-4 py-2 text-left font-semibold">Last active</th>
+                  <th className="px-4 py-2 text-right font-semibold print:hidden">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 print:divide-gray-200">
@@ -350,6 +384,14 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-2 align-top text-xs text-gray-500 print:text-gray-600">
                       {timeAgo(s.last_seen)}
+                    </td>
+                    <td className="px-4 py-2 align-top text-right print:hidden">
+                      <button
+                        onClick={() => kickSession(s.id, s.label)}
+                        className="rounded border border-white/10 px-2 py-1 text-[11px] font-semibold text-gray-400 transition hover:border-rose-500/30 hover:text-rose-300"
+                      >
+                        Revoke
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -423,7 +465,10 @@ function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
     }
   }
 
-  async function updatePin(id: string, patch: Partial<Pick<Pin, "label" | "pin" | "role">>) {
+  async function updatePin(
+    id: string,
+    patch: Partial<Pick<Pin, "label" | "pin" | "role" | "locked">>
+  ) {
     setBusy(true);
     try {
       await fetch("/api/pins", {
@@ -511,6 +556,7 @@ function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
               <th className="px-3 py-2 text-left font-semibold">Label</th>
               <th className="px-3 py-2 text-left font-semibold">PIN</th>
               <th className="px-3 py-2 text-left font-semibold">Role</th>
+              <th className="px-3 py-2 text-left font-semibold">Status</th>
               <th className="px-3 py-2 text-left font-semibold">Active</th>
               <th className="px-3 py-2 text-right font-semibold">Actions</th>
             </tr>
@@ -528,6 +574,11 @@ function PinManager({ pins, onChange }: { pins: Pin[]; onChange: () => void }) {
           </tbody>
         </table>
       </div>
+      <p className="text-[11px] text-gray-500">
+        Locked PINs cannot be used to log in, but existing sessions keep working
+        until they&apos;re kicked or expire. Delete a PIN to also boot everyone
+        currently logged in with it.
+      </p>
     </div>
   );
 }
@@ -540,7 +591,10 @@ function PinRow({
 }: {
   pin: Pin;
   busy: boolean;
-  onUpdate: (id: string, patch: Partial<Pick<Pin, "label" | "pin" | "role">>) => void;
+  onUpdate: (
+    id: string,
+    patch: Partial<Pick<Pin, "label" | "pin" | "role" | "locked">>
+  ) => void;
   onDelete: (id: string, label: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -561,7 +615,7 @@ function PinRow({
   }
 
   return (
-    <tr>
+    <tr className={pin.locked ? "bg-rose-500/5" : ""}>
       <td className="px-3 py-2 align-middle">
         {editing ? (
           <input
@@ -570,7 +624,9 @@ function PinRow({
             className="w-full rounded border border-white/10 bg-gray-950 px-2 py-1 text-sm text-white focus:border-amber-500/50 focus:outline-none"
           />
         ) : (
-          <span className="font-semibold text-white">{pin.label}</span>
+          <span className={`font-semibold ${pin.locked ? "text-gray-500 line-through" : "text-white"}`}>
+            {pin.label}
+          </span>
         )}
       </td>
       <td className="px-3 py-2 align-middle">
@@ -582,7 +638,9 @@ function PinRow({
             className="w-24 rounded border border-white/10 bg-gray-950 px-2 py-1 font-mono text-sm text-white focus:border-amber-500/50 focus:outline-none"
           />
         ) : (
-          <span className="font-mono text-sm text-gray-300">{pin.pin}</span>
+          <span className={`font-mono text-sm ${pin.locked ? "text-gray-500" : "text-gray-300"}`}>
+            {pin.pin}
+          </span>
         )}
       </td>
       <td className="px-3 py-2 align-middle">
@@ -604,6 +662,23 @@ function PinRow({
             }`}
           >
             {pin.role}
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-2 align-middle">
+        {pin.locked ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            Locked
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            Active
           </span>
         )}
       </td>
@@ -631,7 +706,18 @@ function PinRow({
             </button>
           </div>
         ) : (
-          <div className="flex justify-end gap-1">
+          <div className="flex flex-wrap justify-end gap-1">
+            <button
+              onClick={() => onUpdate(pin.id, { locked: !pin.locked })}
+              disabled={busy}
+              className={`rounded border px-2 py-1 text-xs font-semibold transition disabled:opacity-40 ${
+                pin.locked
+                  ? "border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                  : "border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              }`}
+            >
+              {pin.locked ? "Unlock" : "Lock"}
+            </button>
             <button
               onClick={() => setEditing(true)}
               className="rounded border border-white/10 px-2 py-1 text-xs font-semibold text-gray-300 hover:bg-white/5"

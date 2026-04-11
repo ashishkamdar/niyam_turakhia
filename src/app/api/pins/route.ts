@@ -7,6 +7,7 @@ type PinRow = {
   label: string;
   pin: string;
   role: string;
+  locked: number;
   created_at: string;
 };
 
@@ -20,7 +21,9 @@ type PinRow = {
 export async function GET(_req: NextRequest) {
   const db = getDb();
   const pins = db
-    .prepare("SELECT id, label, pin, role, created_at FROM auth_pins ORDER BY created_at ASC")
+    .prepare(
+      "SELECT id, label, pin, role, locked, created_at FROM auth_pins ORDER BY created_at ASC"
+    )
     .all() as PinRow[];
 
   const activeCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
@@ -36,7 +39,14 @@ export async function GET(_req: NextRequest) {
   const countMap = new Map(activeCounts.map((r) => [r.pin_id, r.c]));
 
   return NextResponse.json({
-    pins: pins.map((p) => ({ ...p, active_sessions: countMap.get(p.id) ?? 0 })),
+    // Coerce locked from the raw 0/1 SQLite integer to a proper boolean so
+    // the client can use it directly in JSX conditionals without worrying
+    // about "0" being truthy in string contexts.
+    pins: pins.map((p) => ({
+      ...p,
+      locked: p.locked === 1,
+      active_sessions: countMap.get(p.id) ?? 0,
+    })),
   });
 }
 
@@ -83,11 +93,12 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   const body = await req.json();
-  const { id, label, pin, role } = body as {
+  const { id, label, pin, role, locked } = body as {
     id?: string;
     label?: string;
     pin?: string;
     role?: string;
+    locked?: boolean;
   };
 
   if (!id) {
@@ -121,6 +132,11 @@ export async function PUT(req: NextRequest) {
   if (role !== undefined) {
     updates.push("role = ?");
     params.push(role === "admin" ? "admin" : "staff");
+  }
+  if (locked !== undefined) {
+    // SQLite has no BOOL — store as 0/1 INTEGER.
+    updates.push("locked = ?");
+    params.push(locked ? 1 : 0);
   }
   if (updates.length === 0) {
     return NextResponse.json({ ok: true });

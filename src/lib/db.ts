@@ -173,6 +173,7 @@ function initSchema(db: Database.Database) {
       label TEXT NOT NULL,
       pin TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'staff',
+      locked INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
 
@@ -274,6 +275,17 @@ function runMigrations(db: Database.Database) {
           insert.run("pin_admin", "Admin", "999999", "admin", now);
           insert.run("pin_staff", "Staff", "111111", "staff", now);
         }
+      },
+    },
+    {
+      version: 8,
+      description: "Add locked column to auth_pins for admin lock/unlock",
+      up: () => {
+        // On the server where v7 already ran, auth_pins exists without
+        // the locked column. addColumnIfNotExists is a no-op if the
+        // column happens to already exist (e.g. freshly created DB that
+        // got the column via CREATE TABLE above).
+        addColumnIfNotExists(db, "auth_pins", "locked", "INTEGER NOT NULL DEFAULT 0");
       },
     },
   ];

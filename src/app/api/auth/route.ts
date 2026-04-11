@@ -51,10 +51,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Multiple pins CAN have the same value (user explicitly allowed this in
-  // the spec). Take the first match — any further disambiguation is done
-  // by IP/session row on the /users page.
+  // the spec). Take the first NON-LOCKED match — locked PINs are skipped
+  // entirely so an admin can block a leaked PIN without deleting it, and
+  // any legitimate duplicate PIN rows still work. If every matching row
+  // is locked, treat it like a wrong PIN so we don't leak the fact that
+  // the PIN exists at all.
   const match = db
-    .prepare("SELECT id, label, role FROM auth_pins WHERE pin = ? LIMIT 1")
+    .prepare(
+      "SELECT id, label, role FROM auth_pins WHERE pin = ? AND locked = 0 LIMIT 1"
+    )
     .get(pin) as { id: string; label: string; role: string } | undefined;
 
   if (!match) {
