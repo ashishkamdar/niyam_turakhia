@@ -2,7 +2,7 @@
 
 **Reference document for PrismX (Niyam Turakhia precious-metals MIS).** Companion to [`PROJECT-PLAN.md`](PROJECT-PLAN.md). The plan doc is the narrative (what shipped, why, in what order); this doc is the lookup (schemas, routes, components, architecture, deployment).
 
-**Last updated:** 2026-04-12 (Phase C)
+**Last updated:** 2026-04-12 (Phase C — audit trail, party master, dispatch sync log)
 **Live at:** https://nt.areakpi.in
 **Repo:** https://github.com/ashishkamdar/niyam_turakhia
 
@@ -32,7 +32,7 @@
 
 ## 1. Overview
 
-PrismX is a real-time Management Information System (MIS) for a precious-metals trading business. It ingests WhatsApp-based deal "lock codes" from operator phones, routes them through a maker-checker review pipeline, and dispatches approved trades to downstream accounting systems (OroSoft Neo for Pakka deals, SBS Excel for Kachha deals). It also provides dashboards for stock-in-hand tracking, FY-scoped trade registers, role-based user management, and concurrent-operator coordination.
+PrismX is a real-time Management Information System (MIS) for a precious-metals trading business. It ingests WhatsApp-based deal "lock codes" from operator phones, routes them through a maker-checker review pipeline, and dispatches approved trades to downstream accounting systems (OroSoft Neo for Pakka deals, SBS for Kachha deals — both via REST API). It also provides dashboards for stock-in-hand tracking, FY-scoped trade registers, role-based user management, concurrent-operator coordination, an immutable audit trail, and a party master with dual vendor-code mapping.
 
 **Audience:** A bullion trading desk with 10-15 concurrent operators — 2-3 admins (Niyam, Ashish) + staff placing/reviewing trades. The app is designed mobile-first for field staff and desktop-friendly for admin work.
 
@@ -128,7 +128,8 @@ Checker clicks "Send all to OroSoft" on /outbox
   → readLock() → any lock held by another user? → 409 if yes
   → writeLock({started_by, target, deal_count, expires_at: now+3000ms})
   → UPDATE pending_deals SET dispatched_at=now, dispatched_to='orosoft', dispatch_batch_id=...
-  → return {ok:true, batch_id, deals, lock}
+  → INSERT dispatch_log (sync number, target, deal_count, deal_ids, batch_id, ...)
+  → return {ok:true, batch_id, deals, lock, sync_number, sync_ref}
   → client animates 2-second staged pipeline → flip to "done" state
   → other operators' DispatchBanner polls /api/dispatch
   → sees lock from another user → renders pulsing strip for ≤3 seconds
@@ -148,6 +149,8 @@ src/
 │   ├── outbox/page.tsx              # Dispatch outbox + animated flow visuals
 │   ├── users/page.tsx               # Sessions list + PIN management
 │   ├── review/page.tsx              # Maker-checker queue
+│   ├── audit/page.tsx               # Audit trail — FY-aware timeline with expandable diffs
+│   ├── parties/page.tsx             # Party master — searchable table + CRUD + CSV upload
 │   ├── reports/page.tsx             # P&L reports with ReportLetterhead print
 │   ├── whatsapp/page.tsx            # Chat simulator (compose disabled)
 │   ├── settings/page.tsx            # Financial Year editor + Meta config + data source selector
@@ -161,8 +164,13 @@ src/
 │       ├── stock/live/route.ts      # Per-metal stock register
 │       ├── stock/live/export/route.ts  # 13-column stock CSV export
 │       ├── stock/opening/route.ts   # Daily opening + today's activity + live in-hand
-│       ├── dispatch/route.ts        # Outbox GET + POST + dispatch lock
+│       ├── dispatch/route.ts        # Outbox GET + POST + dispatch lock + sync log
 │       ├── dispatch/export/route.ts # SBS 14-column Bullion Sales Order CSV
+│       ├── audit/route.ts           # Audit log GET with filters (from/to/actor/action/target_id)
+│       ├── parties/route.ts         # Party CRUD (GET search, POST create, PUT update, DELETE deactivate)
+│       ├── parties/upload/route.ts  # CSV bulk import (upsert by short_code)
+│       ├── parties/template/route.ts # Blank CSV template download
+│       ├── parties/sync/route.ts    # Stub (501) — vendor sync placeholder
 │       ├── review/route.ts          # Pending deals list with status filter
 │       ├── review/[id]/route.ts     # Maker-checker approve/reject/patch
 │       ├── pins/route.ts            # PIN CRUD (role-gated)
@@ -238,7 +246,7 @@ deploy.sh                            # Backup → push → pull → build → re
 
 ## 4. Database Schema
 
-Single SQLite file at `data.db`, opened in WAL mode via `better-sqlite3`. Schema version is tracked in the `schema_version` table; current version is **12**. All tables use `CREATE TABLE IF NOT EXISTS` so fresh DBs get the full schema at boot, while existing DBs get column additions via the migration runner (see [§5](#5-migration-system)).
+Single SQLite file at `data.db`, opened in WAL mode via `better-sqlite3`. Schema version is tracked in the `schema_version` table; current version is **15**. All tables use `CREATE TABLE IF NOT EXISTS` so fresh DBs get the full schema at boot, while existing DBs get column additions via the migration runner (see [§5](#5-migration-system)).
 
 ### 4.1 `deals` (legacy Demo trades)
 
@@ -486,6 +494,67 @@ Migration v10. Daily opening stock per metal, with lazy roll-forward from yester
 
 See [§8](#8-financial-year-model) and [§13.2](#132-stock-opening-roll-forward) for the IST + roll-forward details.
 
+### 4.15 `audit_log`
+
+Migration v13. Immutable mutation log — rows are only ever INSERTed, never UPDATEd or DELETEd.
+
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key, UUID v4 |
+| `actor` | TEXT | — | PIN label of the user who performed the action |
+| `action` | TEXT | — | `approve`, `reject`, `edit`, `dispatch`, `party_create`, `party_update`, `party_deactivate` |
+| `target_type` | TEXT | — | `deal`, `party`, etc. |
+| `target_id` | TEXT | — | ID of the affected row |
+| `before` | TEXT | — | JSON snapshot of the row before mutation (null for creates) |
+| `after` | TEXT | — | JSON snapshot of the row after mutation (null for deletes) |
+| `created_at` | TEXT | — | ISO timestamp |
+
+**Indexes:**
+- `idx_audit_log_created ON (created_at)` — sort for timeline view
+- `idx_audit_log_target ON (target_type, target_id)` — lookup by affected entity
+
+### 4.16 `parties`
+
+Migration v14. Party master with dual SBS/OroSoft vendor codes and an aliases JSON array for fuzzy matching.
+
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key, UUID v4 |
+| `short_code` | TEXT | — | UNIQUE, e.g. `TAKFUNG` — matches `pending_deals.party_alias` |
+| `name` | TEXT | — | Full party name |
+| `sbs_party_code` | TEXT | `''` | Party code in SBS system |
+| `orosoft_party_code` | TEXT | `''` | Party code in OroSoft Neo |
+| `aliases` | TEXT | `'[]'` | JSON array of alternate names for matching |
+| `notes` | TEXT | `''` | Free-form notes |
+| `active` | INTEGER | 1 | 0 = soft-deactivated (DELETE sets this, not actual DELETE) |
+| `created_at` | TEXT | — | ISO timestamp |
+| `updated_at` | TEXT | — | ISO timestamp |
+
+**Indexes:**
+- `idx_parties_short_code ON (short_code)` — unique constraint + lookup
+- `idx_parties_active ON (active)` — filter
+
+### 4.17 `dispatch_log`
+
+Migration v15. Sequential sync log with auto-incrementing SYNC-NNNN numbers. Each dispatch POST writes one row.
+
+| Column | Type | Default | Notes |
+|---|---|---|---|
+| `id` | INTEGER | AUTOINCREMENT | Primary key — used as SYNC-{id} display number |
+| `timestamp` | TEXT | — | ISO timestamp of the dispatch |
+| `target` | TEXT | — | `orosoft` / `sbs` |
+| `deal_count` | INTEGER | — | Number of deals in this batch |
+| `deal_ids` | TEXT | — | JSON array of pending_deal IDs |
+| `batch_id` | TEXT | — | UUID shared with `pending_deals.dispatch_batch_id` |
+| `request_summary` | TEXT | — | Human-readable summary of what was sent |
+| `http_status` | INTEGER | — | HTTP status from vendor (simulated for now) |
+| `response_body` | TEXT | — | Raw response or simulated response string |
+| `status` | TEXT | — | `success` / `error` |
+| `error_message` | TEXT | — | Error details if status=error |
+| `sent_by` | TEXT | — | PIN label of the dispatcher |
+
+**Index:** `idx_dispatch_log_timestamp ON (timestamp)` — sort for recent entries
+
 ---
 
 ## 5. Migration System
@@ -523,12 +592,15 @@ Migrations live in `src/lib/db.ts` as an array of `{version, description, up}` o
 | 10 | Add `stock_opening` table | no-op |
 | 11 | Promote `pin_niyam` to `super_admin` role | `UPDATE auth_pins SET role='super_admin' WHERE id='pin_niyam'` |
 | 12 | Add `wamid` / `send_status` / `send_error` columns to `whatsapp_messages` | `addColumnIfNotExists` × 3 |
+| 13 | Add `audit_log` table (immutable mutation log) | no-op (CREATE IF NOT EXISTS) |
+| 14 | Add `parties` table (party master with dual vendor codes + aliases) | no-op (CREATE IF NOT EXISTS) |
+| 15 | Add `dispatch_log` table (sequential sync log with AUTOINCREMENT) | no-op (CREATE IF NOT EXISTS) |
 
 ### 5.3 Adding a new migration
 
 ```typescript
 {
-  version: 13,
+  version: 16,
   description: "Add foo column to bar table",
   up: () => {
     addColumnIfNotExists(db, "bar", "foo", "TEXT");
@@ -597,11 +669,13 @@ Sets cookie `nt_session=<uuid>; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000
 
 | Method | Path | Body | Purpose |
 |---|---|---|---|
-| `GET` | `/api/dispatch` | — | Outbox split by target (pakka/kachha) + last 50 history + current `lock` |
-| `POST` | `/api/dispatch` | `{target:"orosoft"\|"sbs", ids?:string[]}` | Acquire lock, UPDATE rows as dispatched, return batch id + deals + lock |
+| `GET` | `/api/dispatch` | — | Outbox split by target (pakka/kachha) + last 50 history + current `lock` + `sync_log` (last 50 dispatch_log entries) |
+| `POST` | `/api/dispatch` | `{target:"orosoft"\|"sbs", ids?:string[]}` | Acquire lock, UPDATE rows as dispatched, write `dispatch_log` row with sync number, return `{ok, batch_id, dispatched, deals, response, lock, sync_number, sync_ref}` |
 | `GET` | `/api/dispatch/export` | `?batch=<id>&target=sbs` | 14-column SBS Bullion Sales Order CSV |
 
 **Lock semantics:** See [§9.2](#92-dispatch-lock) and [§13.1](#131-dispatch-pipeline).
+
+**Sync log:** Every POST writes a row to `dispatch_log` (see [§4.17](#417-dispatch_log)). The `id` column auto-increments, producing sequential SYNC-1, SYNC-2, ... numbers. The GET response includes `sync_log` (last 50 entries) for the `/outbox` Sync Log table.
 
 ### 6.6 Pins (role-gated)
 
@@ -644,7 +718,43 @@ Sets cookie `nt_session=<uuid>; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000
 |---|---|---|---|
 | `GET` | `/api/screenshots/[filename]` | — | Serve a saved image. **Strict UUID + extension regex filename validation** to block path traversal. Sets `Cache-Control: public, max-age=3600, immutable`. |
 
-### 6.11 Demo / legacy
+### 6.11 Audit
+
+| Method | Path | Query | Purpose |
+|---|---|---|---|
+| `GET` | `/api/audit` | `?from=ISO&to=ISO&actor=name&action=type&target_id=id` | Returns audit_log rows newest-first with optional filters. All params optional. |
+
+**Response shape:**
+```json
+{
+  "entries": [
+    {
+      "id": "uuid",
+      "actor": "Niyam",
+      "action": "approve",
+      "target_type": "deal",
+      "target_id": "uuid",
+      "before": { /* JSON snapshot */ },
+      "after": { /* JSON snapshot */ },
+      "created_at": "2026-04-12T..."
+    }
+  ]
+}
+```
+
+### 6.12 Parties
+
+| Method | Path | Body/Query | Purpose |
+|---|---|---|---|
+| `GET` | `/api/parties` | `?q=search&active=0\|1` | Search parties by short_code, name, or aliases. Defaults to active only. |
+| `POST` | `/api/parties` | `{short_code, name, sbs_party_code?, orosoft_party_code?, aliases?, notes?}` | Create a new party. Validates short_code uniqueness. Audit-logged. |
+| `PUT` | `/api/parties` | `{id, ...fields}` | Partial update. Audit-logged with before/after snapshots. |
+| `DELETE` | `/api/parties?id=...` | — | Soft deactivate (sets `active=0`). Audit-logged. |
+| `POST` | `/api/parties/upload` | CSV file (multipart) | Bulk upsert by `short_code`. Returns `{created, updated, skipped, errors}`. |
+| `GET` | `/api/parties/template` | — | Downloads blank CSV template with column headers. |
+| `GET` | `/api/parties/sync` | `?target=sbs\|orosoft` | Stub endpoint — returns HTTP 501 with vendor requirements message. |
+
+### 6.13 Demo / legacy
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -838,6 +948,8 @@ Correctness is not enough — operators also need to **see** that another operat
 | DispatchBanner | `/api/dispatch` | 2s |
 | Home Demo | 4 endpoints | 3s |
 | WhatsApp | `/api/whatsapp` | 2s |
+| Audit | `/api/audit` | on-demand (no auto-poll) |
+| Parties | `/api/parties` | on-demand (no auto-poll) |
 | Price ticker badge counts | `/api/review` + `/api/deals` + `/api/whatsapp` | 3s |
 
 **Total load at 15 users:** roughly 10-15 req/sec average across all endpoints. SQLite handles this trivially; Next.js is never CPU-bound.
@@ -934,6 +1046,7 @@ Correctness is not enough — operators also need to **see** that another operat
 | Financial year | `lib/financial-year.ts` | Pure FY math |
 | Auth context | `lib/auth-context.ts` | Role helpers for route handlers |
 | User display | `lib/user-display.ts` | `initialsFromLabel`, `roleLabel`, `roleAccentClass` |
+| Audit logger | `lib/audit.ts` | `logAudit(db, {actor, action, target_type, target_id, before?, after?})` — single-call helper for immutable audit log writes |
 
 ---
 
@@ -1067,9 +1180,10 @@ POST /api/dispatch {target: "orosoft" | "sbs", ids?: string[]}
 4. SELECT eligible rows (status='approved' AND dispatched_at IS NULL AND deal_type=?)
 5. writeLock({started_by, target, deal_count, expires_at: now+3000ms})
 6. UPDATE rows: dispatched_at=now, dispatched_to=target, dispatch_response=..., dispatch_batch_id=uuid
-7. SELECT updated rows for the response
+7. INSERT dispatch_log row (timestamp, target, deal_count, deal_ids, batch_id, http_status, response_body, status, sent_by)
+8. SELECT updated rows for the response
    ↓
-{ok: true, batch_id, dispatched, deals, response, lock}
+{ok: true, batch_id, dispatched, deals, response, lock, sync_number, sync_ref}
    ↓
 Client /outbox page:
    - setTimeout-chained staged animation (4 stages, ~500ms each)
@@ -1192,7 +1306,10 @@ ssh nuremberg "cd /var/www/nt-metals && sqlite3 data.db < seed-backup.sql && pm2
 | Check current schema version | `ssh nuremberg 'cd /var/www/nt-metals && sqlite3 data.db "SELECT MAX(version) FROM schema_version;"'` |
 | List PINs | `ssh nuremberg 'cd /var/www/nt-metals && sqlite3 data.db "SELECT label, pin, role FROM auth_pins;"'` |
 | Count active sessions | `ssh nuremberg 'cd /var/www/nt-metals && sqlite3 data.db "SELECT COUNT(*) FROM auth_sessions WHERE last_seen > datetime(\"now\",\"-2 minutes\");"'` |
-| Diagnose Meta token | `ssh nuremberg 'bash /tmp/diag-meta.sh'` |
+| Diagnose Meta token | `ssh nuremberg 'cd /var/www/nt-metals && bash scripts/diagnose-meta.sh'` |
+| Count audit entries | `ssh nuremberg 'cd /var/www/nt-metals && sqlite3 data.db "SELECT COUNT(*) FROM audit_log;"'` |
+| Count active parties | `ssh nuremberg 'cd /var/www/nt-metals && sqlite3 data.db "SELECT COUNT(*) FROM parties WHERE active=1;"'` |
+| Last sync number | `ssh nuremberg 'cd /var/www/nt-metals && sqlite3 data.db "SELECT MAX(id) FROM dispatch_log;"'` |
 | View PM2 logs | `ssh nuremberg 'pm2 logs nt-metals --lines 100'` |
 | Restart without redeploy | `ssh nuremberg 'pm2 restart nt-metals'` |
 
@@ -1219,7 +1336,7 @@ The DB schema, UI states, animation choreography, and audit trail all survive th
 
 ### 15.2 WhatsApp outbound disabled
 
-Backend is fully wired (see [§12.3](#123-outbound-ui-disabled-backend-ready)) but the UI trigger is replaced with a read-only notice. Root cause: the Meta System User token has zero asset permissions on Business Manager. The diagnostic at `/tmp/diag-meta.sh` on the server confirms `assigned_whatsapp_business_accounts` returns `data: []` for the `ashishkamdar` System User. Business Manager's "Add Assets" dialog silently fails to save the grant (empty `user.name` in the success dialog indicates the React context loses the target user reference). Fix requires either creating a new System User from the detail panel (not the list page) or switching to Niyam's verified WABA once Meta Business Verification completes.
+Backend is fully wired (see [§12.3](#123-outbound-ui-disabled-backend-ready)) but the UI trigger is replaced with a read-only notice. Root cause: the Meta System User token has zero asset permissions on Business Manager. The diagnostic at `scripts/diagnose-meta.sh` (previously `/tmp/diag-meta.sh`) confirms `assigned_whatsapp_business_accounts` returns `data: []` for the `ashishkamdar` System User. Business Manager's "Add Assets" dialog silently fails to save the grant (empty `user.name` in the success dialog indicates the React context loses the target user reference). Fix requires either creating a new System User from the detail panel (not the list page) or switching to Niyam's verified WABA once Meta Business Verification completes.
 
 Re-enabling is a one-file revert of `src/components/chat-thread.tsx` — restore the `<input>` block over the read-only notice. No server changes.
 

@@ -47,7 +47,7 @@
 
 ## 🎯 CURRENT BUILD STATUS — April 12, 2026
 
-**Phase A (Maker-Checker Review Pipeline), Phase B (Lifecycle Completion + Financial Year), and Phase C (Polish + Concurrency + Roles) are all SHIPPED and ready to demo to Niyam.** Phase A landed Apr 10. Phase B landed Apr 11 (lifecycle, FY, Demo/Live splits, outbox, users). Phase C landed Apr 12 (super_admin role hierarchy, theme toggle, rich Live dashboard, dispatch lock for concurrency visibility, keyboard PIN entry, user identity cards, WhatsApp inbound-only mode). Everything below reflects the Apr 12 state. A companion document [`TECHNICAL-SPECIFICATION.md`](TECHNICAL-SPECIFICATION.md) contains the reference-style details (full DB schema, API surface, component catalog, auth/FY/concurrency models, deployment config).
+**Phase A (Maker-Checker Review Pipeline), Phase B (Lifecycle Completion + Financial Year), and Phase C (Polish + Concurrency + Roles) are all SHIPPED and ready to demo to Niyam.** Phase A landed Apr 10. Phase B landed Apr 11 (lifecycle, FY, Demo/Live splits, outbox, users). Phase C landed Apr 12 (super_admin role hierarchy, theme toggle, rich Live dashboard, dispatch lock for concurrency visibility, keyboard PIN entry, user identity cards, WhatsApp inbound-only mode, audit trail, party master, dispatch sync log, SBS API-flow visual, installation guide + scripts). Everything below reflects the Apr 12 state. A companion document [`TECHNICAL-SPECIFICATION.md`](TECHNICAL-SPECIFICATION.md) contains the reference-style details (full DB schema, API surface, component catalog, auth/FY/concurrency models, deployment config).
 
 ### Scope change in one paragraph
 
@@ -163,7 +163,7 @@ Internal staff WhatsApp group (#NTK / #NTP / #NT codes)
 
 | Phase | Status | Blocked on |
 |---|---|---|
-| **Kachha → SBS Excel writer** | ✅ Simulated in Phase B `/outbox` with a real CSV export; real XLSX writer still deferred until SBS template blockers are settled | `Bullion Sales Order.xlsx` — 9 open blockers on column schema |
+| **Kachha → SBS REST API writer** | ✅ Simulated in Phase B `/outbox`; SBS vendor agreed to REST APIs Apr 11, Excel path obsoleted. Real HTTP swap is ~50 lines once endpoint details are confirmed. | SBS vendor IT meeting Apr 11 |
 | **Pakka → OroSoft API writer** | ⏳ Still blocked on Monday April 13 meeting | Simulated in Phase B `/outbox`; real HTTP swap is ~50 lines |
 | **HMAC signature verification fix** | ⏳ Still outstanding | Requires re-populating App Secret with temporary logging |
 | **Niyam's own Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Trade License + Business Verification documents |
@@ -225,7 +225,7 @@ Phase A left the story at "approved deals sit in `pending_deals.status='approved
 | `GET /api/dispatch/export?batch=...&target=sbs` — CSV sized to the SBS Bullion Sales Order 14-column template | ✅ Live | Gross-to-fine via purity factor, `SALES`/`PURCHASE` bill type from direction, `Remarks` tagged with `PrismX #<id>` for reconciliation |
 | `/outbox` page with two destination panels side-by-side | ✅ Live | OroSoft emerald accent, SBS sky accent |
 | Animated OroSoft flow visual (PrismX → REST API → OroSoft Neo) | ✅ Live | Traveling particles with staggered delays, pulsing source/destination rings, 4-stage pipeline checklist (Authenticate → Format → POST /sales → Confirm) — keyframes in `globals.css` |
-| Animated SBS Excel visual (mini spreadsheet with rows sliding in) | ✅ Live | Bullion Sales Order.xlsx window chrome, column headers, rows fade in with 180 ms stagger, success state shows batch ID and Download CSV button |
+| Animated SBS flow visual (PrismX → REST API → SBS) | ✅ Live | **Updated Apr 12:** Excel spreadsheet visual replaced with same API pipeline animation as OroSoft, using `ApiFlowVisual` with sky accent. SBS vendor confirmed REST API access on Apr 11. |
 | Unified **Recent Dispatches** timeline | ✅ Live | Cross-destination history with target pill, deal summary, amount, party, response string, timestamp |
 | Dispatch is **simulated** for the demo | ✅ Live | OroSoft API doesn't exist yet (Monday Apr 13 meeting gates that). SBS column schema has 9 open blockers, so the real writer is pending. The simulated pipeline uses the exact UI + DB flow the real wire-up will use — swap is ~50 lines. |
 
@@ -362,7 +362,7 @@ src/app/globals.css                                (dispatch animation keyframes
 | Phase | Status | Blocked on |
 |---|---|---|
 | **Monday Apr 13, 11:15 AM meeting with OroSoft** | ⏳ Gating item | Everything Pakka-output is blocked on this. See `project_orosoft_monday_meeting.md` in memory for the 26 prepared questions and integration brief. |
-| **Kachha → SBS Excel writer (real XLSX, not CSV)** | ⏳ Deferred | 9 open blockers on the Bullion Sales Order template (party master IDs, RATE_TYPE enum, GROSSWT unit, etc). CSV works for demo; real XLSX writer lands once Niyam confirms the template. |
+| **Kachha → SBS REST API writer** | ⏳ Ready to build | SBS vendor agreed to REST APIs on Apr 11 (Excel path obsoleted). Template + endpoint details still TBD. |
 | **Pakka → OroSoft API writer (real HTTP, not simulated)** | ⏳ Blocked on Monday meeting | Swap is ~50 lines once we have API credentials |
 | **HMAC signature verification fix** | ⏳ Investigation needed | Requires re-populating `meta_config.app_secret` with temporary logging of expected-vs-received HMAC |
 | **Niyam's Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Trade License + Business Verification documents |
@@ -466,6 +466,59 @@ Phase C rounds the edges off Phase B into something that genuinely feels like a 
 | Message timestamp "0" bug on `/whatsapp` | ✅ Fixed | `hasLock && "..."` short-circuited to literal number 0 because SQLite returns INTEGER, not boolean. Fixed with `Boolean(m.is_lock)` coercion + ternary. |
 | Failed WhatsApp send rows cleaned up on server | ✅ Done | Two leftover "test"/"ok" rows from outbound debugging deleted so demo chat shows no red bubbles. |
 
+**Audit Trail (migration v13)**
+
+| Feature | Status | Details |
+|---|---|---|
+| `audit_log` table (migration v13) | ✅ Live | Immutable mutation log — columns: id (UUID), actor (PIN label), action (e.g. `approve`, `reject`, `edit`, `dispatch`, `party_create`, `party_update`, `party_deactivate`), target_type (e.g. `deal`, `party`), target_id, before (JSON snapshot), after (JSON snapshot), created_at. |
+| `src/lib/audit.ts` — `logAudit()` helper | ✅ Live | Single call-site helper for all mutation endpoints. Writes immutable rows; no UPDATE/DELETE on audit_log. |
+| Wired into review approve/reject/edit | ✅ Live | Every maker-checker action writes an audit row with before/after snapshots of the pending_deal. |
+| Wired into dispatch | ✅ Live | Dispatch POST logs the batch with deal IDs and target. |
+| Wired into party CRUD | ✅ Live | Party create, update, and soft-deactivate each logged. |
+| `GET /api/audit` with filters | ✅ Live | Query params: `from`, `to`, `actor`, `action`, `target_id`. Returns audit rows newest-first. |
+| `/audit` page | ✅ Live | FY-aware timeline with expandable before/after JSON diffs. Actor + action filter dropdowns at the top. Integrates with `useFy()` for date scoping. |
+
+**Party Master (migration v14)**
+
+| Feature | Status | Details |
+|---|---|---|
+| `parties` table (migration v14) | ✅ Live | Columns: id (UUID), short_code (unique), name, sbs_party_code, orosoft_party_code, aliases (JSON array), notes, active (INTEGER, default 1), created_at, updated_at. Dual vendor codes for both downstream systems. |
+| `GET /api/parties` — search + filter | ✅ Live | Query params: `q` (searches short_code, name, aliases), `active` (0/1). Returns all matching parties. |
+| `POST /api/parties` — create | ✅ Live | Validates required fields, checks short_code uniqueness. Audit-logged. |
+| `PUT /api/parties` — update | ✅ Live | Partial update by id. Audit-logged with before/after. |
+| `DELETE /api/parties` — soft deactivate | ✅ Live | Sets `active=0` instead of deleting the row. Audit-logged. |
+| `POST /api/parties/upload` — CSV bulk import | ✅ Live | Upsert by `short_code` — existing parties are updated, new ones created. Returns counts of created/updated/skipped. |
+| `GET /api/parties/template` — blank CSV template | ✅ Live | Downloads a CSV with column headers only, for staff to fill and upload. |
+| `GET /api/parties/sync?target=sbs\|orosoft` — stub | ✅ Stub (501) | Returns HTTP 501 with a message listing vendor requirements. Ready for real sync once vendor APIs are available. |
+| `/parties` page | ✅ Live | Searchable table with inline add/edit forms, CSV upload button, sync buttons (with 501 toast), print via ReportLetterhead. |
+| Nav items: Parties + Audit | ✅ Live | Added to both SidebarNav and BottomNav More overflow menu. |
+
+**Dispatch Sync Log (migration v15)**
+
+| Feature | Status | Details |
+|---|---|---|
+| `dispatch_log` table (migration v15) | ✅ Live | `INTEGER PRIMARY KEY AUTOINCREMENT` for sequential SYNC-NNNN numbers. Columns: id (auto), timestamp, target, deal_count, deal_ids (JSON), batch_id, request_summary, http_status, response_body, status, error_message, sent_by. |
+| `POST /api/dispatch` writes sync log | ✅ Live | Every dispatch POST inserts a `dispatch_log` row with all context: who sent, which deals, what target, simulated HTTP status + response. |
+| `GET /api/dispatch` returns `sync_log` | ✅ Live | Response now includes `sync_log` (last 50 entries) alongside the existing outbox + history. |
+| `/outbox` Sync Log section | ✅ Live | New section below Recent Dispatches with a table: Sync # | Time | Target | Deals | Status | Response | Sent By. |
+
+**SBS panel updated to API flow visual**
+
+| Feature | Status | Details |
+|---|---|---|
+| SBS destination panel redesign | ✅ Live | The Excel spreadsheet visual (mini XLSX window with rows sliding in) has been replaced with the same PrismX-to-HTTPS-REST animated pipeline used by the OroSoft panel. Title changed "SBS Excel" to "SBS"; acronym changed "XLS" to "API". |
+| `OrosoftVisual` renamed to `ApiFlowVisual` | ✅ Live | Now accepts `destLabel` and `accentColor` props so both panels reuse the same component. `FlowNode` accepts "sky" colour alongside the existing "emerald". |
+| SBS vendor agreed to REST APIs | ✅ Confirmed | Apr 11 meeting with Niyam + SBS vendor IT team confirmed REST API access. The Excel-based pipeline is no longer the plan. |
+
+**Installation guide + scripts**
+
+| Feature | Status | Details |
+|---|---|---|
+| `INSTALL.md` | ✅ Live | Comprehensive installation guide covering Ubuntu/Debian, RHEL, and Windows. Includes prerequisites, step-by-step setup, PM2 configuration, nginx reverse proxy, SSL, and Meta webhook setup. |
+| `scripts/install-ubuntu.sh` | ✅ Live | Automated installer for Ubuntu/Debian — installs Node.js, PM2, Tesseract, clones repo, builds, and configures PM2. |
+| `scripts/diagnose-meta.sh` | ✅ Live | Meta diagnostic script (moved from `/tmp/diag-meta.sh` on server to repo). Runs `debug_token`, `/me/businesses`, phone-number GET, and `assigned_whatsapp_business_accounts` lookup. |
+| Repo hygiene | ✅ Done | `.playwright-mcp/` deleted, root images deleted, `.gitignore` updated. MacBook is source-code only; nuremberg is pre-prod. |
+
 ### New / changed files (Phase C)
 
 **New files**
@@ -476,13 +529,24 @@ src/components/theme-toggle.tsx                    (sun/moon button)
 src/components/dispatch-banner.tsx                 (global in-progress banner)
 src/lib/auth-context.ts                            (role helpers for route handlers)
 src/lib/user-display.ts                            (initials + role formatting)
+src/lib/audit.ts                                   (logAudit() helper for immutable audit log)
+src/app/audit/page.tsx                             (audit trail page — FY-aware timeline)
+src/app/parties/page.tsx                           (party master — searchable table + CRUD)
+src/app/api/audit/route.ts                         (audit log GET with filters)
+src/app/api/parties/route.ts                       (party CRUD — GET/POST/PUT/DELETE)
+src/app/api/parties/upload/route.ts                (CSV bulk import)
+src/app/api/parties/template/route.ts              (blank CSV template download)
+src/app/api/parties/sync/route.ts                  (stub — 501 with vendor requirements)
+INSTALL.md                                         (comprehensive installation guide)
+scripts/install-ubuntu.sh                          (automated Ubuntu/Debian installer)
+scripts/diagnose-meta.sh                           (Meta diagnostic — moved from /tmp)
 TECHNICAL-SPECIFICATION.md                         (new reference doc, repo root)
 ```
 
 **Touched files**
 
 ```
-src/lib/db.ts                                      (migrations v11, v12)
+src/lib/db.ts                                      (migrations v11, v12, v13, v14, v15)
 src/lib/meta-whatsapp.ts                           (sendTextMessage → SendResult)
 src/app/layout.tsx                                 (ThemeProvider + DispatchBanner)
 src/app/globals.css                                (.light palette + dark custom variant)
@@ -490,20 +554,22 @@ src/app/page.tsx                                   (Demo/Live toggle + rich Live
 src/app/deals/page.tsx                             (default Live)
 src/app/stock/page.tsx                             (default Live)
 src/app/users/page.tsx                             (role-aware UI, violet super_admin pills)
-src/app/outbox/page.tsx                            (dispatch lock consumption, blocked state)
-src/app/api/dispatch/route.ts                      (lock acquire/read/expire)
+src/app/outbox/page.tsx                            (dispatch lock + sync log section + API flow visual)
+src/app/api/dispatch/route.ts                      (lock acquire/read/expire + sync log write + sync_log in GET)
+src/app/api/review/[id]/route.ts                   (audit log wired into approve/reject/edit)
 src/app/api/pins/route.ts                          (role-gated POST/PUT/DELETE)
 src/app/api/sessions/route.ts                      (role-gated DELETE, group-kick guard)
 src/app/api/whatsapp/route.ts                      (outbound send wiring, disabled in UI)
-src/components/sidebar-nav.tsx                     (current user card)
-src/components/bottom-nav.tsx                      (current user card in More sheet)
+src/components/sidebar-nav.tsx                     (current user card + Parties/Audit nav items)
+src/components/bottom-nav.tsx                      (current user card in More sheet + Parties/Audit)
 src/components/price-ticker.tsx                    (ThemeToggle in both mobile + desktop strips)
 src/components/pin-pad.tsx                         (keyboard listener)
 src/components/chat-thread.tsx                     (compose input → read-only notice)
+.gitignore                                         (cleaned up — .playwright-mcp/, root images)
 PROJECT-PLAN.md                                    (this file — Phase C section)
 ```
 
-### Database migrations (current version: **12**)
+### Database migrations (current version: **15**)
 
 | Version | Description | Ship date |
 |---|---|---|
@@ -519,10 +585,27 @@ PROJECT-PLAN.md                                    (this file — Phase C sectio
 | 10 | Add `stock_opening` table (daily opening/closing register) | Apr 11 |
 | **11** | Promote seeded Niyam PIN to `super_admin` role | Apr 12 |
 | **12** | Add `wamid` / `send_status` / `send_error` columns to `whatsapp_messages` | Apr 12 |
+| **13** | Add `audit_log` table (immutable mutation log) | Apr 12 |
+| **14** | Add `parties` table (party master with dual vendor codes + aliases) | Apr 12 |
+| **15** | Add `dispatch_log` table (sequential SYNC-NNNN sync log) | Apr 12 |
 
 ---
 
 ### What's NEXT (Apr 12 → Apr 13 OroSoft meeting)
+
+| Phase | Status | Blocked on |
+|---|---|---|
+| **Monday Apr 13, 11:15 AM meeting with OroSoft** | ⏳ Gating item | Everything Pakka-output is blocked on this. |
+| **SBS → REST API writer (real HTTP, not simulated)** | ⏳ Ready to build | SBS vendor agreed to REST APIs on Apr 11. Template + endpoint details still TBD. |
+| **Pakka → OroSoft API writer (real HTTP, not simulated)** | ⏳ Blocked on Monday meeting | Swap is ~50 lines once we have API credentials |
+| **HMAC signature verification fix** | ⏳ Investigation needed | Requires re-populating `meta_config.app_secret` with temporary logging |
+| **Niyam's Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Trade License + Business Verification documents |
+| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | ~10-minute endpoint swap |
+| **Reports page switch from Demo deals → Live** | 💡 Optional next chunk | Reuse `/api/deals/live` math |
+| **Money Flow FY integration** | 💡 Optional next chunk | Low priority until real money-movement data lands |
+| ~~**Audit trail**~~ | ✅ Shipped Apr 12 | `audit_log` table + `/audit` page + wired into all mutations |
+| ~~**Party master**~~ | ✅ Shipped Apr 12 | `parties` table + `/parties` page + CSV upload + sync stubs |
+| ~~**Dispatch sync log**~~ | ✅ Shipped Apr 12 | `dispatch_log` table + SYNC-NNNN numbers + sync log UI in `/outbox` |
 
 The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
 
@@ -606,7 +689,7 @@ A **Management Information System (MIS)** — a real-time executive overview lay
 
 | Module | File | Purpose |
 |--------|------|---------|
-| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. **12 tables:** deals, payments, prices, settings, whatsapp_messages, deliveries, settlements, schema_version, parsed_deals (legacy bot), meta_config, **pending_deals (Apr 10 — maker-checker queue with 19 columns including screenshot_url + screenshot_ocr)**, plus indexes on pending_deals(status) and pending_deals(received_at). **Versioned migration system** (currently v6) — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
+| Database | `db.ts` | SQLite (better-sqlite3) singleton. WAL mode. **15 tables:** deals, payments, prices, settings, whatsapp_messages, deliveries, settlements, schema_version, parsed_deals (legacy bot), meta_config, pending_deals, auth_pins, auth_sessions, stock_opening, **audit_log** (v13), **parties** (v14), **dispatch_log** (v15), plus indexes. **Versioned migration system** (currently v15) — each migration runs once, tracked in schema_version table. Safe for both fresh DBs and existing ones. Never deletes data. |
 | Deal Code Parser | `deal-code-parser.ts` | **Pure function** that extracts structured fields from a WhatsApp lock-code message. Accepts `#NTK` / `#NTP` / `#NT` trigger variants (case-insensitive), parses direction (BUY/SELL), quantity + unit (kg/g/oz with normalisation to grams via 31.1035), metal (gold/silver/platinum/palladium with aliases XAU/XAG/XPT/XPD/PD/PT), purity (18K/20K/22K/24K/995/999/9999/4N with defaults), rate (USD per troy oz), premium (absolute or percent), and party alias. Returns `{is_deal_code, parsed, fields, errors}`. Validated against 9 test fixtures covering happy paths, edge cases, and a deliberately malformed input. |
 | Ignored Messages Buffer | `ignored-messages.ts` | **In-memory ring buffer** (max 100 entries) for WhatsApp text messages that arrive at the webhook but contain no `#NT` deal code trigger. Not persisted to the database — cleared on server restart. Shown in the `/review` **Ignored tab** as proof the bot is listening to everything and not silently dropping junk. Module-scoped state works because PM2 runs nt-metals as a single fork-mode instance. |
 | Orphaned Attachments Buffer | `orphaned-attachments.ts` | **In-memory ring buffer** (max 50 entries, 1-hour TTL) for WhatsApp image attachments that arrive without a matching deal context (no caption, no reply). When a later text message arrives as a reply to one of these orphans (via Meta's `msg.context.id`), the webhook attaches the orphan's OCR + screenshot_url to the new pending_deal and drops the orphan from the buffer. Auto-prunes expired entries on every push/find. |
@@ -649,7 +732,7 @@ Messages arrive every 3-8 seconds (random via setTimeout chain). Multiple conver
 | **Framework** | Next.js 16.2.2 | App Router, TypeScript, Turbopack |
 | **UI Components** | Catalyst Tailwind CSS UI Blocks | 634 React components, dark theme. Used: stats-with-trending (KPI cards), sidebar-navigation (nav), tables (deal lists), form-layouts (deal entry), badges (status indicators) |
 | **Styling** | Tailwind CSS v4 | Dark theme (`bg-gray-950`), amber accent (`text-amber-400`), emerald for positive, rose for negative |
-| **Database** | SQLite via better-sqlite3 | WAL mode, **16 tables** at schema v10: `deals`, `payments`, `prices`, `settings`, `whatsapp_messages`, `deliveries`, `settlements`, `schema_version`, `parsed_deals` (legacy bot), `meta_config`, `pending_deals` (maker-checker queue, with dispatch lifecycle columns), `auth_pins`, `auth_sessions` (named users), `stock_opening` (daily opening/closing register). File: `data.db` |
+| **Database** | SQLite via better-sqlite3 | WAL mode, **17 tables** at schema v15: `deals`, `payments`, `prices`, `settings`, `whatsapp_messages`, `deliveries`, `settlements`, `schema_version`, `parsed_deals` (legacy bot), `meta_config`, `pending_deals` (maker-checker queue, with dispatch lifecycle columns), `auth_pins`, `auth_sessions` (named users), `stock_opening` (daily opening/closing register), `audit_log` (immutable mutation log), `parties` (party master with dual vendor codes), `dispatch_log` (sequential sync log). File: `data.db` |
 | **Charts** | Recharts | Installed but charts not yet implemented in demo |
 | **Auth** | Cookie-based PIN | `nt_session` cookie, httpOnly, secure, 365-day expiry |
 | **IDs** | uuid v4 | All primary keys are UUIDs |
