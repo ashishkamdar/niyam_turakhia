@@ -8,6 +8,7 @@ import { DemoProvider } from "@/components/demo-engine";
 import { DemoIndicator } from "@/components/demo-indicator";
 import { FyProvider } from "@/components/fy-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DispatchBanner } from "@/components/dispatch-banner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <SidebarNav />
                 <div className="overflow-x-hidden lg:pl-60 print:lg:pl-0">
                   <PriceTicker />
+                  <DispatchBanner />
                   <main className="px-3 py-4 pb-20 sm:px-6 lg:px-8 lg:pb-6 print:px-0 print:py-0 print:pb-0">{children}</main>
                 </div>
                 <BottomNav />

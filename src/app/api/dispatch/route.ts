@@ -1,6 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth-context";
+
+/**
+ * Dispatch lock — co-ordinates concurrent dispatches across multiple
+ * operators. Stored in the settings KV under `dispatch_lock` so it
+ * survives restarts and is atomically swappable via a single SQL
+ * INSERT OR REPLACE.
+ *
+ * Shape (JSON):
+ *   {
+ *     started_at: ISO string,
+ *     started_by: PIN label (e.g. "Niyam"),
+ *     target: "orosoft" | "sbs",
+ *     deal_count: number,
+ *     expires_at: ISO string — when the lock naturally ages out
+ *   }
+ *
+ * The lock holds for 3 seconds of wall-clock time so every client's
+ * 2-second poll is guaranteed to see it at least once before it
+ * expires. The server-side DB work is much faster than that (~50ms)
+ * — the lock's purpose is UI visibility, not serialization of the
+ * actual SQL writes (those are already race-safe because better-
+ * sqlite3 serializes writes through the Node process).
+ *
+ * When GET /api/dispatch is called and the current lock is stale
+ * (expires_at < now), it's cleared atomically so UIs can trust the
+ * "no lock" response.
+ */
+
+const LOCK_KEY = "dispatch_lock";
+const LOCK_DURATION_MS = 3000;
+
+type DispatchLock = {
+  started_at: string;
+  started_by: string;
+  target: "orosoft" | "sbs";
+  deal_count: number;
+  expires_at: string;
+};
+
+function readLock(
+  db: ReturnType<typeof getDb>
+): DispatchLock | null {
+  const row = db
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get(LOCK_KEY) as { value: string } | undefined;
+  if (!row) return null;
+  try {
+    const parsed = JSON.parse(row.value) as DispatchLock;
+    // Stale check — if expires_at is in the past, clear and return null.
+    if (new Date(parsed.expires_at).getTime() <= Date.now()) {
+      db.prepare("DELETE FROM settings WHERE key = ?").run(LOCK_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    db.prepare("DELETE FROM settings WHERE key = ?").run(LOCK_KEY);
+    return null;
+  }
+}
+
+function writeLock(
+  db: ReturnType<typeof getDb>,
+  lock: DispatchLock
+): void {
+  db.prepare(
+    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)"
+  ).run(LOCK_KEY, JSON.stringify(lock));
+}
 
 /**
  * Dispatch outbox — pushes approved deals out to their final destination.
@@ -55,6 +124,11 @@ type DispatchableDeal = {
 export async function GET(_req: NextRequest) {
   const db = getDb();
 
+  // Read + auto-clear stale lock. Returned alongside the outbox data
+  // so every caller (global banner, /outbox page, dashboard) sees the
+  // same view of who's dispatching right now.
+  const lock = readLock(db);
+
   // Waiting to ship: approved AND not yet dispatched.
   const pending = db
     .prepare(
@@ -87,6 +161,7 @@ export async function GET(_req: NextRequest) {
     pakka_outbox: pending.filter((d) => d.deal_type === "P"),
     kachha_outbox: pending.filter((d) => d.deal_type === "K"),
     history,
+    lock,
   });
 }
 
@@ -117,6 +192,28 @@ export async function POST(req: NextRequest) {
   const expectedType = target === "orosoft" ? "P" : "K";
   const db = getDb();
 
+  // Check for an existing non-stale lock held by ANOTHER user. If
+  // another operator's dispatch is still within its 3-second display
+  // window, we reject with 409 so the UI can show a clear "wait your
+  // turn" message. better-sqlite3 serializes writes, so this read
+  // cannot race against a concurrent lock acquisition — the next POST
+  // in line waits for this one to commit.
+  const actor = getCurrentUser(req);
+  const actorLabel = actor?.label ?? "unknown";
+  const existing = readLock(db);
+  if (existing && existing.started_by !== actorLabel) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `${existing.started_by} is already dispatching ${existing.deal_count} deal${
+          existing.deal_count === 1 ? "" : "s"
+        } to ${existing.target === "orosoft" ? "OroSoft" : "SBS"}. Please wait a moment.`,
+        lock: existing,
+      },
+      { status: 409 }
+    );
+  }
+
   // Gather the rows that are actually eligible right now. We filter in
   // SQL instead of trusting the client — a stale UI could otherwise
   // re-dispatch an already-sent deal.
@@ -146,6 +243,21 @@ export async function POST(req: NextRequest) {
   if (eligible.length === 0) {
     return NextResponse.json({ ok: true, batch_id: null, dispatched: 0 });
   }
+
+  // Acquire the lock BEFORE the UPDATE so concurrent POSTs racing in
+  // behind us see the lock on their next readLock() and bounce with a
+  // 409. The lock expires 3 seconds from now so the global banner has
+  // time to render on every other client's 2-second poll cycle even
+  // though the actual DB write finishes in ~50ms.
+  const lockStartedAt = new Date();
+  const newLock: DispatchLock = {
+    started_at: lockStartedAt.toISOString(),
+    started_by: actorLabel,
+    target,
+    deal_count: eligible.length,
+    expires_at: new Date(lockStartedAt.getTime() + LOCK_DURATION_MS).toISOString(),
+  };
+  writeLock(db, newLock);
 
   const batchId = randomUUID();
   const now = new Date().toISOString();
@@ -190,5 +302,6 @@ export async function POST(req: NextRequest) {
     dispatched: eligible.length,
     deals: updated,
     response,
+    lock: newLock,
   });
 }

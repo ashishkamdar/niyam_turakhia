@@ -41,10 +41,19 @@ type Deal = {
   dispatch_batch_id: string | null;
 };
 
+type Lock = {
+  started_at: string;
+  started_by: string;
+  target: "orosoft" | "sbs";
+  deal_count: number;
+  expires_at: string;
+};
+
 type DispatchResponse = {
   pakka_outbox: Deal[];
   kachha_outbox: Deal[];
   history: Deal[];
+  lock: Lock | null;
 };
 
 type Target = "orosoft" | "sbs";
@@ -126,7 +135,21 @@ export default function OutboxPage() {
     pakka_outbox: [],
     kachha_outbox: [],
     history: [],
+    lock: null,
   });
+  // Current user's label — used to decide whether the dispatch lock
+  // belongs to us (don't disable our own buttons) or to another
+  // operator (disable ours + show "waiting" copy).
+  const [currentLabel, setCurrentLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.authenticated && d.label) setCurrentLabel(d.label);
+      })
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -140,9 +163,18 @@ export default function OutboxPage() {
 
   useEffect(() => {
     load();
-    const poll = setInterval(load, 4000);
+    // 2s poll so the in-progress lock held by another user is reflected
+    // on this page's buttons with minimal lag (the banner in the layout
+    // polls at the same cadence).
+    const poll = setInterval(load, 2000);
     return () => clearInterval(poll);
   }, [load]);
+
+  // A lock belongs to "someone else" when it exists AND its started_by
+  // doesn't match the current user. Own-lock dispatches let the user
+  // continue to interact normally with their local /outbox animation.
+  const othersLock =
+    data.lock && data.lock.started_by !== currentLabel ? data.lock : null;
 
   return (
     <div className="mx-auto w-full max-w-[1800px] space-y-6">
@@ -161,8 +193,18 @@ export default function OutboxPage() {
 
       {/* ── Two destination panels ───────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <DestinationPanel target="orosoft" queue={data.pakka_outbox} onDispatched={load} />
-        <DestinationPanel target="sbs" queue={data.kachha_outbox} onDispatched={load} />
+        <DestinationPanel
+          target="orosoft"
+          queue={data.pakka_outbox}
+          othersLock={othersLock}
+          onDispatched={load}
+        />
+        <DestinationPanel
+          target="sbs"
+          queue={data.kachha_outbox}
+          othersLock={othersLock}
+          onDispatched={load}
+        />
       </div>
 
       {/* ── History timeline ─────────────────────────────────────────── */}
@@ -233,13 +275,21 @@ export default function OutboxPage() {
 function DestinationPanel({
   target,
   queue,
+  othersLock,
   onDispatched,
 }: {
   target: Target;
   queue: Deal[];
+  othersLock: Lock | null;
   onDispatched: () => void;
 }) {
   const meta = TARGET_META[target];
+  // "Blocked" = another user is currently dispatching (to either
+  // target). We disable BOTH panels' Send buttons while that's
+  // happening, not just the panel that matches the other user's
+  // target. The point is "one dispatch at a time across the whole
+  // app" so operators can't step on each other.
+  const blocked = othersLock !== null;
   // One of: idle | sending | done
   const [phase, setPhase] = useState<"idle" | "sending" | "done">("idle");
   const [lastBatch, setLastBatch] = useState<{
@@ -264,6 +314,10 @@ function DestinationPanel({
 
   async function sendAll() {
     if (queue.length === 0 || phase === "sending") return;
+    // Hard guard — if another operator holds the lock, don't even
+    // attempt the POST. The server will 409 anyway but this avoids
+    // the round-trip and keeps the UI feeling responsive.
+    if (blocked) return;
 
     setPhase("sending");
     setStage(0);
@@ -407,9 +461,24 @@ function DestinationPanel({
       {/* Action footer */}
       {phase !== "done" && (
         <div className="border-t border-white/10 bg-gray-950/60 px-5 py-4">
+          {blocked && othersLock && (
+            <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200/80">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="size-4 shrink-0 text-amber-400">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+              <div>
+                <span className="font-semibold text-amber-200">{othersLock.started_by}</span>{" "}
+                is pushing {othersLock.deal_count} deal
+                {othersLock.deal_count === 1 ? "" : "s"} to{" "}
+                {othersLock.target === "orosoft" ? "OroSoft" : "SBS"}. Other
+                dispatches are paused until this completes.
+              </div>
+            </div>
+          )}
           <button
             onClick={sendAll}
-            disabled={queue.length === 0 || phase === "sending"}
+            disabled={queue.length === 0 || phase === "sending" || blocked}
+            title={blocked ? `${othersLock?.started_by} is dispatching — please wait` : undefined}
             className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
               target === "orosoft"
                 ? "bg-emerald-600 text-white hover:bg-emerald-500"
