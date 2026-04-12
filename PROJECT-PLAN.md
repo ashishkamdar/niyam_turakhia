@@ -589,6 +589,33 @@ PROJECT-PLAN.md                                    (this file — Phase C sectio
 | **14** | Add `parties` table (party master with dual vendor codes + aliases) | Apr 12 |
 | **15** | Add `dispatch_log` table (sequential SYNC-NNNN sync log) | Apr 12 |
 
+**Standard application features (Apr 12, late)**
+
+| Feature | Status | Details |
+|---|---|---|
+| Change Own PIN (self-service) | ✅ Live | `POST /api/auth/change-pin` + inline form in sidebar footer. Verifies current PIN before accepting. Audit-logged. |
+| Brute-force protection | ✅ Live | 5 failed attempts from same IP → 15-minute lockout (HTTP 429). In-memory counter, clears on PM2 restart. |
+| Health check endpoint | ✅ Live | `GET /api/health` — no auth, returns status + version + uptime + memory + db_ok. < 10ms response. |
+| Version info | ✅ Live | "PrismX v1.0 · Apr 2026" in sidebar footer |
+| Custom 404 + 500 error pages | ✅ Live | Branded error pages replacing Next.js defaults |
+| Backup & Restore page | ✅ Live | `/backup` — create/list/download/delete/restore. Optional AES-256-GCM encryption. Audit-logged. |
+| OCR non-blocking fix | ✅ Live | Tesseract moved from `execFileSync` to async `execFile` — event loop stays free during 15-30s OCR runs |
+
+---
+
+### Deferred — to be built next
+
+| Feature | Priority | Scope estimate |
+|---|---|---|
+| **Notifications / Bell Icon** | High | In-app notification center. Bell icon in top bar, polling-based. ~half-day. |
+| **Global Search (⌘K)** | High | Search across deals + parties + audit from anywhere. ~half-day. |
+| **Keyboard shortcuts** | Medium | Ctrl+Enter to approve, arrow keys in review queue. |
+| **Data retention policy** | Medium | Admin setting: archive old audit/dispatch logs. |
+| **Email notifications** | Low | Requires SMTP/SendGrid setup. |
+| **2FA (TOTP)** | Low | Time-based OTP alongside PIN for high-value operations. |
+| **In-app changelog** | Low | "What's new" modal. |
+| **Localization** | Low | Hindi/Gujarati/Arabic support. |
+
 ---
 
 ### What's NEXT (Apr 12 → Apr 13 OroSoft meeting)
