@@ -223,6 +223,50 @@ function initSchema(db: Database.Database) {
       PRIMARY KEY (date, metal)
     );
     CREATE INDEX IF NOT EXISTS idx_stock_opening_date ON stock_opening(date);
+
+    -- Immutable audit log for every mutation across the system. Each
+    -- row records who did what, when, to which record, with before/after
+    -- snapshots so edits can be replayed or investigated after the fact.
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      actor_label TEXT,
+      actor_pin_id TEXT,
+      action TEXT NOT NULL,
+      target_table TEXT,
+      target_id TEXT,
+      summary TEXT NOT NULL,
+      old_values TEXT,
+      new_values TEXT,
+      metadata TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_label);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_target ON audit_log(target_table, target_id);
+
+    -- Party master — the canonical counterparty directory. Each party
+    -- can have separate codes for SBS and OroSoft so dispatches use the
+    -- right code for the destination system. aliases is a JSON array of
+    -- alternate spellings that the deal-code parser can match against.
+    CREATE TABLE IF NOT EXISTS parties (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      short_code TEXT,
+      aliases TEXT,
+      type TEXT NOT NULL DEFAULT 'both',
+      location TEXT,
+      contact_phone TEXT,
+      contact_email TEXT,
+      sbs_party_code TEXT,
+      orosoft_party_code TEXT,
+      notes TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_parties_short_code ON parties(short_code);
+    CREATE INDEX IF NOT EXISTS idx_parties_sbs_code ON parties(sbs_party_code);
+    CREATE INDEX IF NOT EXISTS idx_parties_orosoft_code ON parties(orosoft_party_code);
   `);
 }
 
@@ -356,6 +400,20 @@ function runMigrations(db: Database.Database) {
         addColumnIfNotExists(db, "whatsapp_messages", "wamid", "TEXT");
         addColumnIfNotExists(db, "whatsapp_messages", "send_status", "TEXT");
         addColumnIfNotExists(db, "whatsapp_messages", "send_error", "TEXT");
+      },
+    },
+    {
+      version: 13,
+      description: "Add audit_log table for immutable mutation history",
+      up: () => {
+        // Table is created by CREATE TABLE IF NOT EXISTS above.
+      },
+    },
+    {
+      version: 14,
+      description: "Add parties table for counterparty master directory",
+      up: () => {
+        // Table is created by CREATE TABLE IF NOT EXISTS above.
       },
     },
   ];

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth-context";
+import { logAudit } from "@/lib/audit";
 
 /**
  * Dispatch lock — co-ordinates concurrent dispatches across multiple
@@ -295,6 +296,16 @@ export async function POST(req: NextRequest) {
          ORDER BY dispatched_at DESC`
     )
     .all(...eligible.map((r) => r.id)) as DispatchableDeal[];
+
+  logAudit(db, {
+    actor: actor ? { label: actor.label, pinId: actor.pin_id } : null,
+    action: "dispatch",
+    targetTable: "pending_deals",
+    targetId: batchId,
+    summary: `Dispatched ${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"} to ${target === "orosoft" ? "OroSoft" : "SBS"}`,
+    newValues: { batch_id: batchId, target, deal_ids: eligible.map((r) => r.id) },
+    metadata: { response },
+  });
 
   return NextResponse.json({
     ok: true,

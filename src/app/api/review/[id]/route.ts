@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { logAudit } from "@/lib/audit";
+import { getCurrentUser } from "@/lib/auth-context";
 
 /**
  * PATCH /api/review/:id
@@ -38,18 +40,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const db = getDb();
   const body = await req.json();
+  const actor = getCurrentUser(req);
 
-  const existing = db.prepare("SELECT id FROM pending_deals WHERE id = ?").get(id);
+  const existing = db.prepare("SELECT * FROM pending_deals WHERE id = ?").get(id) as Record<string, unknown> | undefined;
   if (!existing) {
     return NextResponse.json({ error: "Pending deal not found" }, { status: 404 });
   }
 
   const updates: string[] = [];
   const values: unknown[] = [];
+  const oldVals: Record<string, unknown> = {};
+  const newVals: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
     if (WRITABLE_FIELDS.has(key)) {
       updates.push(`${key} = ?`);
       values.push(value);
+      oldVals[key] = existing[key];
+      newVals[key] = value;
     }
   }
 
@@ -59,6 +66,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   values.push(id);
   db.prepare(`UPDATE pending_deals SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+
+  logAudit(db, {
+    actor: actor ? { label: actor.label, pinId: actor.pin_id } : null,
+    action: "edit_deal",
+    targetTable: "pending_deals",
+    targetId: id,
+    summary: `Edited deal #${id.slice(0, 8)} — changed ${Object.keys(newVals).join(", ")}`,
+    oldValues: oldVals,
+    newValues: newVals,
+  });
 
   const updated = db.prepare("SELECT * FROM pending_deals WHERE id = ?").get(id);
   return NextResponse.json({ deal: updated });
@@ -100,9 +117,21 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const newStatus = action === "approve" ? "approved" : "rejected";
   const now = new Date().toISOString();
+  const actor = getCurrentUser(req);
   db.prepare(
     "UPDATE pending_deals SET status = ?, reviewed_by = ?, reviewed_at = ?, reviewer_notes = ? WHERE id = ?"
   ).run(newStatus, reviewer, now, notes, id);
+
+  const dealDesc = `${existing.direction ?? "?"} ${existing.qty_grams ?? "?"}g ${existing.metal ?? "?"} @${existing.rate_usd_per_oz ?? "?"} ${existing.party_alias ?? existing.sender_name ?? ""}`;
+  logAudit(db, {
+    actor: actor ? { label: actor.label, pinId: actor.pin_id } : null,
+    action: action === "approve" ? "approve_deal" : "reject_deal",
+    targetTable: "pending_deals",
+    targetId: id,
+    summary: `${action === "approve" ? "Approved" : "Rejected"} ${existing.deal_type === "K" ? "Kachha" : "Pakka"} deal — ${dealDesc}`.trim(),
+    oldValues: { status: existing.status, deal_type: existing.deal_type },
+    newValues: { status: newStatus, deal_type: existing.deal_type, reviewed_by: reviewer, reviewer_notes: notes },
+  });
 
   const updated = db.prepare("SELECT * FROM pending_deals WHERE id = ?").get(id);
   return NextResponse.json({ deal: updated });
