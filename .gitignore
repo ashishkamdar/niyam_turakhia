@@ -48,11 +48,11 @@ yarn-error.log*
 # saved at the repo root during development. Source assets that
 # belong in the repo (logo, icons) live in public/ and are tracked.
 /*.png
-/*.jpg
 /*.jpeg
 /*.gif
 /*.webp
 /*.bmp
+# Note: /*.jpg is NOT ignored — PrismX Logo.jpg lives at repo root
 
 # TypeScript build info — generated, not source
 tsconfig.tsbuildinfo
