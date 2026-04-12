@@ -138,61 +138,75 @@ async function ocrOpenAI(imageBuffer: Buffer, mimeType: string, apiKey: string):
   return parseAiResponse(text, "openai");
 }
 
-// ─── 4. Built-in OCR (system binary — safe, no shell injection) ───
+// ─── 4. Built-in OCR (system binary — safe, non-blocking) ────────────
+//
+// IMPORTANT: This uses async execFile (NOT execFileSync) so the Node
+// event loop stays responsive during the 15-30 second tesseract run.
+// The tesseract binary runs as a child PROCESS, not on the event loop.
+// 20+ concurrent users can keep polling/approving/dispatching while
+// OCR runs in the background — no request queuing, no hangs.
+//
+// Prior to this fix (Phase C, Apr 12), execFileSync blocked the entire
+// event loop for the full tesseract duration, causing ALL users to
+// experience a 15-30 second hang whenever a WhatsApp image arrived.
+
 async function ocrTesseract(imageBuffer: Buffer): Promise<OcrResult> {
-  // Uses execFileSync which is safe — no shell, no user input in arguments
-  const { execFileSync } = await import("child_process");
+  const { execFile } = await import("child_process");
+  const { promisify } = await import("util");
   const fs = await import("fs");
+  const fsp = fs.promises;
   const os = await import("os");
   const path = await import("path");
+
+  const execFileAsync = promisify(execFile);
 
   const tmpDir = os.tmpdir();
   const ts = Date.now();
   const inputPath = path.join(tmpDir, `ocr_in_${ts}.jpg`);
   const outputBase = path.join(tmpDir, `ocr_out_${ts}`);
 
+  /**
+   * Run tesseract as a child process (non-blocking). Returns the
+   * extracted text, or empty string on failure. The event loop is
+   * FREE during the entire 15-30 second tesseract execution.
+   */
+  async function runTesseract(args: string[], timeoutMs: number): Promise<string> {
+    try {
+      await execFileAsync("tesseract", [inputPath, outputBase, ...args], {
+        timeout: timeoutMs,
+      });
+      const text = await fsp.readFile(outputBase + ".txt", "utf8");
+      await fsp.unlink(outputBase + ".txt").catch(() => {});
+      return text.trim();
+    } catch {
+      await fsp.unlink(outputBase + ".txt").catch(() => {});
+      return "";
+    }
+  }
+
   try {
-    fs.writeFileSync(inputPath, imageBuffer);
+    await fsp.writeFile(inputPath, imageBuffer);
 
     // Try English first (faster, better for numbers and simple text)
-    let text = "";
-    try {
-      execFileSync("tesseract", [inputPath, outputBase, "-l", "eng", "--psm", "6"], {
-        timeout: 15000,
-        stdio: "pipe",
-      });
-      text = fs.readFileSync(outputBase + ".txt", "utf8").trim();
-      try { fs.unlinkSync(outputBase + ".txt"); } catch {}
-    } catch {}
+    let text = await runTesseract(["-l", "eng", "--psm", "6"], 15000);
 
     // If English returned nothing, try multi-language with auto page segmentation
     if (!text) {
-      try {
-        execFileSync("tesseract", [inputPath, outputBase, "-l", "eng+chi_sim+chi_tra+ara", "--psm", "3"], {
-          timeout: 30000,
-          stdio: "pipe",
-        });
-        text = fs.readFileSync(outputBase + ".txt", "utf8").trim();
-        try { fs.unlinkSync(outputBase + ".txt"); } catch {}
-      } catch {}
+      text = await runTesseract(["-l", "eng+chi_sim+chi_tra+ara", "--psm", "3"], 30000);
     }
 
     // Last resort: try with just digits mode
     if (!text) {
-      try {
-        execFileSync("tesseract", [inputPath, outputBase, "-l", "eng", "--psm", "7", "-c", "tessedit_char_whitelist=0123456789.,$-+USDTHKAEBusdt "], {
-          timeout: 15000,
-          stdio: "pipe",
-        });
-        text = fs.readFileSync(outputBase + ".txt", "utf8").trim();
-        try { fs.unlinkSync(outputBase + ".txt"); } catch {}
-      } catch {}
+      text = await runTesseract(
+        ["-l", "eng", "--psm", "7", "-c", "tessedit_char_whitelist=0123456789.,$-+USDTHKAEBusdt "],
+        15000
+      );
     }
 
-    try { fs.unlinkSync(inputPath); } catch {}
+    await fsp.unlink(inputPath).catch(() => {});
 
     if (text) {
-      // Clean common OCR artifacts: leading @, |, ~, `, stray symbols from dots/icons
+      // Clean common OCR artifacts
       text = text.replace(/^[@|~`•●○■□►▶»«<>]+/gm, "").trim();
       return parseOcrText(text, "tesseract");
     }
@@ -203,8 +217,8 @@ async function ocrTesseract(imageBuffer: Buffer): Promise<OcrResult> {
       raw_text: "Could not extract text from this image. The image may be too blurry or low-contrast. Try a clearer screenshot.",
     };
   } catch {
-    try { fs.unlinkSync(inputPath); } catch {}
-    try { fs.unlinkSync(outputBase + ".txt"); } catch {}
+    await fsp.unlink(inputPath).catch(() => {});
+    await fsp.unlink(outputBase + ".txt").catch(() => {});
     return {
       provider: "tesseract",
       type: "unknown",
