@@ -45,9 +45,9 @@
 
 ---
 
-## 🎯 CURRENT BUILD STATUS — April 11, 2026
+## 🎯 CURRENT BUILD STATUS — April 12, 2026
 
-**Phase A (Maker-Checker Review Pipeline) and Phase B (Lifecycle Completion + Financial Year) are both SHIPPED and ready to demo to Niyam.** Phase A landed Apr 10 after two meetings at Matunga Gymkhana and his Matunga office. Phase B landed Apr 11 as a continuous iteration session covering named users, the outbox dispatch page, daily opening/closing stock, Demo↔Live mode toggles across Deals and Stock, and a global financial-year concept. Key decisions captured below; the rest of this document reflects the earlier plan as historical context.
+**Phase A (Maker-Checker Review Pipeline), Phase B (Lifecycle Completion + Financial Year), and Phase C (Polish + Concurrency + Roles) are all SHIPPED and ready to demo to Niyam.** Phase A landed Apr 10. Phase B landed Apr 11 (lifecycle, FY, Demo/Live splits, outbox, users). Phase C landed Apr 12 (super_admin role hierarchy, theme toggle, rich Live dashboard, dispatch lock for concurrency visibility, keyboard PIN entry, user identity cards, WhatsApp inbound-only mode). Everything below reflects the Apr 12 state. A companion document [`TECHNICAL-SPECIFICATION.md`](TECHNICAL-SPECIFICATION.md) contains the reference-style details (full DB schema, API surface, component catalog, auth/FY/concurrency models, deployment config).
 
 ### Scope change in one paragraph
 
@@ -357,7 +357,7 @@ src/app/globals.css                                (dispatch animation keyframes
 
 ---
 
-### What's NEXT (Apr 11 → Apr 13 meeting)
+### What's NEXT from Phase B's perspective (superseded by Phase C below)
 
 | Phase | Status | Blocked on |
 |---|---|---|
@@ -373,7 +373,156 @@ src/app/globals.css                                (dispatch animation keyframes
 
 ---
 
-### What's SUPERSEDED from the original plan
+## 🎯 PHASE C — Polish + Concurrency + Roles (Apr 12, 2026)
+
+Phase C rounds the edges off Phase B into something that genuinely feels like a product. It's smaller in scope than A or B (no new major pages) but touches the entire surface — theme, identity, dashboard, concurrency coordination, keyboard polish, WhatsApp scope.
+
+### One-sentence summary per area
+
+- **Super Admin role** — a third tier above Admin, with hard safeguards against deleting/downgrading the last super_admin. Niyam is promoted via migration v11; Ashish also promoted for co-admin resilience. Rules enforced server-side with granular `canCreateRole` / `canModifyPin` / `canKickRole` helpers shared by `/api/pins` and `/api/sessions`.
+- **Light/dark theme toggle** — sun/moon button in the top bar, `localStorage`-persisted. Palette inversion via CSS variables in `.light` scope so no component files need rewriting — existing `bg-gray-950` / `text-white` / `bg-white/5` classes all flip automatically. Defaults to dark; respects `prefers-color-scheme` on first visit.
+- **Current user card in nav** — avatar (1-2 initials) + label + role pill in the desktop sidebar footer and the mobile More sheet. Colour-coded per role (violet/amber/gray).
+- **Keyboard PIN entry** — lock screen now accepts physical digits 0-9, Backspace, and Escape on desktop. Click-only before.
+- **Rich Live Dashboard** — the Home page got a Demo/Live toggle defaulting to Live. Live view has 8+ card groups including operational queue (pending review, outbox, dispatched today, active users), today's activity, stock-in-hand strip, FY analytics (Kachha/Pakka split, metal volume, top counterparties), and a recent trades feed. **Trading P&L block is role-gated** — only Admin+ sees revenue/cost/realized/unrealized cards and $ amounts in the recent-trades table.
+- **Dispatch lock + global banner** — concurrency visibility. When any operator clicks "Send all" on `/outbox`, a 3-second lock is written to the settings KV. A global `DispatchBanner` mounted in the layout polls `/api/dispatch` every 2s and shows a pulsing "Niyam is pushing 4 deals to OroSoft…" strip on every other operator's screen. Send buttons disable + the server returns 409 if a POST comes in during another user's lock. **This is the answer to the 10-15 concurrent users question**: SQLite+better-sqlite3+PM2-fork was already correctness-safe; Phase C adds the visibility layer.
+- **Demo/Live defaults** — `/deals` and `/stock` now default to **Live**. Demo is still one click away via the toggle.
+- **WhatsApp outbound disabled (demo mode)** — the chat compose input on `/whatsapp` is replaced with a read-only notice. All the backend plumbing (`sendTextMessage`, `wamid`/`send_status`/`send_error` columns from migration v12, red-bubble error state in `ChatThread`) stays wired up and ready — only the UI trigger is removed. Reason: the System User token currently has zero asset permissions on Meta's Business Manager (confirmed via `/tmp/diag-meta.sh` showing empty `assigned_whatsapp_business_accounts`). Real outbound waits on Niyam's Meta Business Verification completing and a fresh token being minted from a correctly-assigned System User.
+
+### Feature table — everything shipped in Phase C
+
+**Role hierarchy — super_admin > admin > staff**
+
+| Feature | Status | Details |
+|---|---|---|
+| Migration v11 | ✅ Live | Promotes `pin_niyam.role = 'super_admin'`. Idempotent UPDATE; `role` column was already TEXT so no schema change needed. |
+| Ashish promoted via direct SQL | ✅ Live | Two super_admins for co-admin resilience. Last-super_admin safeguard still enforced even with two. |
+| `src/lib/auth-context.ts` | ✅ Live | `getCurrentUser(req)`, `normalizeRole`, `canCreateRole`, `canModifyPin`, `canKickRole`, `countSuperAdmins` — single source of truth for the hierarchy, imported by both `/api/pins` and `/api/sessions`. |
+| `/api/pins` POST hardening | ✅ Live | 401 if not signed in, 403 for staff, 403 if non-super_admin tries to create a super_admin PIN. |
+| `/api/pins` PUT hardening | ✅ Live | Blocks admin from touching super_admin rows, blocks role-escalation via PUT, blocks downgrading the last super_admin. |
+| `/api/pins` DELETE hardening | ✅ Live | Same gates + hard refusal to delete the last super_admin. |
+| `/api/sessions` DELETE hardening | ✅ Live | Id-based and group-based (`?label=&ip=`) kicks both check target roles. Group kick refuses if ANY matching label belongs to a super_admin and the caller isn't one. |
+| `/users` page UI | ✅ Live | Role pills colour-coded (violet=super_admin, amber=admin, gray=staff). Add/Edit role dropdowns filtered by `roleOptionsFor(currentRole)`. Lock/Edit/Delete buttons disabled with explanatory tooltips on super_admin rows when viewed by an admin. Revoke/Kick buttons disabled on super_admin sessions for admins. Staff see a "read-only" notice instead of the Manage PINs panel. |
+
+**Light/dark theme toggle**
+
+| Feature | Status | Details |
+|---|---|---|
+| `ThemeProvider` | ✅ Live | React context + `localStorage` (`prismx_theme_v1`). Applies `.dark` or `.light` class to `<html>`. Defaults to dark; first-visit check of `prefers-color-scheme: light` for new users. |
+| `ThemeToggle` | ✅ Live | Sun/moon button with crossfade + rotation. Mounted in PriceTicker mobile strip + desktop FY row. |
+| `.light` palette override in `globals.css` | ✅ Live | `@custom-variant dark (&:where(.dark, .dark *))` enables class-based dark variant. `.light` scope redefines `--color-gray-950` through `--color-gray-50` + `--color-white` so every existing `bg-gray-950` / `text-white` / `bg-white/5` class flips automatically without rewriting components. |
+| Tuned palette (post-feedback) | ✅ Live | Body `#f4f5f7` (soft cool-neutral), cards pure `#ffffff` — matches GitHub/Linear/Stripe light modes. Avoids the "too white" stark look. |
+
+**Dashboard Live view**
+
+| Feature | Status | Details |
+|---|---|---|
+| Demo/Live toggle (defaults Live) | ✅ Live | Same pattern as `/deals` and `/stock`. Demo view preserved unchanged in a `DemoView` sub-component. |
+| Welcome bar | ✅ Live | Avatar (role-coloured) + "Welcome back, {name}" + role pill + FY + date/time. |
+| Operational Queue row | ✅ Live | 4 cards, all roles: Pending Review (turns rose when > 0), In Outbox, Dispatched Today, Active Users. |
+| Today's Activity row | ✅ Live | 4 cards, all roles: Deals Today, Buys Today (grams), Sells Today (grams), FY Deals total with Kachha/Pakka split. |
+| Stock In Hand strip | ✅ Live | 4 per-metal mini cards reusing `/api/stock/opening` data. Delta from today's opening with ↑↓ arrows. |
+| **Trading P&L row** (ADMIN+ ONLY) | ✅ Live | 8 cards gated on `role === 'admin' || role === 'super_admin'`: Today's Revenue / Cost / Realized P&L / FY Realized P&L / Unrealized P&L / Stock Value / Cost Basis / Avg Deal Size. Violet "Admin only" badge next to the heading. |
+| FY Analytics row | ✅ Live | 3 cards, all roles: Kachha vs Pakka split (percent bars), Volume by Metal (grams-only — no $), Top Counterparties (deal count only — no $). |
+| Recent Trades feed | ✅ Live | Last 10 FY deals. Amount column only renders when viewer is admin+ (staff see qty only). |
+| Parallel endpoint fetch | ✅ Live | 7 endpoints hit in `Promise.all()` every 10 seconds. No new `/api/dashboard` aggregator — the page composes existing endpoints. |
+
+**Concurrency — dispatch lock + global banner**
+
+| Feature | Status | Details |
+|---|---|---|
+| Dispatch lock in settings KV | ✅ Live | Stored under key `dispatch_lock` with shape `{started_at, started_by, target, deal_count, expires_at}`. 3-second display window (`LOCK_DURATION_MS`). Auto-cleared on GET when `expires_at` has passed. |
+| `POST /api/dispatch` acquires lock | ✅ Live | Written BEFORE the UPDATE so concurrent POSTs see it. Own-user re-POST allowed; other-user POST returns 409 with `{error, lock}` in body. |
+| `GET /api/dispatch` returns lock | ✅ Live | Every consumer (banner, `/outbox`, dashboard) sees the same view. Stale locks are cleared in the same query. |
+| `DispatchBanner` component | ✅ Live | Mounted in layout below PriceTicker so it appears on every page. Polls `/api/dispatch` every 2s. Resolves current user's label via `/api/auth` so own dispatches don't trigger the banner. Colour-coded (emerald for OroSoft, sky for SBS). Pulsing dot + text + "Other operations paused" subtitle. `print:hidden`. |
+| `/outbox` Send buttons disabled on other-user lock | ✅ Live | Both panels disabled regardless of target — "one dispatch at a time across the whole app" rule. Inline amber explainer above the disabled button. |
+| Hard guard in `sendAll()` | ✅ Live | Early return if `blocked` before POST, so a stale UI state can't trigger a doomed request. |
+| 10-15 concurrent users readiness confirmed | ✅ Documented | SQLite WAL mode + better-sqlite3 synchronous writes + PM2 fork single-instance were already correctness-safe. Lock adds the visibility layer. |
+
+**Identity + UX polish**
+
+| Feature | Status | Details |
+|---|---|---|
+| `src/lib/user-display.ts` | ✅ Live | `initialsFromLabel`, `roleLabel`, `roleAccentClass` — shared helpers for the user card rendering. |
+| Current user card in SidebarNav | ✅ Live | Above Settings. Avatar + label + role. Fetches `/api/auth` once on mount. |
+| Current user card in BottomNav More sheet | ✅ Live | Below drag handle. Identical shape. |
+| PIN pad desktop keyboard | ✅ Live | `useEffect` on `document` `keydown` maps 0-9 → digit, Backspace/Delete → pop, Escape → clear. Uses functional `setPin` form to avoid stale-closure state. Numeric keys `preventDefault` so Safari's in-page find doesn't steal them. Non-numeric keys pass through so `⌘R` / `⌘W` still work. |
+| `/deals` + `/stock` default to Live | ✅ Live | Demo still one click away via the toggle. |
+
+**WhatsApp — inbound-only demo mode**
+
+| Feature | Status | Details |
+|---|---|---|
+| Migration v12 | ✅ Live | Adds `wamid`, `send_status`, `send_error` columns to `whatsapp_messages` so successful and failed outbound sends can be tracked distinctly. |
+| `sendTextMessage` helper returns `SendResult` | ✅ Live | `{ok:true, wamid}` or `{ok:false, error}` with Meta's raw error message surfaced. No more silent `Promise<void>`. |
+| `POST /api/whatsapp` on direction='outgoing' | ✅ Wired up, behind UI feature flag | Resolves contact → phone from `pending_deals.sender_phone` (case-insensitive, whitespace-trimmed), calls `sendTextMessage`, persists `wamid`/`send_status`/`send_error`. The POST path is live and tested; only the UI trigger is disabled. |
+| `ChatThread` compose input disabled | ✅ Live | Replaced with an amber "Read-only — outbound sending paused until WhatsApp Business account verified" notice. Re-enabling is a one-file revert (component still has `DeliveryTicks` / `FailedIndicator` rendering). |
+| `/tmp/diag-meta.sh` on server | ✅ Live | Diagnostic script that runs `debug_token`, `/me/businesses`, phone-number GET, and `assigned_whatsapp_business_accounts` lookup so asset-assignment state can be verified in one pass after any Business Manager change. |
+
+**Small polish**
+
+| Change | Status | Details |
+|---|---|---|
+| Removed "Why this page matters" callout from `/outbox` | ✅ Live | Demo-copy cleanup. |
+| Message timestamp "0" bug on `/whatsapp` | ✅ Fixed | `hasLock && "..."` short-circuited to literal number 0 because SQLite returns INTEGER, not boolean. Fixed with `Boolean(m.is_lock)` coercion + ternary. |
+| Failed WhatsApp send rows cleaned up on server | ✅ Done | Two leftover "test"/"ok" rows from outbound debugging deleted so demo chat shows no red bubbles. |
+
+### New / changed files (Phase C)
+
+**New files**
+
+```
+src/components/theme-provider.tsx                  (theme context + localStorage)
+src/components/theme-toggle.tsx                    (sun/moon button)
+src/components/dispatch-banner.tsx                 (global in-progress banner)
+src/lib/auth-context.ts                            (role helpers for route handlers)
+src/lib/user-display.ts                            (initials + role formatting)
+TECHNICAL-SPECIFICATION.md                         (new reference doc, repo root)
+```
+
+**Touched files**
+
+```
+src/lib/db.ts                                      (migrations v11, v12)
+src/lib/meta-whatsapp.ts                           (sendTextMessage → SendResult)
+src/app/layout.tsx                                 (ThemeProvider + DispatchBanner)
+src/app/globals.css                                (.light palette + dark custom variant)
+src/app/page.tsx                                   (Demo/Live toggle + rich Live dashboard)
+src/app/deals/page.tsx                             (default Live)
+src/app/stock/page.tsx                             (default Live)
+src/app/users/page.tsx                             (role-aware UI, violet super_admin pills)
+src/app/outbox/page.tsx                            (dispatch lock consumption, blocked state)
+src/app/api/dispatch/route.ts                      (lock acquire/read/expire)
+src/app/api/pins/route.ts                          (role-gated POST/PUT/DELETE)
+src/app/api/sessions/route.ts                      (role-gated DELETE, group-kick guard)
+src/app/api/whatsapp/route.ts                      (outbound send wiring, disabled in UI)
+src/components/sidebar-nav.tsx                     (current user card)
+src/components/bottom-nav.tsx                      (current user card in More sheet)
+src/components/price-ticker.tsx                    (ThemeToggle in both mobile + desktop strips)
+src/components/pin-pad.tsx                         (keyboard listener)
+src/components/chat-thread.tsx                     (compose input → read-only notice)
+PROJECT-PLAN.md                                    (this file — Phase C section)
+```
+
+### Database migrations (current version: **12**)
+
+| Version | Description | Ship date |
+|---|---|---|
+| 1 | Add `contact_name` to `deals` | earlier |
+| 2 | Add `refining_cost_per_gram` + `total_cost_usd` to `deals` | earlier |
+| 3 | Add `deliveries` + `settlements` tables | earlier |
+| 4 | Add `parsed_deals` (legacy bot) | earlier |
+| 5 | Add `meta_config` | earlier |
+| 6 | Add `pending_deals` (maker-checker queue) | Apr 10 |
+| 7 | Add `auth_pins` + `auth_sessions` and seed 4 default PINs | Apr 11 |
+| 8 | Add `locked` column to `auth_pins` | Apr 11 |
+| 9 | Add dispatch columns to `pending_deals` | Apr 11 |
+| 10 | Add `stock_opening` table (daily opening/closing register) | Apr 11 |
+| **11** | Promote seeded Niyam PIN to `super_admin` role | Apr 12 |
+| **12** | Add `wamid` / `send_status` / `send_error` columns to `whatsapp_messages` | Apr 12 |
+
+---
+
+### What's NEXT (Apr 12 → Apr 13 OroSoft meeting)
 
 The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
 
