@@ -1036,6 +1036,72 @@ Both the server handlers and the `/users` page UI consult the same `canCreateRol
 
 On other pages (`/deals`, `/stock`, `/dashboard`), role gating is **UI-level only**. Staff can still hit `/api/deals/live` directly and see $ amounts — the role gate just hides the Trading P&L row on the dashboard and the $ column on the recent trades feed. Data-level isolation (staff can never see $ anywhere) is a deferred improvement.
 
+### 7.7 Session Persistence by Device
+
+PrismX is designed for **"log in once, stay logged in forever"** across all devices. The session is a server-side row (`auth_sessions`) referenced by a browser cookie (`nt_session`). Session lifetime depends on two factors: how long the **cookie** persists in the browser, and how long the **session row** persists in the database.
+
+#### Server-side session row lifetime
+
+| Condition | Lifetime |
+|---|---|
+| Normal use | **Indefinite.** Session rows are NEVER auto-expired or swept. A session created on Day 1 still works on Day 365 unless explicitly ended. |
+| Explicit logout | Deleted immediately — the user clicks Logout or the PIN pad's "×" button |
+| Admin kick | Deleted immediately — an admin clicks "Kick" or "Revoke" on `/users` |
+| PIN deleted | Cascade-deleted — `auth_sessions.pin_id` has `ON DELETE CASCADE`, so deleting a PIN row kills all its sessions |
+| Server restart | **Survives.** Sessions are in SQLite, not in memory. A PM2 restart or server reboot does NOT invalidate sessions. |
+| Database backup/restore | Sessions survive as long as the restored `data.db` contains the session row and the client still has the matching cookie. |
+
+#### Client-side cookie lifetime by platform
+
+| Platform / Browser | Cookie persistence | Effective session duration |
+|---|---|---|
+| **Desktop Chrome** (macOS/Windows/Linux) | `Max-Age: 31536000` (365 days) honored. Cookie persists across browser restarts, OS reboots, and sleep/wake cycles. | **365 days** from login |
+| **Desktop Safari** (macOS) | `Max-Age` honored. Cookie persists. Safari does NOT apply ITP (Intelligent Tracking Prevention) to first-party cookies from the site itself. | **365 days** from login |
+| **Desktop Firefox** | `Max-Age` honored. Cookie persists. Exception: if user enables "Delete cookies when Firefox is closed" in settings, the cookie is wiped on quit. | **365 days** (default) or **until browser close** (if user has strict cookie settings) |
+| **Desktop Edge** | Same behavior as Chrome (Chromium-based). | **365 days** from login |
+| **iOS Safari** (iPhone/iPad) | `Max-Age` honored for first-party cookies. Cookie persists across app close, phone restart, and iOS updates. ITP does NOT affect first-party same-site cookies. | **365 days** from login |
+| **iOS Chrome** (iPhone/iPad) | Uses WebKit under the hood (Apple requires it). Same behavior as iOS Safari. | **365 days** from login |
+| **Android Chrome** | `Max-Age` honored. Cookie persists across app close and phone restart. | **365 days** from login |
+| **Android Firefox** | Same as desktop Firefox. | **365 days** from login |
+| **PWA / Add to Home Screen** (iOS) | The app opens in a standalone WebKit instance. Cookies set with `SameSite=Lax` + `Secure` + `HttpOnly` persist as long as the PWA is installed. **If the user deletes the PWA from their home screen and re-adds it, the cookie is lost** — they must log in again. | **Indefinite** (while PWA is installed) |
+| **PWA / Add to Home Screen** (Android) | Uses Chrome's cookie jar. Same persistence as Android Chrome. | **365 days** from login |
+| **Private / Incognito mode** (any browser) | Cookies are destroyed when the private window is closed. | **Until window close** |
+
+#### What "session expired" looks like to the user
+
+There is no explicit "session expired" error message. When the cookie is missing or the session row no longer exists, this is what happens:
+
+1. The browser sends a request to `GET /api/auth` (triggered by the 30-second heartbeat in `AuthGate`)
+2. The server finds no matching `auth_sessions` row for the cookie value (or no cookie at all)
+3. The server returns `{authenticated: false}` and clears the cookie with `Set-Cookie: nt_session=; Max-Age=0`
+4. `AuthGate` component sets state to `"locked"`
+5. The PIN pad renders over the current page — the user re-enters their PIN and is back in immediately
+6. A **new** `auth_sessions` row is created with a **new** session id and a **new** cookie
+
+The user experiences this as: "I opened the app and had to enter my PIN again." No error message, no redirect, no lost state — the PIN pad overlays the page, and after entering the PIN the same page loads with fresh data.
+
+#### What "another device" looks like
+
+Each login creates a **separate** `auth_sessions` row. A user can be logged in from:
+- Their office desktop (Chrome, session A)
+- Their personal phone (Safari PWA, session B)
+- Their tablet at home (iPad Chrome, session C)
+
+All three sessions are visible on `/users` → Active Now table as separate rows with different IPs and user-agents. Each session has its own cookie. Logging out on one device does NOT affect the others — only `POST /api/auth {action:"logout"}` on that specific device's cookie deletes that specific session row.
+
+An admin can kick a specific session (by clicking "Revoke" on a specific row) or kick all sessions for a user from a specific IP (by clicking "Kick all N" on a grouped row). The other sessions remain active.
+
+#### Security considerations
+
+| Concern | How it's addressed |
+|---|---|
+| **Session hijacking** | Cookie is `HttpOnly` (no JS access) + `Secure` (HTTPS only) + `SameSite=Lax` (no cross-site POST). An attacker would need to intercept the HTTPS connection itself. |
+| **Session fixation** | Each login creates a fresh UUID. PrismX never reuses a session id from a prior login. |
+| **Brute force on session id** | UUID v4 has 122 bits of entropy = 5.3 × 10³⁶ possible values. Guessing a valid session id is computationally infeasible. |
+| **Concurrent session limit** | None — a user can have unlimited concurrent sessions. If you need to limit this, add a check in `POST /api/auth` that counts existing sessions for the PIN before creating a new one. |
+| **Admin visibility** | All active sessions (with IP + user-agent + last_seen) are visible to Admin+ on `/users`. Suspicious sessions can be kicked immediately. |
+| **Force-logout all** | Delete the PIN from `/users` → cascades to all sessions. Then re-create the PIN with a new value. All users on the old PIN must re-login with the new one. |
+
 ---
 
 ## 8. Financial Year Model
