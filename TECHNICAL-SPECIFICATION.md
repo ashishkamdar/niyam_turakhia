@@ -14,11 +14,19 @@
 
 1. [Overview](#1-overview)
 2. [Tech Stack](#2-tech-stack)
+   - [2.1 Installation & Dependencies](#21-installation--dependencies)
+   - [2.2 Middle Tier](#22-middle-tier--how-the-application-server-works)
 3. [Architecture](#3-architecture)
 4. [Database Schema](#4-database-schema)
+   - [4.0 Database Engine Details](#40-database-engine-details)
+   - [4.0.1 Application Users (PINs & Passwords)](#401-application-users-pins--passwords)
+   - [4.0.2 Tables Overview](#402-tables-overview)
 5. [Migration System](#5-migration-system)
 6. [API Surface](#6-api-surface)
 7. [Authentication & Authorization](#7-authentication--authorization)
+   - [7.2 Cookie Specification](#72-cookie-specification)
+   - [7.2.1 localStorage Keys](#721-localstorage-keys)
+   - [7.2.2 Heartbeat](#722-heartbeat)
 8. [Financial Year Model](#8-financial-year-model)
 9. [Concurrency Model](#9-concurrency-model)
 10. [Frontend Architecture](#10-frontend-architecture)
@@ -26,7 +34,9 @@
 12. [WhatsApp Integration](#12-whatsapp-integration)
 13. [Dispatch Pipeline](#13-dispatch-pipeline)
 14. [Deployment & Operations](#14-deployment--operations)
+    - [14.0 Runtime Configuration (Port, PM2, nginx, Firewall)](#140-runtime-configuration)
 15. [Known Limitations](#15-known-limitations)
+16. [Troubleshooting Guide](#16-troubleshooting-guide)
 
 ---
 
@@ -63,6 +73,89 @@ PrismX is a real-time Management Information System (MIS) for a precious-metals 
 - No Vercel — see `feedback_no_vercel.md` in memory. The vercel-plugin hook fires false positives on unrelated keywords; ignore all `vercel:*` skill suggestions.
 - No WebSockets/SSE — concurrency coordination uses the dispatch lock + 2-second polling. See [§9](#9-concurrency-model).
 - No Docker — deployed as a raw Node.js app managed by PM2. The `deploy.sh` script is the entire CI/CD.
+
+### 2.1 Installation & Dependencies
+
+**Full installation instructions are in [`INSTALL.md`](INSTALL.md).** Below is a summary for reference.
+
+#### System-level prerequisites
+
+| Dependency | Install command (Ubuntu/Debian) | Purpose |
+|---|---|---|
+| **Node.js 22 LTS** | `curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo -E bash - && sudo apt-get install -y nodejs` | JavaScript runtime |
+| **npm** | Ships with Node.js | Package manager |
+| **PM2** | `sudo npm install -g pm2` | Process manager (keeps the app alive, restarts on crash/reboot) |
+| **build-essential + python3** | `sudo apt-get install -y build-essential python3` | C compiler for `better-sqlite3`'s native SQLite addon |
+| **nginx** | `sudo apt-get install -y nginx` | Reverse proxy (HTTPS termination, `X-Forwarded-For` header injection for IP tracking) |
+| **certbot** | `sudo apt-get install -y certbot python3-certbot-nginx` | Let's Encrypt HTTPS certificate automation |
+| **Tesseract OCR** (optional) | `sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim tesseract-ocr-ara` | WhatsApp payment screenshot text extraction |
+| **Git** | Pre-installed on most servers | Source control |
+
+**Windows Server:** Replace apt commands with: Node.js MSI from nodejs.org, Visual C++ Build Tools for native compilation, IIS + URL Rewrite as the reverse proxy alternative to nginx.
+
+#### npm dependencies (from `package.json`)
+
+| Package | Purpose | Native? |
+|---|---|---|
+| `next` | Web framework (App Router, server-side rendering, API routes) | No |
+| `react` + `react-dom` | UI rendering | No |
+| `better-sqlite3` | SQLite database driver — synchronous, zero-config, WAL-mode | **Yes** (C addon, needs build tools) |
+| `tailwindcss` + `@tailwindcss/postcss` | Utility-first CSS framework | No |
+| `recharts` | Bar chart on the Demo dashboard | No |
+| `tesseract.js` | JavaScript wrapper for Tesseract OCR engine | No (but calls native `tesseract` binary) |
+| `uuid` | UUID v4 generation for primary keys | No |
+
+**No additional services to install.** No PostgreSQL, no MySQL, no Redis, no RabbitMQ, no Docker. The entire persistence layer is a single SQLite file (`data.db`) that the app creates on first request.
+
+#### Automated installer
+
+```bash
+git clone https://github.com/ashishkamdar/niyam_turakhia.git /opt/prismx
+cd /opt/prismx
+sudo bash scripts/install-ubuntu.sh
+```
+
+The script is idempotent (safe to re-run), installs all system dependencies, builds the app, starts it under PM2 on port 3020, writes an nginx site config, opens firewall ports, and sets up PM2 boot persistence. See [`INSTALL.md`](INSTALL.md) for the full walkthrough.
+
+### 2.2 Middle Tier — How the Application Server Works
+
+PrismX is a **Next.js 16 App Router** application. There is no separate "backend" or "frontend" — the same Node.js process serves both the React pages (server-rendered HTML + client hydration) and the API endpoints (JSON REST handlers).
+
+#### Request lifecycle
+
+```
+Browser request (e.g. GET /deals)
+    │
+    ▼
+nginx (:443) — TLS termination, injects X-Forwarded-For + X-Real-IP
+    │
+    ▼
+Node.js (:3020) — Next.js handles routing:
+    │
+    ├─ If path matches /api/* → runs the route handler in src/app/api/*/route.ts
+    │     • Handler receives NextRequest, calls getDb() for SQLite access
+    │     • better-sqlite3 runs synchronously — no async/await for DB calls
+    │     • Returns NextResponse (JSON, CSV, or file)
+    │
+    ├─ If path matches a page route → server-renders the React component
+    │     • "use client" pages render a loading shell on the server
+    │     • Client-side hydration takes over, starts polling endpoints
+    │     • All data fetching happens client-side via fetch() in useEffect
+    │
+    └─ If path matches a static asset (/_next/static/*) → serves from .next/static/
+```
+
+#### Key middle-tier design decisions
+
+1. **No server-side data fetching in pages.** Every page is `"use client"` and fetches its data via `useEffect` + `fetch("/api/...")`. This means the server-rendered HTML is always a loading shell (spinner), and the real content appears after the client hydrates and the first fetch resolves. The trade-off: slightly slower first paint, but dramatically simpler codebase — no server components, no data serialization, no `getServerSideProps` equivalent.
+
+2. **No middleware.** Next.js supports a `middleware.ts` file for request interception, but PrismX doesn't use one. Auth checking happens inside each API handler via `getCurrentUser(req)`, and inside the client via the `AuthGate` component. This keeps the auth boundary explicit and auditable.
+
+3. **Singleton database connection.** `getDb()` in `src/lib/db.ts` opens the SQLite file once and caches the handle in a module-scoped variable. Every subsequent call returns the same handle. This is safe because PM2 runs a single fork-mode instance — there's no connection-pool problem. The handle is never closed; Node's process exit handles cleanup.
+
+4. **Synchronous database I/O.** `better-sqlite3` blocks the Node event loop for each SQL call. This is a deliberate choice — it eliminates callback hell, makes transactions trivial (`db.transaction()`), and guarantees that two API handlers can never interleave their SQL operations. At PrismX's scale (10-15 users, ~30 req/sec), the blocking time per request (~1-5ms) is invisible. If the app ever needed to serve 1000+ concurrent users, this would need to change to an async driver like `better-sqlite3`'s worker-thread mode or a switch to PostgreSQL.
+
+5. **No API versioning.** All routes are unversioned (`/api/deals`, not `/api/v1/deals`). The app and the client are deployed together, so there's no version skew risk. If we ever separate the API from the frontend, versioning becomes necessary.
 
 ---
 
@@ -246,7 +339,79 @@ deploy.sh                            # Backup → push → pull → build → re
 
 ## 4. Database Schema
 
-Single SQLite file at `data.db`, opened in WAL mode via `better-sqlite3`. Schema version is tracked in the `schema_version` table; current version is **15**. All tables use `CREATE TABLE IF NOT EXISTS` so fresh DBs get the full schema at boot, while existing DBs get column additions via the migration runner (see [§5](#5-migration-system)).
+### 4.0 Database Engine Details
+
+| Property | Value |
+|---|---|
+| **Engine** | SQLite 3.x (embedded, serverless) |
+| **Driver** | `better-sqlite3` 12.x (native C addon, synchronous API) |
+| **File** | `data.db` in the app root directory (e.g. `/opt/prismx/data.db`) |
+| **Journal mode** | WAL (Write-Ahead Logging) — set via `PRAGMA journal_mode = WAL` on connection |
+| **Foreign keys** | Enabled via `PRAGMA foreign_keys = ON` on connection |
+| **Connection pooling** | None — singleton handle cached in a module-scoped variable via `getDb()`. Safe because PM2 runs one Node process. |
+| **Database users** | SQLite has **no user/password system**. Access control is at the OS filesystem level — whoever can read/write `data.db` can do anything. The app's own user authentication (PINs → sessions → roles) is entirely application-layer. |
+| **Backup** | File copy of `data.db`. The `deploy.sh` script creates a timestamped backup before every deploy. WAL mode ensures a file copy during normal operation is consistent. |
+| **Max size** | Theoretical 281 TB. Practical limit is disk space. At current usage (~1000 rows across 17 tables), the file is ~200KB. |
+| **Concurrency** | WAL mode allows unlimited concurrent readers + one writer at a time. `better-sqlite3`'s synchronous API ensures writes serialize through the Node event loop. See [§9](#9-concurrency-model). |
+
+**No external database server.** There is no PostgreSQL, no MySQL, no connection string, no database port to open, no database admin tool to install. SQLite is compiled into the Node.js process via `better-sqlite3`'s native addon. The entire database is one file on disk.
+
+**PRAGMA settings** (applied in `getDb()` on first connection):
+
+```sql
+PRAGMA journal_mode = WAL;    -- concurrent reads during writes
+PRAGMA foreign_keys = ON;     -- enforce FK constraints (e.g. auth_sessions → auth_pins CASCADE)
+```
+
+### 4.0.1 Application Users (PINs & Passwords)
+
+PrismX uses **numeric PINs** (4-8 digits) instead of username/password pairs. PINs are stored in the `auth_pins` table. There is no concept of a "database user" — SQLite doesn't have users. All access control is application-layer via the PIN → session → role hierarchy.
+
+**Default seeded users (created by migration v7, promoted by v11):**
+
+| Label | PIN (password) | Role | Purpose |
+|---|---|---|---|
+| **Niyam** | `639263` | `super_admin` | Owner / primary admin. Can do anything including creating other super_admins. |
+| **Ashish** | `520125` | `super_admin` | Co-admin. Same privileges as Niyam. Promoted via direct SQL on Apr 12. |
+| **Admin** | `999999` | `admin` | Break-glass admin account. Can manage admin + staff PINs but cannot touch super_admins. |
+| **Staff** | `111111` | `staff` | Shared PIN for all 15-20 staff. Read-only for PIN/session management. Trading P&L hidden on dashboard. |
+
+**⚠️ Change these PINs immediately after installation** from the `/users` page. The defaults are published in this document and in `INSTALL.md`.
+
+**How PINs differ from passwords:**
+- PINs are numeric-only (digits 0-9), 4-8 characters
+- Multiple users can share the same PIN (e.g. all staff use `111111`)
+- Individual users sharing a PIN are distinguished by IP address + user-agent in `auth_sessions`
+- Failed login returns "Wrong PIN" regardless of whether the PIN is wrong, locked, or non-existent — prevents enumeration
+- Locked PINs (`auth_pins.locked = 1`) reject login with the same generic error
+
+**Role hierarchy:** `super_admin > admin > staff`. See [§7.4](#74-role-hierarchy) for the full permission matrix.
+
+### 4.0.2 Tables Overview
+
+Current schema version: **15**. Total tables: **17**.
+
+| # | Table | Rows (typical) | Purpose |
+|---|---|---|---|
+| 1 | `deals` | 50-200 | Demo trades (from Start Demo button) |
+| 2 | `payments` | 50-200 | Demo payments |
+| 3 | `prices` | 4 | Live/demo metal prices (XAU, XAG, XPT, XPD) |
+| 4 | `settings` | 2-5 | Key-value config (FY start, dispatch lock) |
+| 5 | `whatsapp_messages` | 100-500 | Chat history (demo + real inbound) |
+| 6 | `deliveries` | 10-50 | Demo shipments to HK |
+| 7 | `settlements` | 10-50 | Demo payment settlements |
+| 8 | `schema_version` | 15 | Migration version tracker |
+| 9 | `parsed_deals` | 0-100 | Legacy bot archive |
+| 10 | `meta_config` | 4-8 | Meta WhatsApp API credentials |
+| 11 | `pending_deals` | 10-1000+ | **Core table** — WhatsApp lock codes through the review pipeline |
+| 12 | `auth_pins` | 4-20 | Named PINs with roles |
+| 13 | `auth_sessions` | 5-50 | Active + historical login sessions |
+| 14 | `stock_opening` | 4-1000+ | Daily opening stock per metal |
+| 15 | `audit_log` | 0-10000+ | Immutable mutation history |
+| 16 | `parties` | 0-500+ | Counterparty master with dual SBS/OroSoft codes |
+| 17 | `dispatch_log` | 0-1000+ | API sync history with sequential SYNC-NNNN numbers |
+
+All tables use `CREATE TABLE IF NOT EXISTS` so fresh DBs get the full schema at boot, while existing DBs get column additions via the migration runner (see [§5](#5-migration-system)).
 
 ### 4.1 `deals` (legacy Demo trades)
 
@@ -777,15 +942,44 @@ Sets cookie `nt_session=<uuid>; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000
 - **Failed login** returns the same error regardless of whether the PIN is wrong, non-existent, or locked — prevents information leak about which PINs exist.
 - **Multiple PINs can have the same value** (intentional — e.g. a shared "Staff" PIN used by 15 people). The server takes the first non-locked match. Individual staff are distinguished in `auth_sessions` by IP + user-agent.
 
-### 7.2 Cookie + heartbeat
+### 7.2 Cookie specification
 
-- Cookie: `nt_session=<session_id>; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000 (365 days); Path=/`
-- `AuthGate` in the root layout mounts, calls `GET /api/auth` once on mount, and then every 30 seconds (`HEARTBEAT_INTERVAL_MS`)
-- GET `/api/auth` does three things:
-  1. Resolves the session row by cookie
-  2. Updates `last_seen = now` (heartbeat)
-  3. Returns `{authenticated, label, role}` for consumers like the sidebar user card
-- If the cookie references a session that no longer exists (revoked, cascaded from PIN delete), the GET clears the cookie via `Set-Cookie: nt_session=; Max-Age=0` and returns `{authenticated: false}`. The AuthGate flips the user to the PIN pad within 30 seconds.
+The app uses a single HTTP cookie for session management. **No JWT, no OAuth, no token in `Authorization` header.**
+
+| Property | Value | Notes |
+|---|---|---|
+| **Name** | `nt_session` | Hardcoded in `src/app/api/auth/route.ts` |
+| **Value** | UUID v4 string | The `id` column from `auth_sessions` — a random 36-character string like `f4eaadda-ae2e-4fa1-b5e0-890c5af6ed04` |
+| **HttpOnly** | `true` | JavaScript cannot read the cookie — protects against XSS session theft |
+| **Secure** | `true` | Only sent over HTTPS. **If testing on HTTP locally, login will fail** because the browser won't send the cookie. Use `localhost` (which browsers treat as secure) or set up a local HTTPS proxy. |
+| **SameSite** | `Lax` | Cookie is sent on top-level navigations and same-site requests. Cross-site POST requests (e.g. from a phishing page) won't carry the cookie. |
+| **Max-Age** | `31536000` (365 days) | The cookie persists for a full year. The server never auto-expires sessions — see [§7.3](#73-session-lifecycle). |
+| **Path** | `/` | Cookie is valid for every path in the app. |
+| **Domain** | (not set) | Defaults to the current hostname. The cookie won't be sent to subdomains. |
+
+**Set on login:** `POST /api/auth` with `{pin}` → if valid → `Set-Cookie: nt_session=<uuid>; ...`
+
+**Cleared on logout:** `POST /api/auth` with `{action:"logout"}` → `Set-Cookie: nt_session=; Max-Age=0; Path=/`
+
+**Cleared on invalid session:** `GET /api/auth` with an orphaned cookie (session row deleted) → same `Max-Age=0` clear header → AuthGate flips to PIN pad.
+
+### 7.2.1 localStorage keys
+
+The app stores non-sensitive UI preferences in the browser's `localStorage`. These are **not security-sensitive** — they control theme, FY selection, etc.
+
+| Key | Example value | Purpose | Set by |
+|---|---|---|---|
+| `prismx_theme_v1` | `"dark"` or `"light"` | Light/dark theme preference | ThemeProvider |
+| `prismx_selected_fy_v1` | `"FY 2026-27"` | Last-selected financial year label | FyProvider |
+
+**No session data, tokens, or PINs are ever stored in localStorage.** The session is cookie-only.
+
+### 7.2.2 Heartbeat
+
+- `AuthGate` in the root layout calls `GET /api/auth` on mount and then every **30 seconds** (`HEARTBEAT_INTERVAL_MS = 30_000` in `src/components/auth-gate.tsx`)
+- Each GET updates `auth_sessions.last_seen` to `NOW()` — this is how the `/users` page knows who's "active" (last_seen within 2 minutes)
+- If the server returns `{authenticated: false}` (session deleted by admin kick / PIN cascade / explicit logout), the AuthGate sets component state to `"locked"` and renders the PIN pad. The user must re-enter their PIN.
+- The heartbeat is the **only push-less notification mechanism** in the app. A kicked user will see the PIN pad within 30 seconds. No WebSocket needed.
 
 ### 7.3 Session lifecycle
 
@@ -1252,7 +1446,144 @@ Market Rate (USD/oz), Market Value (USD), Unrealized P&L (USD)
 
 ## 14. Deployment & Operations
 
-### 14.1 Server layout
+**Full installation instructions are in [`INSTALL.md`](INSTALL.md).** This section covers the runtime configuration reference — what's running, on which port, how many processes, and the exact nginx config.
+
+### 14.0 Runtime Configuration
+
+#### Application port
+
+| Setting | Value | How to change |
+|---|---|---|
+| **Default port** | `3020` | Set the `PORT` environment variable: `PORT=3020 pm2 start npm --name prismx -- start` |
+| **Configurable?** | Yes — any available port | Change the `PORT=` value in the PM2 start command |
+| **Direct access** | `http://localhost:3020` | Only for local testing; production should always go through nginx |
+| **Production access** | `https://your-domain.com` (ports 80/443 via nginx) | All client traffic hits nginx, which proxies to `:3020` internally |
+
+#### PM2 process configuration
+
+| Setting | Value | Why |
+|---|---|---|
+| **Process name** | `prismx` (or `nt-metals` on the nuremberg pre-prod server) | Used in `pm2 restart`, `pm2 logs`, `pm2 stop` commands |
+| **Mode** | `fork` (NOT cluster) | SQLite + `better-sqlite3` is single-threaded. Cluster mode would spawn multiple workers, each with its own SQLite handle, causing `SQLITE_BUSY` lock contention. **Always use fork mode = 1 instance.** |
+| **Instances** | `1` | **Exactly one.** Never increase. See above. |
+| **Auto-restart** | Enabled (PM2 default) | If the Node process crashes, PM2 restarts it within seconds |
+| **Boot persistence** | `pm2 startup` + `pm2 save` | PM2 re-launches the process list after server reboot |
+| **Memory limit** | None set (PM2 default) | The app uses ~80-130 MB. If needed: `pm2 start ... --max-memory-restart 300M` |
+| **Log location** | `~/.pm2/logs/prismx-out.log` + `prismx-error.log` | View with `pm2 logs prismx --lines 100` |
+
+**Start command (generic — works on any server):**
+```bash
+PORT=3020 pm2 start npm --name prismx -- start
+pm2 save
+pm2 startup   # follow the printed instruction to install the boot hook
+```
+
+**⚠️ Critical: never run more than 1 PM2 instance.** SQLite locks the database file during writes. Two Node processes writing simultaneously will cause `SQLITE_BUSY` errors. PM2 cluster mode is explicitly incompatible with this architecture. If you need horizontal scaling, you must migrate from SQLite to PostgreSQL or MySQL first.
+
+#### nginx configuration
+
+The complete nginx site config for PrismX. Copy to `/etc/nginx/sites-available/prismx`, edit `YOUR_DOMAIN`, enable with a symlink, and reload.
+
+```nginx
+# /etc/nginx/sites-available/prismx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name YOUR_DOMAIN;  # Replace with your domain, or use _ for IP-only
+
+    # Redirect HTTP → HTTPS (certbot adds this automatically)
+    # location / { return 301 https://$host$request_uri; }
+
+    location / {
+        # Proxy to the Next.js app running under PM2
+        proxy_pass http://127.0.0.1:3020;
+        proxy_http_version 1.1;
+
+        # WebSocket support (used by Next.js HMR in dev, harmless in prod)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+
+        # Pass the real client IP to the app — used by auth_sessions.ip
+        # for tracking who's logged in from where
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Allow large uploads (WhatsApp images can be up to 16 MB,
+        # party CSV uploads can be several MB)
+        client_max_body_size 20M;
+
+        # Timeouts for slow OCR processing (Tesseract can take 15-30s)
+        proxy_read_timeout 60s;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+    }
+}
+
+# After certbot runs, it adds a server block for :443 with SSL certs.
+# The :80 block above gets a redirect to :443.
+```
+
+**Enable and reload:**
+```bash
+sudo ln -sf /etc/nginx/sites-available/prismx /etc/nginx/sites-enabled/
+sudo nginx -t          # test config syntax
+sudo systemctl reload nginx
+```
+
+**HTTPS with Let's Encrypt:**
+```bash
+sudo certbot --nginx -d your-domain.com
+# Certbot auto-renews via systemd timer. Test: sudo certbot renew --dry-run
+```
+
+#### Firewall rules
+
+| Port | Protocol | Purpose | Open to |
+|---|---|---|---|
+| `80` | TCP | HTTP (redirects to HTTPS) | World |
+| `443` | TCP | HTTPS (nginx → app) | World |
+| `3020` | TCP | Direct app access (testing only) | Localhost only in production; open for testing |
+| `22` | TCP | SSH | Admin IPs only |
+
+```bash
+# Ubuntu UFW:
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 22/tcp
+# Don't open 3020 to the world in production — nginx handles external traffic
+```
+
+#### Directory structure on the server
+
+```
+/opt/prismx/                    # (or /var/www/nt-metals on nuremberg)
+├── .next/                      # Compiled app (generated by npm run build)
+├── node_modules/               # npm dependencies
+├── src/                        # Source code (from git)
+├── public/                     # Static assets (logo, icons)
+├── scripts/                    # install-ubuntu.sh, diagnose-meta.sh
+├── data.db                     # SQLite database (created on first request)
+├── data.db-wal                 # WAL journal (managed by SQLite)
+├── data.db-shm                 # Shared memory (managed by SQLite)
+├── data.db.bak.*               # Timestamped backups (created by deploy.sh)
+├── screenshots/                # WhatsApp payment images (created by webhook)
+├── package.json                # npm manifest
+├── deploy.sh                   # Backup → push → pull → build → restart
+├── INSTALL.md                  # Installation guide
+├── TECHNICAL-SPECIFICATION.md  # This document
+└── PROJECT-PLAN.md             # Phase narrative
+```
+
+**Files created at runtime (NOT in git):**
+- `data.db` + `-wal` + `-shm` — the database. Created by `getDb()` on first request.
+- `screenshots/*.jpg|png|webp` — saved by the WhatsApp webhook when image messages arrive.
+- `.next/` — compiled build output. Created by `npm run build`.
+- `node_modules/` — npm dependencies. Created by `npm install`.
+
+### 14.1 Pre-prod server layout (nuremberg)
 
 | Item | Value |
 |---|---|
@@ -1264,7 +1595,7 @@ Market Rate (USD/oz), Market Value (USD), Unrealized P&L (USD)
 | PM2 mode | fork, 1 instance |
 | Upstream port | 3020 |
 | nginx site | `/etc/nginx/sites-enabled/nt.areakpi.in` |
-| TLS | Let's Encrypt via certbot (auto-renew) |
+| TLS | Let's Encrypt via certbot (auto-renew, expires 2026-07-06) |
 | Domain | https://nt.areakpi.in |
 
 ### 14.2 Deploy script
@@ -1371,6 +1702,97 @@ Rows inserted before migration v12 have `wamid=null` even for outgoing messages.
 ### 15.10 `whatsapp_messages.contact_name` is free text
 
 There's no foreign key to a contacts table. Two different insert paths could write "Ashish Kamdar" and "ashish kamdar" and they'd appear as separate contacts on `/whatsapp`. `resolveContactPhone` uses `LOWER(TRIM(...))` matching to be robust to this, but a normalized contacts table would be the proper fix.
+
+---
+
+## 16. Troubleshooting Guide
+
+### 16.1 Installation issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `npm install` fails with `node-gyp` or `better-sqlite3` compilation errors | Missing C compiler / build tools | **Ubuntu:** `sudo apt-get install -y build-essential python3`. **Windows:** Install Visual C++ Build Tools from https://visualstudio.microsoft.com/visual-cpp-build-tools/ |
+| `npm install` fails with permission errors (`EACCES`) | Running as wrong user or node_modules owned by root | `sudo chown -R $USER /opt/prismx` then `npm install` without sudo. Never `sudo npm install`. |
+| `npm run build` runs out of memory | Server has < 512 MB RAM | Add swap: `sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`. Or build on a bigger machine and copy `.next/` over. |
+| Build completes but app shows blank white page | Build errors were silently swallowed | Run `npm run build` again and read the full output. Check for TypeScript errors. |
+| Tesseract OCR not found | `tesseract` binary not in PATH | **Ubuntu:** `sudo apt-get install -y tesseract-ocr`. **Windows:** Install from https://github.com/UB-Mannheim/tesseract/wiki and add to PATH. |
+
+### 16.2 Startup / runtime issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `pm2 start` succeeds but app is not accessible | Port 3020 blocked by firewall | **Ubuntu:** `sudo ufw allow 3020/tcp`. **Windows:** Open port in Windows Firewall → Inbound Rules. |
+| App starts but immediately crashes (PM2 shows `errored`) | Missing dependencies or build output | Run `npm install && npm run build` then `pm2 restart prismx`. Check logs: `pm2 logs prismx --lines 50`. |
+| `SQLITE_BUSY` or "database is locked" errors | More than 1 PM2 instance running | Check `pm2 list` — should show exactly 1 process. If multiple: `pm2 delete all && PORT=3020 pm2 start npm --name prismx -- start`. **Never use cluster mode.** |
+| App works on `http://localhost:3020` but not via nginx | nginx config error or not reloaded | `sudo nginx -t` to check config syntax. `sudo systemctl reload nginx` to apply. Check `/var/log/nginx/error.log`. |
+| HTTPS certificate expired | Certbot auto-renew failed | `sudo certbot renew`. If that fails: `sudo certbot --nginx -d your-domain.com` to re-issue. Check systemd timer: `systemctl status certbot.timer`. |
+| App very slow (pages take 5+ seconds) | Tesseract OCR running on a large image blocks the event loop | This is expected for OCR — it blocks for 15-30s. Non-OCR requests queue behind it. For production: consider moving OCR to a worker thread or using a Cloud Vision API instead of local Tesseract. |
+
+### 16.3 Authentication issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| PIN pad accepts clicks but nothing happens | JavaScript not loading — check browser console for 404s on `/_next/static/chunks/` | Re-run `npm run build && pm2 restart prismx`. Clear browser cache. |
+| Correct PIN shows "Wrong PIN" | PIN is locked | Check from `/users` page → Manage PINs → the PIN's status column. Unlock it. Or via SQL: `sqlite3 data.db "SELECT label, pin, locked FROM auth_pins;"` |
+| User gets kicked to PIN pad randomly | Another admin kicked their session, OR the heartbeat failed | Check `/users` → Active Now table. If the session was kicked, the user just re-enters their PIN. If no kick happened, check PM2 logs for errors in `GET /api/auth`. |
+| Cookie not being set on login (works on localhost but not on the domain) | `Secure` flag on the cookie requires HTTPS | PrismX sets `Secure: true` on the session cookie. If your server doesn't have HTTPS, the browser silently drops the cookie. Set up certbot or test on `http://localhost:3020` (browsers treat localhost as secure). |
+| "Cannot delete the last Super Admin" error | Trying to delete or downgrade the only super_admin | This is a safety guardrail. Promote another PIN to super_admin first, then you can delete/downgrade the original. |
+
+### 16.4 WhatsApp webhook issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Meta webhook verification fails (challenge not returned) | `verify_token` in PrismX Settings doesn't match what's configured in Meta Developer Console | Open `/settings` → Meta WhatsApp Business API → check `verify_token`. Must exactly match the string in Meta's webhook configuration. |
+| Webhook receives messages but deals don't appear in `/review` | Message text doesn't contain a `#NT` / `#NTK` / `#NTP` trigger | The parser only creates `pending_deals` rows for messages starting with a trigger code. Non-trigger messages go to the Ignored tab. Check `/review` → Ignored tab. |
+| Images arrive but OCR panel shows empty | Tesseract not installed, or access token expired (can't download the image from Meta) | Check `tesseract --version` on the server. Check the access token hasn't expired: `bash scripts/diagnose-meta.sh`. |
+| "Unsupported post request. Object with ID does not exist" on outbound send | System User token lacks asset permissions on the WABA | Run `bash scripts/diagnose-meta.sh` and check step 4. If `assigned_whatsapp_business_accounts` returns `data: []`, the System User needs WABA asset assignment in Meta Business Manager. See [§15.2](#152-whatsapp-outbound-disabled). |
+
+### 16.5 Data issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `data.db` doesn't exist | First-time install — it's created on the first request | Just access the app in a browser. `getDb()` creates the file, runs `initSchema()`, and executes all migrations. |
+| Schema version is behind (e.g. shows 12 but should be 15) | Migrations ran but new ones weren't deployed | `git pull && npm run build && pm2 restart prismx`. Migrations run automatically on the next request. |
+| Deals from one FY showing in a different FY's view | FY start date is misconfigured | Check `/settings` → Financial Year. Default is April 1 (`04-01`). The FY boundary is IST-aligned, not UTC. |
+| Stock In Hand shows 0 for all metals despite approved deals | Opening stock not set for today | Go to `/stock` → Live → expand "Opening Stock" → enter today's opening grams → Save. Or wait for the lazy roll-forward (happens on next page load if yesterday's closing can be computed). |
+| "Cannot approve an unclassified deal" error | A `#NT` deal (no K or P suffix) is being approved without choosing Kachha or Pakka | Use the "Approve as Kachha" / "Approve as Pakka" buttons instead of the plain "Approve" button. |
+
+### 16.6 Performance issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Dashboard loads slowly with 1000+ deals | Large response from `/api/deals/live` | The endpoint accepts `?limit=N` (default 500, max 2000). Reduce the limit if the FY has accumulated many deals. |
+| SQLite file growing very large (> 100 MB) | Lots of audit_log + dispatch_log + screenshots | Run `sqlite3 data.db "VACUUM;"` to reclaim space. Consider archiving old audit_log rows to a separate file. |
+| PM2 memory usage climbing over time | Node.js memory leak (unlikely but possible) | Set a memory ceiling: `pm2 restart prismx --max-memory-restart 300M`. PM2 will auto-restart when the process exceeds 300 MB. |
+
+### 16.7 Quick diagnostic checklist
+
+When something isn't working, run through this checklist in order:
+
+```bash
+# 1. Is the process running?
+pm2 list                        # should show 'prismx' with status 'online'
+
+# 2. Are there errors in the logs?
+pm2 logs prismx --lines 30      # look for stack traces or error messages
+
+# 3. Is the app responding locally?
+curl -s http://localhost:3020 | head -5   # should return HTML
+
+# 4. Is nginx forwarding correctly?
+curl -s https://your-domain.com | head -5  # should return the same HTML
+# If not: sudo nginx -t && sudo systemctl reload nginx
+
+# 5. What's the database state?
+sqlite3 /opt/prismx/data.db "SELECT MAX(version) FROM schema_version;"  # should show 15
+sqlite3 /opt/prismx/data.db "SELECT label, role FROM auth_pins;"        # should show 4 PINs
+
+# 6. Is the Meta webhook working?
+bash /opt/prismx/scripts/diagnose-meta.sh   # should show valid token + accessible phone number
+
+# 7. Restart everything clean
+pm2 restart prismx && sudo systemctl reload nginx
+```
 
 ---
 
