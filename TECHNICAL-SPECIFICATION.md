@@ -1214,6 +1214,92 @@ Correctness is not enough — operators also need to **see** that another operat
 
 **Total load at 15 users:** roughly 10-15 req/sec average across all endpoints. SQLite handles this trivially; Next.js is never CPU-bound.
 
+### 9.5 Capacity Planning — RAM, CPU, PM2 Workers, and Scaling Thresholds
+
+PrismX is designed for a 10-15 user bullion trading desk. This section documents the server requirements at that scale and at higher scales, so you can right-size the infrastructure when deploying to a client's cloud or on-premise server.
+
+#### Current architecture constraints
+
+| Component | Constraint | Reason |
+|---|---|---|
+| **PM2 workers** | **Always 1.** Never use cluster mode. | SQLite locks the database file during writes. Two Node processes writing simultaneously cause `SQLITE_BUSY` errors. `better-sqlite3`'s synchronous API serializes all writes through a single event loop — this is a feature, not a limitation. Adding a second PM2 worker BREAKS the app. |
+| **Database** | Single SQLite file, no connection pool | The `getDb()` singleton opens one handle and reuses it for every request. This is correct for a single-process architecture. No connection string, no pool size, no max-connections setting. |
+| **In-memory state** | Module-scoped ring buffers (~100 entries each) | Ignored messages buffer and orphaned-attachments buffer live in Node memory. Capped at ~100 entries each. Cleared on PM2 restart. |
+
+#### Sizing table
+
+| Concurrent users | RAM (Node process) | RAM (total with OS) | CPU | Disk | PM2 workers | Can handle? |
+|---|---|---|---|---|---|---|
+| **1-5** (development) | ~80 MB | 512 MB | Any single core | 500 MB | 1 | ✅ Trivially |
+| **10-15** (Niyam's desk) | ~100-130 MB | 1 GB | 1 vCPU | 1 GB | 1 | ✅ The design target |
+| **20-30** (larger desk) | ~130-180 MB | 2 GB | 1-2 vCPU | 2 GB | 1 | ✅ Still comfortable |
+| **50** (multi-desk) | ~200-250 MB | 2-4 GB | 2 vCPU | 5 GB | 1 | ⚠️ Approaching SQLite write-lock ceiling |
+| **100+** | N/A | N/A | N/A | N/A | N/A | ❌ **Requires architectural change** — migrate from SQLite to PostgreSQL, switch to cluster mode or separate API workers |
+
+#### What limits scaling at each tier
+
+**10-15 users (comfortable):**
+- **Request rate:** ~10-15 req/sec across all polling endpoints. SQLite handles 100+ reads/sec and 50+ writes/sec without breaking a sweat. Node.js is never CPU-bound at this load.
+- **Write contention:** `better-sqlite3`'s synchronous writes take ~1-5ms each. At 15 users, writes happen maybe 1-2/sec (approve a deal, dispatch, heartbeat). The write lock is held for <5ms per request — no queuing.
+- **Memory:** Node process stays at ~100-130 MB. OCR on large images can spike to ~200 MB briefly. A 1 GB server handles this with room for nginx + OS.
+- **No bottleneck.** Everything works out of the box.
+
+**20-30 users (still fine, monitor these):**
+- **Polling load doubles:** ~25-40 req/sec. Still trivial for SQLite reads, but watch for nginx connection queuing if the server has a very slow CPU.
+- **Heartbeat writes increase:** 20-30 `UPDATE auth_sessions SET last_seen = ?` every 30 seconds = ~1 write/sec from heartbeats alone. Combined with deal activity, total writes might reach 3-5/sec. SQLite handles this but the write lock starts to matter if a Tesseract OCR call blocks the event loop for 15+ seconds — other writes queue behind it.
+- **Recommendation:** Monitor with `pm2 monit`. If average response time exceeds 200ms, move Tesseract OCR to a Cloud Vision API (Google/Claude) to free the event loop. Increase server to 2 GB RAM.
+
+**50 users (architecture stress point):**
+- **Polling load:** ~60-80 req/sec. SQLite reads are still fine, but Node.js single-threaded event loop starts to saturate at ~100 req/sec when each request does synchronous DB I/O.
+- **Write contention risk:** 50 heartbeats every 30 seconds = ~2 writes/sec from heartbeats alone. Add deal activity + dispatches + audit logging = potentially 5-10 writes/sec. Each write blocks the event loop for 1-5ms, so the worst case is 10 × 5ms = 50ms of write-blocking per second — visible as occasional 50-100ms response spikes.
+- **Recommendations:**
+  - Increase heartbeat interval from 30s to 60s (halves heartbeat writes)
+  - Move OCR to a Cloud API (removes 15-30s event-loop blocks)
+  - Consider 4 GB RAM
+  - Start evaluating PostgreSQL migration if write contention becomes measurable
+
+**100+ users (requires architectural change):**
+- SQLite's single-writer model becomes a bottleneck. The event loop spends too much time blocked on synchronous writes.
+- **Migration path:** Replace `better-sqlite3` with `pg` (node-postgres) or `mysql2`. Change `getDb()` to return a connection pool. Convert synchronous `.prepare().run()` calls to `await pool.query()`. Switch PM2 to cluster mode (2-4 workers). This is a ~2-day refactor touching `src/lib/db.ts` and every route handler that calls `getDb()`.
+- **Alternative:** Deploy multiple PrismX instances behind a load balancer, each with its own PostgreSQL connection. This is a standard Next.js scaling pattern.
+
+#### Cloud VM sizing guide
+
+| Provider | Tier | vCPU | RAM | Disk | Monthly cost (approx) | Users supported |
+|---|---|---|---|---|---|---|
+| **AWS EC2** | t3.micro | 2 | 1 GB | 8 GB EBS | ~$8/mo | 10-15 |
+| **AWS EC2** | t3.small | 2 | 2 GB | 20 GB EBS | ~$15/mo | 20-30 |
+| **DigitalOcean** | Basic | 1 | 1 GB | 25 GB SSD | $6/mo | 10-15 |
+| **DigitalOcean** | Basic | 2 | 2 GB | 50 GB SSD | $12/mo | 20-30 |
+| **Hetzner** | CX22 | 2 | 4 GB | 40 GB SSD | €4/mo | 30-50 |
+| **Azure** | B1s | 1 | 1 GB | 4 GB | ~$7/mo | 10-15 |
+| **On-premise Windows** | Any | 2+ cores | 4 GB+ | 50 GB+ | N/A | 20-50 |
+
+**The nuremberg pre-prod server** is a Hetzner VPS with 4 GB RAM and 2 vCPU — comfortably handles the current 10-15 user target with headroom for 3× growth.
+
+#### What you DON'T need at any scale ≤ 50 users
+
+| Often asked about | Needed? | Why not |
+|---|---|---|
+| Redis / Memcached | ❌ | No caching layer needed. SQLite reads are <1ms. Polling is cheap. |
+| PostgreSQL / MySQL | ❌ | SQLite handles 50 users fine. Migrate only if you hit 100+. |
+| Docker / Kubernetes | ❌ | Single-process app on a single server. Docker adds deployment complexity with zero performance benefit at this scale. |
+| CDN (CloudFront, Cloudflare) | ❌ (optional) | Static assets are served by Next.js with long Cache-Control headers. A CDN would shave ~50ms off first-load for geographically distant users but isn't needed for a single-office or single-city deployment. |
+| Load balancer | ❌ | One PM2 process = one upstream. nginx reverse-proxies directly. |
+| Background job queue (Bull, BullMQ) | ❌ | Everything is request-driven. Lazy roll-forward, stale-lock cleanup, session sweeps — all happen inside GET handlers. No cron, no worker. |
+| Separate API server | ❌ | Next.js serves both the UI and the API from the same process. No need for a dedicated Express/Fastify backend. |
+| Message broker (RabbitMQ, Kafka) | ❌ | Dispatch coordination uses a simple SQLite row (dispatch_lock in settings KV) + 2-second polling. No pub/sub needed. |
+
+#### When to reconsider this architecture
+
+Monitor these signals. If any become persistent (not just occasional spikes), start planning the PostgreSQL migration:
+
+1. **Average API response time > 200ms** (check with `pm2 monit` or nginx access logs)
+2. **`SQLITE_BUSY` errors in PM2 logs** (means writes are contending — should never happen with 1 worker, but if it does, something spawned a second process)
+3. **Node.js process memory > 500 MB** (likely a memory leak or very large OCR payloads — restart with `pm2 restart prismx --max-memory-restart 500M`)
+4. **Heartbeat poll-to-response latency > 5 seconds** (means the event loop is blocked — likely by Tesseract OCR on a large image)
+5. **More than 50 concurrent users are regularly active** (the 2-second dispatch-banner poll from 50 users = 25 req/sec from that single endpoint alone)
+
 ---
 
 ## 10. Frontend Architecture
