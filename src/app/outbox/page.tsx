@@ -103,10 +103,10 @@ const TARGET_META: Record<Target, {
     accentBg: "bg-emerald-500/10",
   },
   sbs: {
-    title: "SBS Excel",
-    subtitle: "Kachha deals — REST API",
+    title: "SBS",
+    subtitle: "Kachha deals — live API",
     type: "K",
-    acronym: "XLS",
+    acronym: "API",
     destLabel: "SBS",
     wayLabel: "via REST API",
     accent: "from-sky-500/30 to-sky-400/5",
@@ -488,13 +488,15 @@ function DestinationPanel({
         </div>
       </div>
 
-      {/* Hero visual */}
+      {/* Hero visual — same API pipeline flow for both targets since
+          SBS vendor agreed to build REST APIs (Apr 11 meeting). */}
       <div className="border-b border-white/5 bg-gray-950/40 p-5">
-        {target === "orosoft" ? (
-          <OrosoftVisual phase={phase} stage={stage} />
-        ) : (
-          <SbsVisual phase={phase} queue={queue} batchDeals={lastBatch?.deals ?? []} />
-        )}
+        <ApiFlowVisual
+          phase={phase}
+          stage={stage}
+          destLabel={meta.title}
+          accentColor={target === "orosoft" ? "emerald" : "sky"}
+        />
       </div>
 
       {/* Queue list */}
@@ -614,14 +616,26 @@ function DestinationPanel({
   );
 }
 
-// ─── OrosoftVisual ──────────────────────────────────────────────────────
+// ─── ApiFlowVisual ──────────────────────────────────────────────────────
 //
-// Horizontal flow: [PrismX] ─► [API gateway] ─► [OroSoft Neo]
-// Dots travel along the line while `phase === "sending"`. The stage
-// index lights up progress checkpoints underneath so Niyam can see what
-// the system is doing at each moment.
+// Horizontal flow: [PrismX] ─► [API gateway] ─► [Destination]
+// Used by BOTH OroSoft and SBS panels since SBS vendor agreed to
+// REST APIs (Apr 11 meeting). Dots travel along the line while
+// `phase === "sending"`. The stage index lights up progress
+// checkpoints underneath. destLabel and accentColor let each panel
+// render with its own identity (emerald for OroSoft, sky for SBS).
 
-function OrosoftVisual({ phase, stage }: { phase: "idle" | "sending" | "done"; stage: number }) {
+function ApiFlowVisual({
+  phase,
+  stage,
+  destLabel = "OroSoft Neo",
+  accentColor = "emerald",
+}: {
+  phase: "idle" | "sending" | "done";
+  stage: number;
+  destLabel?: string;
+  accentColor?: "emerald" | "sky";
+}) {
   const stages = [
     "Authenticate",
     "Format payload",
@@ -629,25 +643,32 @@ function OrosoftVisual({ phase, stage }: { phase: "idle" | "sending" | "done"; s
     "Confirm receipt",
   ];
 
+  const dotColor = accentColor === "sky" ? "bg-sky-400" : "bg-emerald-400";
+  const dotShadow = accentColor === "sky"
+    ? "shadow-[0_0_12px_rgba(56,189,248,0.9)]"
+    : "shadow-[0_0_12px_rgba(52,211,153,0.9)]";
+  const gradientVia = accentColor === "sky" ? "via-sky-400/50" : "via-emerald-400/50";
+  const gradientTo = accentColor === "sky" ? "to-sky-500/50" : "to-emerald-500/50";
+
   return (
     <div className="space-y-4">
       {/* Flow line */}
       <div className="relative flex items-center justify-between gap-2">
         <FlowNode label="PrismX" sublabel="Source" active={phase !== "idle"} color="amber" />
         <div className="relative flex-1 px-2">
-          <div className="h-px w-full bg-gradient-to-r from-amber-500/50 via-emerald-400/50 to-emerald-500/50" />
+          <div className={`h-px w-full bg-gradient-to-r from-amber-500/50 ${gradientVia} ${gradientTo}`} />
           {phase === "sending" && (
             <>
               <span
-                className="absolute top-1/2 -mt-1 size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)] animate-flow"
+                className={`absolute top-1/2 -mt-1 size-2 rounded-full ${dotColor} ${dotShadow} animate-flow`}
                 style={{ "--flow-distance": "calc(100% - 8px)" } as React.CSSProperties}
               />
               <span
-                className="absolute top-1/2 -mt-1 size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)] animate-flow"
+                className={`absolute top-1/2 -mt-1 size-2 rounded-full ${dotColor} ${dotShadow} animate-flow`}
                 style={{ "--flow-distance": "calc(100% - 8px)", animationDelay: "0.4s" } as React.CSSProperties}
               />
               <span
-                className="absolute top-1/2 -mt-1 size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)] animate-flow"
+                className={`absolute top-1/2 -mt-1 size-2 rounded-full ${dotColor} ${dotShadow} animate-flow`}
                 style={{ "--flow-distance": "calc(100% - 8px)", animationDelay: "0.8s" } as React.CSSProperties}
               />
             </>
@@ -656,7 +677,7 @@ function OrosoftVisual({ phase, stage }: { phase: "idle" | "sending" | "done"; s
             HTTPS · REST
           </div>
         </div>
-        <FlowNode label="OroSoft Neo" sublabel="Destination" active={phase === "done"} color="emerald" />
+        <FlowNode label={destLabel} sublabel="Destination" active={phase === "done"} color={accentColor} />
       </div>
 
       {/* Stage checklist */}
@@ -717,12 +738,16 @@ function FlowNode({
   label: string;
   sublabel: string;
   active: boolean;
-  color: "amber" | "emerald";
+  color: "amber" | "emerald" | "sky";
 }) {
-  const colorClasses = color === "amber"
-    ? "border-amber-500/50 bg-amber-500/10 text-amber-200"
-    : "border-emerald-500/50 bg-emerald-500/10 text-emerald-200";
-  const ringColor = color === "amber" ? "bg-amber-400/40" : "bg-emerald-400/40";
+  const colorClasses =
+    color === "amber"
+      ? "border-amber-500/50 bg-amber-500/10 text-amber-200"
+      : color === "sky"
+      ? "border-sky-500/50 bg-sky-500/10 text-sky-200"
+      : "border-emerald-500/50 bg-emerald-500/10 text-emerald-200";
+  const ringColor =
+    color === "amber" ? "bg-amber-400/40" : color === "sky" ? "bg-sky-400/40" : "bg-emerald-400/40";
   return (
     <div className="relative flex flex-col items-center">
       {active && (
