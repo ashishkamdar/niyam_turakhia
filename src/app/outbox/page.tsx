@@ -87,11 +87,11 @@ const TARGET_META: Record<Target, {
   },
   sbs: {
     title: "SBS Excel",
-    subtitle: "Kachha deals — sheet upload",
+    subtitle: "Kachha deals — REST API",
     type: "K",
     acronym: "XLS",
     destLabel: "SBS",
-    wayLabel: "via Excel batch",
+    wayLabel: "via REST API",
     accent: "from-sky-500/30 to-sky-400/5",
     accentRing: "ring-sky-400/40",
     accentText: "text-sky-300",
@@ -183,9 +183,8 @@ export default function OutboxPage() {
         <h1 className="text-2xl font-bold text-white">Outbox</h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-400">
           Approved trades waiting to be pushed to{" "}
-          <span className="font-semibold text-emerald-300">OroSoft</span> (Pakka · API) or
-          exported to{" "}
-          <span className="font-semibold text-sky-300">SBS</span> (Kachha · Excel).
+          <span className="font-semibold text-emerald-300">OroSoft</span> (Pakka · API) or{" "}
+          <span className="font-semibold text-sky-300">SBS</span> (Kachha · API).
           This is where the lifecycle ends — once a trade lands here,
           it&apos;s a quotable, invoice-ready line item.
         </p>
@@ -491,11 +490,11 @@ function DestinationPanel({
                   <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
                   <path d="M4 12a8 8 0 018-8" strokeLinecap="round" />
                 </svg>
-                {target === "orosoft" ? "Transmitting to OroSoft…" : "Updating SBS sheet…"}
+                {target === "orosoft" ? "Transmitting to OroSoft…" : "Transmitting to SBS…"}
               </>
             ) : (
               <>
-                {target === "orosoft" ? "Send all to OroSoft" : "Update SBS Excel"}
+                {target === "orosoft" ? "Send all to OroSoft" : "Send all to SBS"}
                 {queue.length > 0 && (
                   <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold">
                     {queue.length}
