@@ -1228,13 +1228,13 @@ PrismX is designed for a 10-15 user bullion trading desk. This section documents
 
 #### Sizing table
 
-| Concurrent users | RAM (Node process) | RAM (total with OS) | CPU | Disk | PM2 workers | Can handle? |
+| Concurrent users | RAM (total) | CPU | Disk | PM2 workers | OCR strategy | Can handle? |
 |---|---|---|---|---|---|---|
-| **1-5** (development) | ~80 MB | 512 MB | Any single core | 500 MB | 1 | ✅ Trivially |
-| **10-15** (Niyam's desk) | ~100-130 MB | 1 GB | 1 vCPU | 1 GB | 1 | ✅ The design target |
-| **20-30** (larger desk) | ~130-180 MB | 2 GB | 1-2 vCPU | 2 GB | 1 | ✅ Still comfortable |
-| **50** (multi-desk) | ~200-250 MB | 2-4 GB | 2 vCPU | 5 GB | 1 | ⚠️ Approaching SQLite write-lock ceiling |
-| **100+** | N/A | N/A | N/A | N/A | N/A | ❌ **Requires architectural change** — migrate from SQLite to PostgreSQL, switch to cluster mode or separate API workers |
+| **1-5** (development) | 512 MB | 1 vCPU | 500 MB | **1** | Local Tesseract (fine — OCR blocks are rare and no one notices) | ✅ Trivially |
+| **10-15** (Niyam's desk) | 1 GB | 1 vCPU | 1 GB | **1** | Local Tesseract OK but Cloud Vision recommended | ✅ The design target |
+| **20-30** (larger desk) | 2 GB | 1-2 vCPU | 2 GB | **1** | **Cloud Vision required** (or Worker Thread) — Tesseract blocks all users for 15-30s | ✅ With OCR offloaded |
+| **50** (multi-desk) | 2-4 GB | 2 vCPU | 5 GB | **1** | Cloud Vision required + heartbeat interval increased to 60s | ⚠️ Approaching event-loop ceiling |
+| **100+** | 4+ GB | 4+ vCPU | 10+ GB | 2-4 (cluster) | Cloud Vision | ❌ **Requires PostgreSQL migration** — SQLite single-writer can't scale to cluster mode |
 
 #### What limits scaling at each tier
 
@@ -1244,19 +1244,49 @@ PrismX is designed for a 10-15 user bullion trading desk. This section documents
 - **Memory:** Node process stays at ~100-130 MB. OCR on large images can spike to ~200 MB briefly. A 1 GB server handles this with room for nginx + OS.
 - **No bottleneck.** Everything works out of the box.
 
-**20-30 users (still fine, monitor these):**
-- **Polling load doubles:** ~25-40 req/sec. Still trivial for SQLite reads, but watch for nginx connection queuing if the server has a very slow CPU.
-- **Heartbeat writes increase:** 20-30 `UPDATE auth_sessions SET last_seen = ?` every 30 seconds = ~1 write/sec from heartbeats alone. Combined with deal activity, total writes might reach 3-5/sec. SQLite handles this but the write lock starts to matter if a Tesseract OCR call blocks the event loop for 15+ seconds — other writes queue behind it.
-- **Recommendation:** Monitor with `pm2 monit`. If average response time exceeds 200ms, move Tesseract OCR to a Cloud Vision API (Google/Claude) to free the event loop. Increase server to 2 GB RAM.
+**20-30 users (fine for normal ops, but OCR becomes a problem):**
+- **Polling load doubles:** ~25-40 req/sec. Each SQLite read takes ~1-5ms synchronously. At 30 req/sec × 5ms = 150ms of event-loop blocking per second → the loop is 85% idle. **Users notice nothing during normal operations** — approvals, dispatches, page loads all feel instant.
+- **Heartbeat writes increase:** 20-30 `UPDATE auth_sessions SET last_seen = ?` every 30 seconds = ~1 write/sec from heartbeats alone. Combined with deal activity, total writes might reach 3-5/sec. SQLite handles this easily.
+- **⚠️ THE REAL BOTTLENECK: Tesseract OCR.** When a WhatsApp image arrives, `execFileSync('tesseract', ...)` blocks the ENTIRE Node event loop for **15-30 seconds**. During that time, ALL 25 users' polling requests queue. Every user sees a 15-30 second hang, then a burst of responses catching up. This is the single worst-case scenario in the current architecture and it happens every time someone sends a payment screenshot to the bot.
+- **Why adding PM2 workers DOESN'T fix OCR:** A second PM2 worker would mean a second Node process opening `data.db` simultaneously. SQLite allows only one writer at a time — the second process's writes would hit `SQLITE_BUSY` errors. The fix is NOT more workers — it's moving OCR off the main event loop.
+- **Recommendations at 20+ users:**
+  1. **Switch OCR to a Cloud Vision API** (Google Cloud Vision, Claude Vision, or GPT-4o Vision) — these return in ~1-3 seconds and are async (non-blocking `await fetch()`), freeing the event loop completely. Set `ocr_provider` to `google`, `anthropic`, or `openai` in `/settings` → Meta WhatsApp section.
+  2. **OR move Tesseract to a Worker Thread** — spawn OCR in a Node.js `worker_threads` worker so the main event loop stays responsive. This is a code change (~50 lines to wrap `execFileSync` in a worker) but keeps OCR free/local.
+  3. Monitor with `pm2 monit`. If average response time exceeds 200ms even without OCR, increase server to 2 GB RAM.
+  4. **Increase heartbeat interval** from 30s to 60s if needed — halves heartbeat writes from ~1/sec to ~0.5/sec.
+
+**Why 1 PM2 worker is genuinely enough (math):**
+
+```
+Request budget per second at 20 users:
+  - 20 users × 1 heartbeat/30s         =  0.7 req/s
+  - 20 users × 1 page poll/5s (avg)    =  4.0 req/s
+  - 20 users × 1 dispatch banner/2s    = 10.0 req/s
+  - 20 users × 1 badge count/3s        =  6.7 req/s
+  ─────────────────────────────────────────────────
+  Total: ~21 req/s
+
+  Each request: ~5ms sync SQLite + ~2ms JSON serialization = ~7ms
+  Event loop blocked: 21 × 7ms = 147ms per second = 15% utilization
+  Event loop idle: 85% of the time → plenty of headroom
+
+  Average queuing delay: ~3-4ms (barely perceptible)
+  P99 response time: ~20ms (excellent)
+
+  Conclusion: 1 worker handles 20 users with 85% idle capacity.
+  The bottleneck is NOT request volume — it's the 15-30s OCR block.
+```
 
 **50 users (architecture stress point):**
-- **Polling load:** ~60-80 req/sec. SQLite reads are still fine, but Node.js single-threaded event loop starts to saturate at ~100 req/sec when each request does synchronous DB I/O.
+- **Polling load:** ~55-70 req/sec. Each request ~7ms → 55 × 7ms = 385ms blocking/sec → 62% utilization. The event loop is still responsive but with less headroom. P99 response time rises to ~50-80ms — still good, but monitor.
 - **Write contention risk:** 50 heartbeats every 30 seconds = ~2 writes/sec from heartbeats alone. Add deal activity + dispatches + audit logging = potentially 5-10 writes/sec. Each write blocks the event loop for 1-5ms, so the worst case is 10 × 5ms = 50ms of write-blocking per second — visible as occasional 50-100ms response spikes.
+- **OCR is mandatory to offload at this scale.** A 15-second event-loop block with 50 users queuing means 50 × 1 req/s × 15s = 750 queued requests. That's a cascade failure.
 - **Recommendations:**
-  - Increase heartbeat interval from 30s to 60s (halves heartbeat writes)
-  - Move OCR to a Cloud API (removes 15-30s event-loop blocks)
+  - Cloud Vision API is **required**, not optional
+  - Increase heartbeat interval from 30s to 60s (halves heartbeat load)
   - Consider 4 GB RAM
   - Start evaluating PostgreSQL migration if write contention becomes measurable
+  - Consider adding a dedicated OCR microservice (a tiny Express server on a different port that runs Tesseract in isolation, called via `await fetch()` from the main app)
 
 **100+ users (requires architectural change):**
 - SQLite's single-writer model becomes a bottleneck. The event loop spends too much time blocked on synchronous writes.
