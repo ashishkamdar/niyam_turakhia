@@ -1231,9 +1231,9 @@ PrismX is designed for a 10-15 user bullion trading desk. This section documents
 | Concurrent users | RAM (total) | CPU | Disk | PM2 workers | OCR strategy | Can handle? |
 |---|---|---|---|---|---|---|
 | **1-5** (development) | 512 MB | 1 vCPU | 500 MB | **1** | Local Tesseract (fine — OCR blocks are rare and no one notices) | ✅ Trivially |
-| **10-15** (Niyam's desk) | 1 GB | 1 vCPU | 1 GB | **1** | Local Tesseract OK but Cloud Vision recommended | ✅ The design target |
-| **20-30** (larger desk) | 2 GB | 1-2 vCPU | 2 GB | **1** | **Cloud Vision required** (or Worker Thread) — Tesseract blocks all users for 15-30s | ✅ With OCR offloaded |
-| **50** (multi-desk) | 2-4 GB | 2 vCPU | 5 GB | **1** | Cloud Vision required + heartbeat interval increased to 60s | ⚠️ Approaching event-loop ceiling |
+| **10-15** (Niyam's desk) | 1 GB | 1 vCPU | 1 GB | **1** | Local Tesseract (async — non-blocking since Apr 12 fix) | ✅ The design target |
+| **20-30** (larger desk) | 2 GB | 1-2 vCPU | 2 GB | **1** | Local Tesseract (async) or Cloud Vision for faster results | ✅ Comfortable |
+| **50** (multi-desk) | 2-4 GB | 2 vCPU | 5 GB | **1** | Cloud Vision recommended + heartbeat interval increased to 60s | ⚠️ Approaching event-loop ceiling |
 | **100+** | 4+ GB | 4+ vCPU | 10+ GB | 2-4 (cluster) | Cloud Vision | ❌ **Requires PostgreSQL migration** — SQLite single-writer can't scale to cluster mode |
 
 #### What limits scaling at each tier
@@ -1247,13 +1247,12 @@ PrismX is designed for a 10-15 user bullion trading desk. This section documents
 **20-30 users (fine for normal ops, but OCR becomes a problem):**
 - **Polling load doubles:** ~25-40 req/sec. Each SQLite read takes ~1-5ms synchronously. At 30 req/sec × 5ms = 150ms of event-loop blocking per second → the loop is 85% idle. **Users notice nothing during normal operations** — approvals, dispatches, page loads all feel instant.
 - **Heartbeat writes increase:** 20-30 `UPDATE auth_sessions SET last_seen = ?` every 30 seconds = ~1 write/sec from heartbeats alone. Combined with deal activity, total writes might reach 3-5/sec. SQLite handles this easily.
-- **⚠️ THE REAL BOTTLENECK: Tesseract OCR.** When a WhatsApp image arrives, `execFileSync('tesseract', ...)` blocks the ENTIRE Node event loop for **15-30 seconds**. During that time, ALL 25 users' polling requests queue. Every user sees a 15-30 second hang, then a burst of responses catching up. This is the single worst-case scenario in the current architecture and it happens every time someone sends a payment screenshot to the bot.
-- **Why adding PM2 workers DOESN'T fix OCR:** A second PM2 worker would mean a second Node process opening `data.db` simultaneously. SQLite allows only one writer at a time — the second process's writes would hit `SQLITE_BUSY` errors. The fix is NOT more workers — it's moving OCR off the main event loop.
+- **OCR is no longer a bottleneck (fixed Apr 12).** The `ocrTesseract()` function was switched from `execFileSync` (blocked the entire event loop for 15-30s) to async `execFile` (spawns tesseract as a child process, event loop stays free). Users notice nothing during OCR — the 15-30 second tesseract execution happens in a background process while the main Node event loop continues serving heartbeats, polls, approvals, and dispatches at full speed.
+- **Cloud Vision APIs remain an option for faster OCR results** (1-3 seconds vs 15-30 seconds for Tesseract) but are no longer **required** for concurrency — only for speed.
 - **Recommendations at 20+ users:**
-  1. **Switch OCR to a Cloud Vision API** (Google Cloud Vision, Claude Vision, or GPT-4o Vision) — these return in ~1-3 seconds and are async (non-blocking `await fetch()`), freeing the event loop completely. Set `ocr_provider` to `google`, `anthropic`, or `openai` in `/settings` → Meta WhatsApp section.
-  2. **OR move Tesseract to a Worker Thread** — spawn OCR in a Node.js `worker_threads` worker so the main event loop stays responsive. This is a code change (~50 lines to wrap `execFileSync` in a worker) but keeps OCR free/local.
-  3. Monitor with `pm2 monit`. If average response time exceeds 200ms even without OCR, increase server to 2 GB RAM.
-  4. **Increase heartbeat interval** from 30s to 60s if needed — halves heartbeat writes from ~1/sec to ~0.5/sec.
+  1. Monitor with `pm2 monit`. If average response time exceeds 200ms, increase server to 2 GB RAM.
+  2. **Increase heartbeat interval** from 30s to 60s if needed — halves heartbeat writes from ~1/sec to ~0.5/sec.
+  3. **Optionally switch to Cloud Vision** for faster OCR results (set `ocr_provider` in `/settings`). Not needed for concurrency — just for user experience (1-3s result vs 15-30s).
 
 **Why 1 PM2 worker is genuinely enough (math):**
 
