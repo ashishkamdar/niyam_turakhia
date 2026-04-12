@@ -30,6 +30,41 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
+// ── Brute-force protection ────────────────────────────────────────────
+// In-memory map of IP → { count, lockedUntil }. After 5 failed PIN
+// attempts from the same IP, that IP is locked out for 15 minutes.
+// Module-scoped so it survives across requests but clears on PM2
+// restart (acceptable — a restart is a natural cooldown).
+const LOGIN_ATTEMPTS = new Map<string, { count: number; lockedUntil: number }>();
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkBruteForce(ip: string): { blocked: boolean; remainingMs?: number } {
+  const entry = LOGIN_ATTEMPTS.get(ip);
+  if (!entry) return { blocked: false };
+  if (entry.lockedUntil > Date.now()) {
+    return { blocked: true, remainingMs: entry.lockedUntil - Date.now() };
+  }
+  // Lockout expired — reset
+  if (entry.lockedUntil > 0) {
+    LOGIN_ATTEMPTS.delete(ip);
+  }
+  return { blocked: false };
+}
+
+function recordFailedAttempt(ip: string): void {
+  const entry = LOGIN_ATTEMPTS.get(ip) ?? { count: 0, lockedUntil: 0 };
+  entry.count += 1;
+  if (entry.count >= MAX_ATTEMPTS) {
+    entry.lockedUntil = Date.now() + LOCKOUT_MS;
+  }
+  LOGIN_ATTEMPTS.set(ip, entry);
+}
+
+function clearAttempts(ip: string): void {
+  LOGIN_ATTEMPTS.delete(ip);
+}
+
 export async function POST(req: NextRequest) {
   const { pin, action } = await req.json();
   const db = getDb();
@@ -50,6 +85,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Missing PIN" }, { status: 400 });
   }
 
+  // Brute-force check BEFORE the DB lookup so locked-out IPs can't
+  // even probe whether a PIN exists.
+  const ip = getClientIp(req);
+  const bruteCheck = checkBruteForce(ip);
+  if (bruteCheck.blocked) {
+    const mins = Math.ceil((bruteCheck.remainingMs ?? 0) / 60000);
+    return NextResponse.json(
+      { ok: false, error: `Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.` },
+      { status: 429 }
+    );
+  }
+
   // Multiple pins CAN have the same value (user explicitly allowed this in
   // the spec). Take the first NON-LOCKED match — locked PINs are skipped
   // entirely so an admin can block a leaked PIN without deleting it, and
@@ -63,12 +110,16 @@ export async function POST(req: NextRequest) {
     .get(pin) as { id: string; label: string; role: string } | undefined;
 
   if (!match) {
+    recordFailedAttempt(ip);
     return NextResponse.json({ ok: false, error: "Wrong PIN" }, { status: 401 });
   }
 
+  // Successful login — clear any accumulated failed attempts for this IP.
+  clearAttempts(ip);
+
   const now = new Date().toISOString();
   const sessionId = randomUUID();
-  const ip = getClientIp(req);
+  // ip already resolved above for brute-force check — reuse it
   const userAgent = req.headers.get("user-agent") ?? "";
 
   db.prepare(

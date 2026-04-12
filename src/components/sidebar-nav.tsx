@@ -158,6 +158,8 @@ export function SidebarNav() {
               </svg>
               Settings
             </Link>
+            {/* Change PIN — self-service */}
+            <ChangePinButton />
             <button
               onClick={() => {
                 fetch("/api/auth", {
@@ -173,8 +175,107 @@ export function SidebarNav() {
               </svg>
               Logout
             </button>
+            {/* Version tag */}
+            <div className="mt-2 px-2 text-[9px] text-gray-600">
+              PrismX v1.0 · Apr 2026
+            </div>
           </div>
         </nav>
+      </div>
+    </div>
+  );
+}
+
+// ─── Change PIN button + inline dialog ────────────────────────────────
+
+function ChangePinButton() {
+  const [open, setOpen] = useState(false);
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  async function handleChange() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/auth/change-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setMsg({ text: "PIN changed successfully", ok: true });
+        setCurrentPin("");
+        setNewPin("");
+        setTimeout(() => { setOpen(false); setMsg(null); }, 1500);
+      } else {
+        setMsg({ text: json.error || "Failed", ok: false });
+      }
+    } catch {
+      setMsg({ text: "Network error", ok: false });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="group flex w-full gap-x-3 rounded-md p-2 text-sm font-semibold text-gray-400 hover:bg-white/5 hover:text-white"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-6 shrink-0">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+        </svg>
+        Change PIN
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02] p-2">
+      <div className="mb-2 text-xs font-semibold text-white">Change PIN</div>
+      <div className="space-y-1.5">
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={8}
+          placeholder="Current PIN"
+          value={currentPin}
+          onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, ""))}
+          className="w-full rounded border border-white/10 bg-gray-950 px-2 py-1 font-mono text-sm text-white placeholder:text-gray-600 focus:border-amber-500/50 focus:outline-none"
+        />
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={8}
+          placeholder="New PIN (4-8 digits)"
+          value={newPin}
+          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+          className="w-full rounded border border-white/10 bg-gray-950 px-2 py-1 font-mono text-sm text-white placeholder:text-gray-600 focus:border-amber-500/50 focus:outline-none"
+        />
+      </div>
+      {msg && (
+        <p className={`mt-1.5 text-[11px] ${msg.ok ? "text-emerald-400" : "text-rose-400"}`}>
+          {msg.text}
+        </p>
+      )}
+      <div className="mt-2 flex gap-1">
+        <button
+          onClick={handleChange}
+          disabled={busy || !currentPin || !newPin || newPin.length < 4}
+          className="rounded bg-amber-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-amber-500 disabled:opacity-40"
+        >
+          {busy ? "…" : "Save"}
+        </button>
+        <button
+          onClick={() => { setOpen(false); setMsg(null); setCurrentPin(""); setNewPin(""); }}
+          className="rounded bg-gray-700 px-2 py-1 text-[11px] font-semibold text-gray-300 hover:bg-gray-600"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
