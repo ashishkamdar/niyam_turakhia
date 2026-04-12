@@ -158,11 +158,31 @@ export async function GET(_req: NextRequest) {
     )
     .all() as DispatchableDeal[];
 
+  // Sync log — last 50 entries for the Sync History section on /outbox.
+  const syncLog = db
+    .prepare(
+      `SELECT id, timestamp, target, deal_count, deal_ids, batch_id,
+              request_summary, http_status, response_body, status,
+              error_message, sent_by
+         FROM dispatch_log
+         ORDER BY id DESC
+         LIMIT 50`
+    )
+    .all() as Record<string, unknown>[];
+
+  // Format the sync_ref from the integer id.
+  const syncLogFormatted = syncLog.map((row) => ({
+    ...row,
+    sync_ref: `SYNC-${String(row.id).padStart(4, "0")}`,
+    deal_ids: typeof row.deal_ids === "string" ? JSON.parse(row.deal_ids) : [],
+  }));
+
   return NextResponse.json({
     pakka_outbox: pending.filter((d) => d.deal_type === "P"),
     kachha_outbox: pending.filter((d) => d.deal_type === "K"),
     history,
     lock,
+    sync_log: syncLogFormatted,
   });
 }
 
@@ -307,9 +327,49 @@ export async function POST(req: NextRequest) {
     metadata: { response },
   });
 
+  // Write a sync log entry so the full history of API calls to the
+  // external system is preserved — including retries and failures
+  // once the real endpoints are wired up. The sequential integer id
+  // gives a human-readable sync number (SYNC-0001, SYNC-0002, …).
+  const dealSummaries = updated.slice(0, 5).map(
+    (d) => `${d.direction ?? "?"} ${d.qty_grams ?? "?"}g ${d.metal ?? "?"}`
+  );
+  const requestSummary = `${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"}: ${dealSummaries.join(", ")}${updated.length > 5 ? "…" : ""}`;
+
+  // For now the dispatch is simulated so we record http_status=200
+  // and status='success'. When the real SBS/OroSoft endpoints are
+  // wired up, these will come from the actual HTTP response.
+  db.prepare(
+    `INSERT INTO dispatch_log
+       (timestamp, target, deal_count, deal_ids, batch_id, request_summary,
+        http_status, response_body, status, error_message, sent_by, sent_by_pin_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    now,
+    target,
+    eligible.length,
+    JSON.stringify(eligible.map((r) => r.id)),
+    batchId,
+    requestSummary,
+    200,           // simulated — will be real HTTP status later
+    response,      // simulated — will be real response body later
+    "success",     // simulated — will be 'success'|'failed'|'partial' later
+    null,          // no error
+    actorLabel,
+    actor?.pin_id ?? null
+  );
+
+  // Read back the auto-generated sync number for the response.
+  const syncRow = db
+    .prepare("SELECT id FROM dispatch_log WHERE batch_id = ? ORDER BY id DESC LIMIT 1")
+    .get(batchId) as { id: number } | undefined;
+  const syncNumber = syncRow?.id ?? null;
+
   return NextResponse.json({
     ok: true,
     batch_id: batchId,
+    sync_number: syncNumber,
+    sync_ref: syncNumber ? `SYNC-${String(syncNumber).padStart(4, "0")}` : null,
     dispatched: eligible.length,
     deals: updated,
     response,

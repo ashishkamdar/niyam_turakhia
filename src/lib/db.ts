@@ -267,6 +267,33 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_parties_short_code ON parties(short_code);
     CREATE INDEX IF NOT EXISTS idx_parties_sbs_code ON parties(sbs_party_code);
     CREATE INDEX IF NOT EXISTS idx_parties_orosoft_code ON parties(orosoft_party_code);
+
+    -- Dispatch sync log — one row per API call to SBS or OroSoft.
+    -- The id is INTEGER PRIMARY KEY so SQLite auto-increments it as
+    -- a sequential sync number (SYNC-0001, SYNC-0002, …). This is
+    -- separate from pending_deals.dispatch_batch_id (which tracks
+    -- which deals were in the batch) and from audit_log (which tracks
+    -- who did what inside PrismX). The sync log tracks what the
+    -- external system responded — for vendor coordination and retry
+    -- forensics.
+    CREATE TABLE IF NOT EXISTS dispatch_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      target TEXT NOT NULL,
+      deal_count INTEGER NOT NULL DEFAULT 0,
+      deal_ids TEXT,
+      batch_id TEXT,
+      request_summary TEXT,
+      http_status INTEGER,
+      response_body TEXT,
+      status TEXT NOT NULL DEFAULT 'success',
+      error_message TEXT,
+      sent_by TEXT,
+      sent_by_pin_id TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_dispatch_log_timestamp ON dispatch_log(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_dispatch_log_target ON dispatch_log(target);
+    CREATE INDEX IF NOT EXISTS idx_dispatch_log_batch ON dispatch_log(batch_id);
   `);
 }
 
@@ -412,6 +439,13 @@ function runMigrations(db: Database.Database) {
     {
       version: 14,
       description: "Add parties table for counterparty master directory",
+      up: () => {
+        // Table is created by CREATE TABLE IF NOT EXISTS above.
+      },
+    },
+    {
+      version: 15,
+      description: "Add dispatch_log table for external API sync history",
       up: () => {
         // Table is created by CREATE TABLE IF NOT EXISTS above.
       },

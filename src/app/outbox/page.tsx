@@ -49,11 +49,28 @@ type Lock = {
   expires_at: string;
 };
 
+type SyncLogEntry = {
+  id: number;
+  sync_ref: string;
+  timestamp: string;
+  target: "orosoft" | "sbs";
+  deal_count: number;
+  deal_ids: string[];
+  batch_id: string;
+  request_summary: string;
+  http_status: number | null;
+  response_body: string | null;
+  status: "success" | "failed" | "partial";
+  error_message: string | null;
+  sent_by: string | null;
+};
+
 type DispatchResponse = {
   pakka_outbox: Deal[];
   kachha_outbox: Deal[];
   history: Deal[];
   lock: Lock | null;
+  sync_log: SyncLogEntry[];
 };
 
 type Target = "orosoft" | "sbs";
@@ -136,6 +153,7 @@ export default function OutboxPage() {
     kachha_outbox: [],
     history: [],
     lock: null,
+    sync_log: [],
   });
   // Current user's label — used to decide whether the dispatch lock
   // belongs to us (don't disable our own buttons) or to another
@@ -252,6 +270,93 @@ export default function OutboxPage() {
                       </td>
                       <td className="px-4 py-2 text-xs text-gray-500">
                         {timeAgo(d.dispatched_at)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* ── Sync Log ───────────────────────────────────────────────── */}
+      <section>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+          Sync Log
+          <span className="text-xs font-normal text-gray-500">
+            · every API call to SBS / OroSoft
+          </span>
+        </h2>
+        {data.sync_log.length === 0 ? (
+          <div className="rounded-lg border border-white/5 bg-gray-900 p-6 text-center text-sm text-gray-500">
+            No syncs yet. Each &quot;Send all&quot; creates a numbered sync entry here.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-white/5 bg-gray-900">
+            <table className="w-full text-sm">
+              <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold">Sync #</th>
+                  <th className="px-4 py-2 text-left font-semibold">Time</th>
+                  <th className="px-4 py-2 text-left font-semibold">Target</th>
+                  <th className="px-4 py-2 text-right font-semibold">Deals</th>
+                  <th className="px-4 py-2 text-left font-semibold">Status</th>
+                  <th className="px-4 py-2 text-left font-semibold">Response</th>
+                  <th className="px-4 py-2 text-left font-semibold">Sent By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {data.sync_log.map((s) => {
+                  const targetMeta = TARGET_META[s.target];
+                  return (
+                    <tr key={s.id}>
+                      <td className="px-4 py-2">
+                        <span className="rounded bg-white/5 px-2 py-0.5 font-mono text-xs font-bold text-amber-300">
+                          {s.sync_ref}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-400">
+                        {new Date(s.timestamp).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${targetMeta.accentBg} ${targetMeta.accentText}`}>
+                          <span className={`size-1.5 rounded-full ${s.target === "orosoft" ? "bg-emerald-400" : "bg-sky-400"}`} />
+                          {targetMeta.destLabel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums text-white">
+                        {s.deal_count}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                            s.status === "success"
+                              ? "bg-emerald-500/10 text-emerald-300"
+                              : s.status === "failed"
+                              ? "bg-rose-500/10 text-rose-300"
+                              : "bg-amber-500/10 text-amber-300"
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                        {s.http_status && (
+                          <span className="ml-1.5 font-mono text-[10px] text-gray-500">
+                            HTTP {s.http_status}
+                          </span>
+                        )}
+                      </td>
+                      <td className="max-w-[300px] truncate px-4 py-2 text-xs text-gray-500">
+                        {s.error_message ?? s.response_body ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-400">
+                        {s.sent_by ?? "—"}
                       </td>
                     </tr>
                   );
