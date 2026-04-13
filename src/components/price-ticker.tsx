@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import type { Price } from "@/lib/types";
 import { FySelector } from "./fy-selector";
 import { ThemeToggle } from "./theme-toggle";
+import { NotificationBell } from "./notification-bell";
+import { GlobalSearchTrigger } from "./global-search";
 
 const METAL_LABELS: Record<string, string> = {
   XAU: "Gold",
@@ -52,7 +54,9 @@ export function PriceTicker() {
           alt="PrismX"
           className="h-5 w-auto sm:h-6"
         />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <GlobalSearchTrigger />
+          <NotificationBell />
           <FySelector />
           <ThemeToggle />
           <a href="/settings" className="flex items-center gap-1.5 rounded-md px-2 py-1 text-gray-400 hover:text-amber-400">
@@ -74,6 +78,8 @@ export function PriceTicker() {
           aligned to match where Settings/Logout used to live in the
           sidebar's line of sight. */}
       <div className="hidden items-center justify-end gap-2 border-b border-white/5 px-4 py-1.5 lg:flex">
+        <GlobalSearchTrigger />
+        <NotificationBell />
         <FySelector />
         <ThemeToggle />
       </div>

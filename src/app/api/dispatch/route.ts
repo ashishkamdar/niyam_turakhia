@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth-context";
 import { logAudit } from "@/lib/audit";
+import { createNotification } from "@/lib/notifications";
 
 /**
  * Dispatch lock — co-ordinates concurrent dispatches across multiple
@@ -365,11 +366,22 @@ export async function POST(req: NextRequest) {
     .get(batchId) as { id: number } | undefined;
   const syncNumber = syncRow?.id ?? null;
 
+  const syncRef = syncNumber ? `SYNC-${String(syncNumber).padStart(4, "0")}` : null;
+
+  createNotification(db, {
+    type: "dispatch",
+    title: `${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"} dispatched to ${target === "orosoft" ? "OroSoft" : "SBS"}`,
+    body: syncRef ?? undefined,
+    icon: "📦",
+    href: "/outbox",
+    createdBy: actorLabel,
+  });
+
   return NextResponse.json({
     ok: true,
     batch_id: batchId,
     sync_number: syncNumber,
-    sync_ref: syncNumber ? `SYNC-${String(syncNumber).padStart(4, "0")}` : null,
+    sync_ref: syncRef,
     dispatched: eligible.length,
     deals: updated,
     response,

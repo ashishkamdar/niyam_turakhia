@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth-context";
+import { createNotification } from "@/lib/notifications";
 
 /**
  * PATCH /api/review/:id
@@ -131,6 +132,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     summary: `${action === "approve" ? "Approved" : "Rejected"} ${existing.deal_type === "K" ? "Kachha" : "Pakka"} deal — ${dealDesc}`.trim(),
     oldValues: { status: existing.status, deal_type: existing.deal_type },
     newValues: { status: newStatus, deal_type: existing.deal_type, reviewed_by: reviewer, reviewer_notes: notes },
+  });
+
+  createNotification(db, {
+    type: action === "approve" ? "deal_approved" : "deal_rejected",
+    title: `Deal ${action === "approve" ? "approved" : "rejected"} — ${dealDesc}`,
+    body: `${existing.deal_type === "K" ? "Kachha" : "Pakka"} · ${existing.party_alias ?? existing.sender_name ?? ""}`,
+    icon: action === "approve" ? "✓" : "✗",
+    href: "/review",
+    createdBy: actor?.label,
   });
 
   const updated = db.prepare("SELECT * FROM pending_deals WHERE id = ?").get(id);

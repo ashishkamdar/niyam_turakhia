@@ -9,6 +9,7 @@ import { DemoIndicator } from "@/components/demo-indicator";
 import { FyProvider } from "@/components/fy-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { DispatchBanner } from "@/components/dispatch-banner";
+import { GlobalSearchModal } from "@/components/global-search";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <main className="px-3 py-4 pb-20 sm:px-6 lg:px-8 lg:pb-6 print:px-0 print:py-0 print:pb-0">{children}</main>
                 </div>
                 <BottomNav />
+                <GlobalSearchModal />
               </DemoProvider>
             </FyProvider>
           </AuthGate>
