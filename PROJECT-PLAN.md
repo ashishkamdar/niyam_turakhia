@@ -600,6 +600,27 @@ PROJECT-PLAN.md                                    (this file — Phase C sectio
 | Custom 404 + 500 error pages | ✅ Live | Branded error pages replacing Next.js defaults |
 | Backup & Restore page | ✅ Live | `/backup` — create/list/download/delete/restore. Optional AES-256-GCM encryption. Audit-logged. |
 | OCR non-blocking fix | ✅ Live | Tesseract moved from `execFileSync` to async `execFile` — event loop stays free during 15-30s OCR runs |
+| Notifications / Bell Icon | ✅ Live | Migration v16. notifications table + `/api/notifications` + bell icon in top bar with unread badge. Auto-generated on deal approve/reject + dispatch. Polls every 5s. Mark-read + mark-all-read. |
+| Global Search (⌘K / Ctrl+K) | ✅ Live | `/api/search` queries across deals + parties + audit. Modal with debounced search, grouped results, arrow-key navigation. Trigger button in top bar for mobile. |
+| Privacy Policy page | ✅ Live | `/privacy` — required by Meta for WhatsApp app setup |
+| Staff Training Guide | ✅ Live | `docs/PrismX-Staff-Training-Guide.html` — branded HTML document with AREA KPI letterhead |
+
+**Niyam's WhatsApp Business API — GO LIVE (Apr 21)**
+
+| Milestone | Status | Details |
+|---|---|---|
+| Meta Developer account for Niyam | ✅ Done | Verified via debit card (phone SMS was rate-limited). App name: `NTWattsapp`, App ID: `1846937332664508` |
+| Facebook Page created | ✅ Done | "Jinyi Gold HK" page in Meta Business Suite |
+| WhatsApp product added to app | ✅ Done | Privacy policy at `https://nt.areakpi.in/privacy` satisfied Meta's requirement |
+| Test number assigned | ✅ Done | `+1 555 653 5708`, Phone Number ID: `1134616856395015`, WABA ID: `605885604541511` |
+| Permanent System User token | ✅ Done | Never-expiring token via `prismx_bot` System User with `whatsapp_business_messaging` + `whatsapp_business_management` scopes |
+| Webhook verified + messages subscribed | ✅ Done | Callback URL `https://nt.areakpi.in/api/whatsapp/webhook`, verify token `prismx_webhook_verify` |
+| **First real trades received** | ✅ Done | Two test trades from Niyam ("Nt") received and visible on `/review` — Apr 21, 2026 |
+| Old test2WattsApp app retired | ✅ Done | Ashish's test app (app ID 1184960910192872, +1 555 629 9466) no longer connected to PrismX |
+| Demo data cleared | ✅ Done | All 17 data tables cleared, system tables (auth, settings, meta_config) preserved |
+| meta_config corruption fixed | ✅ Done | `verify_token` was `pris...rify` (truncated), `ocr_provider` was `tess...ract`. Root cause: Settings UI displayed truncated values and someone saved the form. Fixed directly in DB. |
+
+**Known issue:** The PrismX Settings page (`/settings`) displays truncated values for long config strings and will OVERWRITE the DB with truncated values if saved. **Do not edit meta_config from the Settings UI** — use direct SQL or a future fix to the display logic.
 
 ---
 
@@ -607,32 +628,30 @@ PROJECT-PLAN.md                                    (this file — Phase C sectio
 
 | Feature | Priority | Scope estimate |
 |---|---|---|
-| **Notifications / Bell Icon** | High | In-app notification center. Bell icon in top bar, polling-based. ~half-day. |
-| **Global Search (⌘K)** | High | Search across deals + parties + audit from anywhere. ~half-day. |
 | **Keyboard shortcuts** | Medium | Ctrl+Enter to approve, arrow keys in review queue. |
 | **Data retention policy** | Medium | Admin setting: archive old audit/dispatch logs. |
 | **Email notifications** | Low | Requires SMTP/SendGrid setup. |
 | **2FA (TOTP)** | Low | Time-based OTP alongside PIN for high-value operations. |
 | **In-app changelog** | Low | "What's new" modal. |
 | **Localization** | Low | Hindi/Gujarati/Arabic support. |
+| **Fix Settings page truncation bug** | Medium | The meta_config display truncates long values. Saving overwrites DB with truncated strings. |
 
 ---
 
-### What's NEXT (Apr 12 → Apr 13 OroSoft meeting)
+### What's NEXT (Apr 21 onwards)
 
 | Phase | Status | Blocked on |
 |---|---|---|
-| **Monday Apr 13, 11:15 AM meeting with OroSoft** | ⏳ Gating item | Everything Pakka-output is blocked on this. |
-| **SBS → REST API writer (real HTTP, not simulated)** | ⏳ Ready to build | SBS vendor agreed to REST APIs on Apr 11. Template + endpoint details still TBD. |
-| **Pakka → OroSoft API writer (real HTTP, not simulated)** | ⏳ Blocked on Monday meeting | Swap is ~50 lines once we have API credentials |
-| **HMAC signature verification fix** | ⏳ Investigation needed | Requires re-populating `meta_config.app_secret` with temporary logging |
-| **Niyam's Meta Business Verification** | ⏳ 2-4 weeks (Meta-side review) | Trade License + Business Verification documents |
-| **Switch webhook from Ashish's test app to Niyam's verified PrismX number** | ⏳ Awaiting Niyam's Meta verification | ~10-minute endpoint swap |
-| **Reports page switch from Demo deals → Live** | 💡 Optional next chunk | Reuse `/api/deals/live` math |
-| **Money Flow FY integration** | 💡 Optional next chunk | Low priority until real money-movement data lands |
-| ~~**Audit trail**~~ | ✅ Shipped Apr 12 | `audit_log` table + `/audit` page + wired into all mutations |
-| ~~**Party master**~~ | ✅ Shipped Apr 12 | `parties` table + `/parties` page + CSV upload + sync stubs |
-| ~~**Dispatch sync log**~~ | ✅ Shipped Apr 12 | `dispatch_log` table + SYNC-NNNN numbers + sync log UI in `/outbox` |
+| **OroSoft sandbox credentials** | ⏳ Waiting on OroSoft | They confirmed APIs exist (Apr 13 meeting). Sandbox environment being created. |
+| **SBS REST API credentials** | ⏳ Waiting on SBS vendor | SBS vendor agreed to REST APIs on Apr 11. |
+| **Pakka → OroSoft API writer (real HTTP)** | ⏳ Blocked on sandbox | ~50-line swap once credentials arrive |
+| **Kachha → SBS API writer (real HTTP)** | ⏳ Blocked on SBS credentials | Same ~50-line swap pattern |
+| **Niyam's dedicated HK/Indian number** | ⏳ Niyam buying a new number | Will replace the US test number. Staff messages the new number. |
+| **Meta Business Verification** | ⏳ Not started | Requires: trade license upload, domain verification (prismx.org DNS TXT record), domain-matched email |
+| **App publishing** | ⏳ After Business Verification | Required for production webhooks from a real business number. Not needed for the test number. |
+| **Reports page switch from Demo → Live** | 💡 Optional | Reuse `/api/deals/live` math |
+| **Money Flow FY integration** | 💡 Optional | Low priority until real money-movement data lands |
+| **WhatsApp outbound re-enable** | 💡 After real number | Re-enable compose input in ChatThread when outbound actually works |
 
 The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
 
