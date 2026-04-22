@@ -638,20 +638,51 @@ PROJECT-PLAN.md                                    (this file — Phase C sectio
 
 ---
 
-### What's NEXT (Apr 21 onwards)
+### Meta Business Verification — In Progress (Apr 22)
+
+| Event | Date | Status |
+|---|---|---|
+| WABA account restricted by Meta (automated, false positive) | Apr 21, 2:22 PM PST | ⚠️ Restriction on outbound. Inbound unaffected. |
+| Appeal submitted via Business Support Home | Apr 22 | ⏳ Under review (24-48 hrs expected) |
+| Business Verification documents submitted | Apr 22 | ❌ Rejected — wrong document types |
+| **Rejection reasons:** | | |
+| 1. Legal business name document — wrong type | | Need: CI, BR, or bank statement showing `JINYI GOLD HK LIMITED` |
+| 2. Business address document — wrong type | | Need: document showing company name + `Unit 1712, 17/F Peninsula Square, 18 Sung On Street, Kowloon` |
+| 3. Business phone document — wrong type | | Need: document showing company name + `+852 6946 9274` together. Bank confirmation letter is the best option. |
+| **Resubmission** | ⏳ Pending | Niyam gathering correct documents (CI, BR, bank statement/letter). See `docs/Meta-Business-Verification-Guide.html` for full requirements. |
+
+**Documents created for this process:**
+- `docs/WABA-Restriction-Resolution-Guide.html` — appeal instructions + impact assessment + contingency plans
+- `docs/Meta-Business-Verification-Guide.html` — document requirements for resubmission + action checklist
+
+**Key insight:** The phone number `+852 6946 9274` is the hardest to verify — most official documents (CI, BR) don't include phone numbers. If it's a personal number not registered under the company, a bank confirmation letter listing it as the company's contact number is the best path. Or change the business phone in the form to one that IS on a company document.
+
+---
+
+### What's NEXT (Apr 22 onwards)
 
 | Phase | Status | Blocked on |
 |---|---|---|
-| **OroSoft sandbox credentials** | ⏳ Waiting on OroSoft | They confirmed APIs exist (Apr 13 meeting). Sandbox environment being created. |
+| **Meta Business Verification resubmission** | ⏳ Niyam gathering documents | Need correct document types (CI/BR/bank statement). See `docs/Meta-Business-Verification-Guide.html` |
+| **WABA restriction appeal** | ⏳ Under Meta review | Submitted Apr 22. Expected resolution: 24-48 hours. Likely auto-lifts once Business Verification completes. |
+| **OroSoft sandbox credentials** | ⏳ Waiting on OroSoft | They confirmed APIs exist (Apr 13 meeting). Sandbox being created. |
 | **SBS REST API credentials** | ⏳ Waiting on SBS vendor | SBS vendor agreed to REST APIs on Apr 11. |
 | **Pakka → OroSoft API writer (real HTTP)** | ⏳ Blocked on sandbox | ~50-line swap once credentials arrive |
 | **Kachha → SBS API writer (real HTTP)** | ⏳ Blocked on SBS credentials | Same ~50-line swap pattern |
-| **Niyam's dedicated HK/Indian number** | ⏳ Niyam buying a new number | Will replace the US test number. Staff messages the new number. |
-| **Meta Business Verification** | ⏳ Not started | Requires: trade license upload, domain verification (prismx.org DNS TXT record), domain-matched email |
+| **Niyam's dedicated HK/Indian number** | ⏳ Niyam buying a new number | Will replace the US test number (+1 555 653 5708). Staff messages the new number. |
 | **App publishing** | ⏳ After Business Verification | Required for production webhooks from a real business number. Not needed for the test number. |
+| **Fix Settings page truncation bug** | Medium | The meta_config display truncates long values. Saving overwrites DB with truncated strings. Caused a production issue on Apr 21 (corrupted verify_token + ocr_provider). |
 | **Reports page switch from Demo → Live** | 💡 Optional | Reuse `/api/deals/live` math |
 | **Money Flow FY integration** | 💡 Optional | Low priority until real money-movement data lands |
-| **WhatsApp outbound re-enable** | 💡 After real number | Re-enable compose input in ChatThread when outbound actually works |
+| **WhatsApp outbound re-enable** | 💡 After real number + WABA restriction lifted | Re-enable compose input in ChatThread |
+
+**Current operational status (Apr 22):**
+- ✅ **Inbound trades working** — staff can send `#NT` codes to `+1 555 653 5708` and they appear in `/review`
+- ✅ **Full pipeline operational** — review → approve → dispatch → sync log all working
+- ✅ **Permanent token** — never-expiring System User token installed
+- ❌ **Outbound blocked** — WABA restricted (was already disabled in PrismX UI anyway)
+- ⏳ **Business Verification** — rejected, resubmission pending with correct documents
+- ⏳ **OroSoft + SBS real API integration** — waiting on vendor sandbox credentials
 
 The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
 
