@@ -24,6 +24,7 @@ type SessionRow = {
   role: string;
   ip: string;
   user_agent: string;
+  country: string | null;
   created_at: string;
   last_seen: string;
 };
@@ -49,7 +50,7 @@ export async function GET(_req: NextRequest) {
   // is handled by not loading them into the UI, not by deleting them.
   const rows = db
     .prepare(
-      `SELECT s.id, s.pin_id, p.label, p.role, s.ip, s.user_agent, s.created_at, s.last_seen
+      `SELECT s.id, s.pin_id, p.label, p.role, s.ip, s.user_agent, s.country, s.created_at, s.last_seen
          FROM auth_sessions s
          JOIN auth_pins p ON p.id = s.pin_id
          WHERE s.last_seen >= ?

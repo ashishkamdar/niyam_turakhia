@@ -201,6 +201,7 @@ function initSchema(db: Database.Database) {
       pin_id TEXT NOT NULL,
       ip TEXT NOT NULL,
       user_agent TEXT NOT NULL DEFAULT '',
+      country TEXT,
       created_at TEXT NOT NULL,
       last_seen TEXT NOT NULL,
       FOREIGN KEY (pin_id) REFERENCES auth_pins(id) ON DELETE CASCADE
@@ -481,6 +482,13 @@ function runMigrations(db: Database.Database) {
       description: "Add email column to auth_pins for Cloudflare Access sync",
       up: () => {
         addColumnIfNotExists(db, "auth_pins", "email", "TEXT");
+      },
+    },
+    {
+      version: 18,
+      description: "Add country column to auth_sessions for geo display",
+      up: () => {
+        addColumnIfNotExists(db, "auth_sessions", "country", "TEXT");
       },
     },
   ];

@@ -30,10 +30,29 @@ type Session = {
   role: string;
   ip: string;
   user_agent: string;
+  country: string | null;
   created_at: string;
   last_seen: string;
   is_active: boolean;
 };
+
+/** Convert 2-letter ISO country code to flag emoji + name. */
+function countryLabel(code: string | null): string {
+  if (!code || code === "XX" || code === "T1") return "";
+  // Flag emoji: regional indicator symbols
+  const flag = [...code.toUpperCase()].map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join("");
+  // Common country names for bullion trading regions
+  const names: Record<string, string> = {
+    HK: "Hong Kong", CN: "China", IN: "India", AE: "UAE", SG: "Singapore",
+    US: "United States", GB: "United Kingdom", JP: "Japan", AU: "Australia",
+    CH: "Switzerland", DE: "Germany", SA: "Saudi Arabia", QA: "Qatar",
+    KW: "Kuwait", BH: "Bahrain", OM: "Oman", MY: "Malaysia", TH: "Thailand",
+    ID: "Indonesia", PH: "Philippines", VN: "Vietnam", KR: "South Korea",
+    TW: "Taiwan", BD: "Bangladesh", PK: "Pakistan", LK: "Sri Lanka",
+    NP: "Nepal", MM: "Myanmar", KH: "Cambodia", LA: "Laos",
+  };
+  return `${flag} ${names[code.toUpperCase()] || code.toUpperCase()}`;
+}
 
 type Role = "super_admin" | "admin" | "staff" | "trade_desk";
 
@@ -221,6 +240,7 @@ export default function UsersPage() {
       label: string;
       role: string;
       ip: string;
+      country: string | null;
       count: number;
       newestLastSeen: string;
       oldestCreatedAt: string;
@@ -242,6 +262,7 @@ export default function UsersPage() {
         label: s.label,
         role: s.role,
         ip: s.ip,
+        country: s.country,
         count: 1,
         newestLastSeen: s.last_seen,
         oldestCreatedAt: s.created_at,
@@ -450,8 +471,11 @@ export default function UsersPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-top font-mono text-xs text-gray-300 print:text-gray-700">
-                        {g.ip}
+                      <td className="px-4 py-3 align-top">
+                        <div className="font-mono text-xs text-gray-300 print:text-gray-700">{g.ip}</div>
+                        {g.country && (
+                          <div className="mt-0.5 text-[10px] text-gray-500">{countryLabel(g.country)}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3 align-top">
                         <span
@@ -526,8 +550,11 @@ export default function UsersPage() {
                       <td className="px-4 py-2 align-top font-semibold text-gray-300 print:text-gray-700">
                         {s.label}
                       </td>
-                      <td className="px-4 py-2 align-top font-mono text-xs text-gray-400 print:text-gray-600">
-                        {s.ip}
+                      <td className="px-4 py-2 align-top">
+                        <div className="font-mono text-xs text-gray-400 print:text-gray-600">{s.ip}</div>
+                        {s.country && (
+                          <div className="mt-0.5 text-[10px] text-gray-500">{countryLabel(s.country)}</div>
+                        )}
                       </td>
                       <td className="px-4 py-2 align-top text-xs text-gray-400 print:text-gray-600">
                         {shortenUA(s.user_agent)}

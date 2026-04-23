@@ -132,11 +132,13 @@ export async function POST(req: NextRequest) {
   const sessionId = randomUUID();
   // ip already resolved above for brute-force check — reuse it
   const userAgent = req.headers.get("user-agent") ?? "";
+  // Cloudflare injects CF-IPCountry on every proxied request — free geo lookup
+  const country = req.headers.get("cf-ipcountry") ?? null;
 
   db.prepare(
-    `INSERT INTO auth_sessions (id, pin_id, ip, user_agent, created_at, last_seen)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(sessionId, match.id, ip, userAgent, now, now);
+    `INSERT INTO auth_sessions (id, pin_id, ip, user_agent, country, created_at, last_seen)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(sessionId, match.id, ip, userAgent, country, now, now);
 
   const res = NextResponse.json({ ok: true, label: match.label, role: match.role });
   res.cookies.set(COOKIE_NAME, sessionId, {
