@@ -6,470 +6,459 @@
 <title>Jinyi Gold HK — Trade Desk</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Trade Desk">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#f8f9fa">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0a0a0f;
-    color: #e5e5e5;
-    min-height: 100dvh;
+    background: #f5f6f8; color: #1a1a1a; min-height: 100dvh;
   }
 
-  /* ── Header ────────────────────────────────── */
   .header {
-    background: #111118;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    background: #fff; border-bottom: 1px solid #e5e7eb;
+    padding: 14px 20px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 10;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
-  .header h1 { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; color: #fff; }
-  .header .sub { font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: #666; margin-top: 2px; }
+  .header h1 { font-size: 15px; font-weight: 700; color: #111; letter-spacing: 0.3px; }
+  .header .sub { font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: #999; margin-top: 2px; }
   .header .right { display: flex; align-items: center; gap: 12px; }
-  .header .user { font-size: 12px; color: #888; }
+  .header .user { font-size: 12px; color: #666; font-weight: 500; }
   .btn-logout {
-    background: none; border: 1px solid rgba(255,255,255,0.1);
-    color: #888; padding: 4px 10px; border-radius: 4px;
-    font-size: 11px; cursor: pointer;
+    background: none; border: 1px solid #e5e7eb; color: #888;
+    padding: 5px 12px; border-radius: 6px; font-size: 11px; cursor: pointer;
   }
-  .btn-logout:hover { color: #f87171; border-color: rgba(248,113,113,0.3); }
+  .btn-logout:hover { color: #ef4444; border-color: #fecaca; }
 
-  /* ── Login ──────────────────────────────────── */
+  /* Login */
   .login-screen {
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; min-height: 80dvh; padding: 20px;
+    justify-content: center; min-height: 80dvh; padding: 20px; background: #fff;
   }
-  .login-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: #fff; }
-  .login-sub { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; }
-  .pin-dots { display: flex; gap: 10px; margin-bottom: 24px; }
-  .pin-dot {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: #222; transition: background 0.15s;
-  }
-  .pin-dot.filled { background: #f59e0b; }
+  .login-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #111; }
+  .login-sub { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; }
+  .pin-dots { display: flex; gap: 10px; margin-bottom: 20px; }
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: #e5e7eb; transition: 0.15s; }
+  .pin-dot.filled { background: #b45309; }
   .pin-dot.error { background: #ef4444; }
   .pin-error { color: #ef4444; font-size: 13px; margin-bottom: 12px; min-height: 20px; }
-  .pin-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 10px; max-width: 260px; width: 100%;
-  }
+  .pin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; max-width: 260px; width: 100%; }
   .pin-btn {
-    height: 56px; border-radius: 12px; border: none;
-    background: rgba(255,255,255,0.04); color: #fff;
-    font-size: 22px; font-weight: 500; cursor: pointer;
-    transition: background 0.15s;
+    height: 56px; border-radius: 12px; border: 1px solid #e5e7eb;
+    background: #fff; color: #111; font-size: 22px; font-weight: 500;
+    cursor: pointer; transition: 0.15s;
   }
-  .pin-btn:active { background: rgba(255,255,255,0.1); }
+  .pin-btn:active { background: #f3f4f6; }
   .pin-btn.del { font-size: 14px; color: #888; }
 
-  /* ── Main ────────────────────────────────────── */
-  .main { max-width: 600px; margin: 0 auto; padding: 20px; }
+  /* Main */
+  .main { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
+  .section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #888; font-weight: 600; margin-bottom: 8px; }
 
-  /* ── Trade input ─────────────────────────────── */
-  .section-label {
-    font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
-    color: #666; font-weight: 600; margin-bottom: 8px;
-  }
   .trade-input {
-    width: 100%; background: #111118; border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px; padding: 14px 16px; color: #fff;
-    font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    width: 100%; background: #fff; border: 1px solid #d1d5db;
+    border-radius: 10px; padding: 14px 16px; color: #111;
+    font-family: 'SF Mono','Fira Code','Courier New', monospace;
     font-size: 14px; line-height: 1.7; resize: vertical; min-height: 80px;
     outline: none; transition: border-color 0.2s;
   }
-  .trade-input::placeholder { color: #333; }
-  .trade-input:focus { border-color: rgba(245,158,11,0.4); }
-  .input-footer {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-top: 10px;
+  .trade-input::placeholder { color: #bbb; }
+  .trade-input:focus { border-color: #b45309; box-shadow: 0 0 0 3px rgba(180,83,9,0.08); }
+
+  .btn-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; gap: 8px; flex-wrap: wrap; }
+  .input-hint { font-size: 10px; color: #aaa; }
+  .btn-validate {
+    background: #fff; color: #b45309; border: 1.5px solid #b45309;
+    padding: 10px 20px; border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: 0.15s;
   }
-  .input-hint { font-size: 10px; color: #444; }
+  .btn-validate:hover { background: #fffbeb; }
+  .btn-validate:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-submit {
-    background: #b45309; color: #fff; border: none; padding: 10px 24px;
-    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
-    transition: background 0.15s;
+    background: #b45309; color: #fff; border: none;
+    padding: 10px 24px; border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: 0.15s;
   }
-  .btn-submit:hover { background: #a3520b; }
-  .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-submit:hover { background: #92400e; }
+  .btn-submit:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  /* ── Preview ──────────────────────────────────── */
-  .preview { margin-top: 16px; }
-  .preview-item {
-    padding: 8px 12px; border-radius: 6px; margin-bottom: 6px;
-    font-size: 12px; border: 1px solid;
+  /* Preview / validation */
+  .validation { margin-top: 16px; }
+  .val-item {
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 6px;
+    font-size: 12px; border: 1px solid; line-height: 1.6;
   }
-  .preview-ok { border-color: rgba(16,185,129,0.2); background: rgba(16,185,129,0.05); }
-  .preview-warn { border-color: rgba(245,158,11,0.2); background: rgba(245,158,11,0.05); }
-  .preview-err { border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.05); color: #f87171; }
-  .field { display: inline-block; margin-right: 8px; }
-  .f-type-k { color: #38bdf8; font-weight: 700; }
-  .f-type-p { color: #34d399; font-weight: 700; }
-  .f-type-u { color: #fbbf24; font-weight: 700; }
-  .f-dir-buy { color: #f87171; font-weight: 600; }
-  .f-dir-sell { color: #34d399; font-weight: 600; }
-  .f-metal-gold { color: #fbbf24; font-weight: 600; }
-  .f-metal-silver { color: #d1d5db; font-weight: 600; }
-  .f-metal-platinum { color: #93c5fd; font-weight: 600; }
-  .f-metal-palladium { color: #c4b5fd; font-weight: 600; }
-  .f-rate { color: #e5e5e5; }
-  .f-party { color: #fff; font-weight: 600; }
-  .f-purity { color: #888; }
-  .f-premium { color: #888; }
-  .f-error { color: #fbbf24; font-size: 11px; }
+  .val-ok { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+  .val-warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+  .val-err { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+  .field { display: inline-block; margin-right: 6px; }
+  .f-type-k { color: #0369a1; font-weight: 700; }
+  .f-type-p { color: #047857; font-weight: 700; }
+  .f-type-u { color: #b45309; font-weight: 700; }
+  .f-dir-buy { color: #dc2626; font-weight: 600; }
+  .f-dir-sell { color: #059669; font-weight: 600; }
+  .f-metal { font-weight: 600; color: #111; }
+  .f-rate { color: #333; }
+  .f-party { color: #111; font-weight: 700; }
+  .f-error { color: #dc2626; font-size: 11px; }
 
-  /* ── Results ──────────────────────────────────── */
+  /* Format guide */
+  .format-guide {
+    margin-top: 14px; background: #fff; border: 1px solid #e5e7eb;
+    border-radius: 10px; padding: 14px 16px; font-size: 12px; color: #666; line-height: 1.8;
+  }
+  .format-guide .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #999; margin: 6px 0 2px; font-weight: 600; }
+  .format-guide .ex { color: #333; font-family: monospace; }
+  .format-guide .trigger { font-weight: 700; }
+
+  /* Results */
   .result-item {
-    padding: 8px 12px; border-radius: 6px; margin-bottom: 6px;
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 6px;
     font-size: 12px; font-family: monospace; border: 1px solid;
   }
-  .result-ok { border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.05); color: #34d399; }
-  .result-fail { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); color: #f87171; }
+  .result-ok { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+  .result-fail { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
 
-  /* ── Recent ──────────────────────────────────── */
+  /* Recent */
   .recent { margin-top: 28px; }
-  .recent-list {
-    background: #111118; border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
-  }
+  .recent-list { background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; overflow: hidden; }
   .recent-item {
-    padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding: 10px 14px; border-bottom: 1px solid #f3f4f6;
     display: flex; align-items: center; justify-content: space-between;
   }
   .recent-item:last-child { border-bottom: none; }
-  .recent-msg { font-family: monospace; font-size: 12px; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 10px; }
+  .recent-msg { font-family: monospace; font-size: 12px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 10px; }
   .recent-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
   .recent-status { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-  .status-pending { color: #fbbf24; }
-  .status-approved { color: #34d399; }
-  .status-rejected { color: #f87171; }
-  .recent-time { font-size: 10px; color: #555; }
+  .status-pending { color: #b45309; }
+  .status-approved { color: #059669; }
+  .status-rejected { color: #dc2626; }
+  .recent-time { font-size: 10px; color: #999; }
 
-  /* ── Reference ───────────────────────────────── */
   .ref-toggle {
-    width: 100%; background: #111118; border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px; padding: 12px 14px; color: #666;
-    font-size: 12px; cursor: pointer; text-align: left; margin-top: 20px;
+    width: 100%; background: #fff; border: 1px solid #e5e7eb;
+    border-radius: 10px; padding: 12px 14px; color: #888;
+    font-size: 12px; cursor: pointer; text-align: left; margin-top: 16px;
   }
-  .ref-toggle:hover { color: #999; }
-  .ref-content {
-    background: #111118; border: 1px solid rgba(255,255,255,0.06);
-    border-top: none; border-radius: 0 0 10px 10px; padding: 14px;
-    font-family: monospace; font-size: 12px; color: #888; line-height: 1.8;
-    display: none;
-  }
-  .ref-content.open { display: block; }
-  .ref-content .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #555; margin: 8px 0 4px; }
-  .ref-content .ex { color: #ccc; }
+  .ref-toggle:hover { color: #555; }
+  #refContent { display: none; }
+  #refContent.open { display: block; }
+
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
 
-<div id="app"></div>
+<!-- ── Login Screen ─────────────────────────────── -->
+<div id="loginScreen" class="hidden">
+  <div class="header">
+    <div><h1>JINYI GOLD HK</h1><div class="sub">Trade Desk</div></div>
+  </div>
+  <div class="login-screen">
+    <div class="login-title">Trade Desk</div>
+    <div class="login-sub">Enter PIN</div>
+    <div class="pin-dots" id="pinDots"></div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="pin-grid" id="pinGrid"></div>
+  </div>
+</div>
+
+<!-- ── Main Screen ──────────────────────────────── -->
+<div id="mainScreen" class="hidden">
+  <div class="header">
+    <div><h1>JINYI GOLD HK</h1><div class="sub">Trade Desk</div></div>
+    <div class="right">
+      <span class="user" id="userName"></span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="section-label">Enter Trade Code</div>
+    <textarea class="trade-input" id="tradeInput" rows="3"
+      placeholder="#NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG"></textarea>
+
+    <div class="btn-row">
+      <span class="input-hint">One trade per line</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn-validate" id="btnValidate" onclick="validateTrades()" disabled>Validate</button>
+        <button class="btn-submit" id="btnSubmit" onclick="submitTrades()" disabled>Send Trade</button>
+      </div>
+    </div>
+
+    <div id="validationArea"></div>
+    <div id="resultsArea"></div>
+
+    <button class="ref-toggle" onclick="toggleRef()">
+      <span id="refArrow">▸</span> Format Reference
+    </button>
+    <div id="refContent" class="format-guide">
+      <div class="label">Syntax</div>
+      <div class="ex">&lt;TRIGGER&gt; &lt;BUY/SELL&gt; &lt;QTY&gt;&lt;UNIT&gt; &lt;METAL&gt; [PURITY] @&lt;RATE&gt; [PREMIUM] &lt;PARTY&gt;</div>
+      <div class="label">Examples</div>
+      <div class="ex"><span class="trigger">#NTP</span> SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG</div>
+      <div class="ex"><span class="trigger">#NTK</span> BUY 50KG SILVER 999 @70.51 +1.2 SAPAN</div>
+      <div class="ex"><span class="trigger">#NT</span> SELL 2KG PLATINUM 999 @979.25 -4 SHAH</div>
+      <div class="label">Triggers</div>
+      <div><span class="f-type-p">#NTP</span> = Pakka &nbsp; <span class="f-type-k">#NTK</span> = Kachha &nbsp; <span class="f-type-u">#NT</span> = Decide later</div>
+    </div>
+
+    <div id="recentArea"></div>
+  </div>
+</div>
+
+<!-- ── Loading ──────────────────────────────────── -->
+<div id="loadingScreen" style="display:flex;align-items:center;justify-content:center;height:100dvh">
+  <div style="width:32px;height:32px;border:2px solid #b45309;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <script>
-// ─── Minimal deal code parser (mirrors server-side parseDealCode) ───
+// ─── Parser (mirrors server-side) ────────────────
 function parseDealCode(line) {
   const result = { is_deal_code: false, parsed: false, fields: {}, errors: [] };
   const t = line.trim();
   const m = t.match(/^#NT([KP]?)\b/i);
   if (!m) return result;
   result.is_deal_code = true;
-
   const suffix = (m[1] || '').toUpperCase();
   result.fields.deal_type = suffix === 'K' ? 'K' : suffix === 'P' ? 'P' : null;
-
   const rest = t.slice(m[0].length).trim();
   const tokens = rest.split(/\s+/);
-
-  // Direction
   const dirIdx = tokens.findIndex(t => /^(buy|sell)$/i.test(t));
   if (dirIdx >= 0) result.fields.direction = tokens[dirIdx].toLowerCase();
   else result.errors.push('Missing BUY/SELL');
-
-  // Quantity
-  const qtyToken = tokens.find(t => /^\d+(\.\d+)?\s*(kg|kgs|g|grams?|oz)\b/i.test(t)) ||
-    (() => { for (let i = 0; i < tokens.length - 1; i++) { if (/^\d+(\.\d+)?$/.test(tokens[i]) && /^(kg|kgs|g|grams?|oz)$/i.test(tokens[i+1])) return tokens[i] + tokens[i+1]; } return null; })();
   const combinedQty = tokens.find(t => /^\d+(\.\d+)?(kg|kgs|g|grams?|oz)$/i.test(t));
   if (combinedQty) {
     const qm = combinedQty.match(/^(\d+(?:\.\d+)?)(kg|kgs|g|grams?|oz)$/i);
-    if (qm) {
-      let g = parseFloat(qm[1]);
-      const u = qm[2].toLowerCase();
-      if (u === 'kg' || u === 'kgs') g *= 1000;
-      else if (u === 'oz') g *= 31.1035;
-      result.fields.qty_grams = g;
-    }
-  } else if (qtyToken) {
-    result.fields.qty_grams = parseFloat(qtyToken);
-  } else {
-    result.errors.push('Missing quantity');
-  }
-
-  // Metal
-  const metalMap = { gold: 'gold', xau: 'gold', silver: 'silver', xag: 'silver', platinum: 'platinum', pt: 'platinum', xpt: 'platinum', palladium: 'palladium', pd: 'palladium', xpd: 'palladium' };
+    if (qm) { let g = parseFloat(qm[1]); const u = qm[2].toLowerCase(); if (u==='kg'||u==='kgs') g*=1000; else if (u==='oz') g*=31.1035; result.fields.qty_grams = g; }
+  } else result.errors.push('Missing quantity');
+  const metalMap = {gold:'gold',xau:'gold',silver:'silver',xag:'silver',platinum:'platinum',pt:'platinum',xpt:'platinum',palladium:'palladium',pd:'palladium',xpd:'palladium'};
   const metalToken = tokens.find(t => metalMap[t.toLowerCase()]);
   if (metalToken) result.fields.metal = metalMap[metalToken.toLowerCase()];
   else result.errors.push('Missing metal');
-
-  // Purity
   const purityToken = tokens.find(t => /^(18K|20K|22K|24K|995|999|9999|4N)$/i.test(t));
-  result.fields.purity = purityToken ? purityToken.toUpperCase() : (result.fields.metal === 'gold' ? '24K' : '999');
-
-  // Rate
+  result.fields.purity = purityToken ? purityToken.toUpperCase() : (result.fields.metal==='gold'?'24K':'999');
   const rateToken = tokens.find(t => /^@[\d.]+$/.test(t));
   if (rateToken) result.fields.rate_usd_per_oz = parseFloat(rateToken.slice(1));
   else result.errors.push('Missing @rate');
-
-  // Premium
   const premToken = tokens.find(t => /^[+-]\d+(\.\d+)?%?$/.test(t) && !/^@/.test(t));
-  if (premToken) {
-    result.fields.premium_type = premToken.endsWith('%') ? 'percent' : 'absolute';
-    result.fields.premium_value = parseFloat(premToken.replace('%', ''));
-  }
-
-  // Party (last token after rate/premium)
+  if (premToken) { result.fields.premium_type = premToken.endsWith('%')?'percent':'absolute'; result.fields.premium_value = parseFloat(premToken.replace('%','')); }
   const rateIdx = tokens.indexOf(rateToken);
-  if (rateIdx >= 0) {
-    let partyIdx = rateIdx + 1;
-    if (premToken && tokens.indexOf(premToken) === partyIdx) partyIdx++;
-    if (partyIdx < tokens.length) result.fields.party_alias = tokens.slice(partyIdx).join(' ');
-  }
-
+  if (rateIdx >= 0) { let pi = rateIdx+1; if (premToken && tokens.indexOf(premToken)===pi) pi++; if (pi<tokens.length) result.fields.party_alias = tokens.slice(pi).join(' '); }
   result.parsed = result.errors.length === 0;
   return result;
 }
 
 // ─── State ────────────────────────────────────────
-let state = { screen: 'loading', pin: '', pinError: false, user: '', text: '', results: null, recent: [], refOpen: false };
+let pin = '', pinError = false, user = '', validated = false;
 
-function setState(patch) {
-  Object.assign(state, patch);
-  render();
+// ─── DOM refs ─────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+// ─── Screen management ───────────────────────────
+function showScreen(name) {
+  $('loadingScreen').style.display = 'none';
+  $('loginScreen').classList.toggle('hidden', name !== 'login');
+  $('mainScreen').classList.toggle('hidden', name !== 'main');
+  if (name === 'login') renderPinPad();
+  if (name === 'main') { $('userName').textContent = user; loadRecent(); }
 }
 
-// ─── API helpers ──────────────────────────────────
+// ─── PIN pad ──────────────────────────────────────
+function renderPinPad() {
+  const dotsHtml = Array.from({length:6}, (_,i) =>
+    `<div class="pin-dot ${i < pin.length ? (pinError ? 'error' : 'filled') : ''}"></div>`
+  ).join('');
+  $('pinDots').innerHTML = dotsHtml;
+  $('pinError').textContent = pinError ? 'Wrong PIN. Try again.' : '';
+  const digits = ['1','2','3','4','5','6','7','8','9','','0','del'];
+  $('pinGrid').innerHTML = digits.map(d => {
+    if (d === '') return '<div></div>';
+    if (d === 'del') return '<button class="pin-btn del" onclick="pinDel()">&#9003;</button>';
+    return `<button class="pin-btn" onclick="pinDigit('${d}')">${d}</button>`;
+  }).join('');
+}
+
+function pinDigit(d) {
+  if (pin.length >= 6) return;
+  pinError = false;
+  pin += d;
+  renderPinPad();
+  if (pin.length === 6) setTimeout(() => doLogin(pin), 100);
+}
+function pinDel() { pin = pin.slice(0,-1); pinError = false; renderPinPad(); }
+
+document.addEventListener('keydown', function(e) {
+  if (!$('loginScreen').classList.contains('hidden')) {
+    if (/^[0-9]$/.test(e.key)) { e.preventDefault(); pinDigit(e.key); }
+    else if (e.key === 'Backspace') { e.preventDefault(); pinDel(); }
+  }
+});
+
+// ─── Auth ─────────────────────────────────────────
 async function checkAuth() {
   try {
     const r = await fetch('/api/auth');
     const d = await r.json();
-    if (d.authenticated) setState({ screen: 'main', user: d.label || '' });
-    else setState({ screen: 'login' });
-  } catch { setState({ screen: 'login' }); }
+    if (d.authenticated) { user = d.label || ''; showScreen('main'); }
+    else showScreen('login');
+  } catch { showScreen('login'); }
 }
 
-async function doLogin(pin) {
-  const r = await fetch('/api/auth', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin })
-  });
+async function doLogin(p) {
+  const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pin:p}) });
   const d = await r.json();
-  if (d.ok) { setState({ screen: 'main', user: d.label || '', pin: '', pinError: false }); loadRecent(); }
-  else setState({ pinError: true, pin: '' });
+  if (d.ok) { user = d.label || ''; pin = ''; pinError = false; showScreen('main'); }
+  else { pinError = true; pin = ''; renderPinPad(); }
 }
 
 async function doLogout() {
-  await fetch('/api/auth', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'logout' })
+  await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'logout'}) });
+  user = ''; pin = ''; validated = false;
+  $('tradeInput').value = '';
+  $('validationArea').innerHTML = '';
+  $('resultsArea').innerHTML = '';
+  $('recentArea').innerHTML = '';
+  showScreen('login');
+}
+
+// ─── Trade input handlers ─────────────────────────
+// NO re-rendering on input — just toggle button states
+$('tradeInput')?.addEventListener?.('input', function() {
+  validated = false;
+  $('btnSubmit').disabled = true;
+  $('btnValidate').disabled = !this.value.trim();
+  $('validationArea').innerHTML = '';
+  $('resultsArea').innerHTML = '';
+});
+
+// Wait for DOM then attach listener
+function attachInputListener() {
+  const ta = $('tradeInput');
+  if (!ta) return;
+  ta.addEventListener('input', function() {
+    validated = false;
+    $('btnSubmit').disabled = true;
+    $('btnValidate').disabled = !this.value.trim();
+    $('validationArea').innerHTML = '';
+    $('resultsArea').innerHTML = '';
   });
-  setState({ screen: 'login', user: '', pin: '', text: '', results: null, recent: [] });
+  ta.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (validated) submitTrades();
+      else validateTrades();
+    }
+  });
 }
 
+// ─── Validate ─────────────────────────────────────
+function validateTrades() {
+  const text = $('tradeInput').value.trim();
+  if (!text) return;
+  const lines = text.split('\n').filter(l => l.trim());
+  let allValid = true;
+  let html = '<div class="validation">';
+
+  lines.forEach(line => {
+    const p = parseDealCode(line.trim());
+    if (!p.is_deal_code) {
+      allValid = false;
+      html += `<div class="val-item val-err">✗ <strong>Not a deal code</strong> — must start with #NTK, #NTP, or #NT<br><code>${line}</code></div>`;
+    } else if (!p.parsed) {
+      allValid = false;
+      const f = p.fields;
+      html += `<div class="val-item val-warn">⚠ Parse errors: <strong>${p.errors.join(', ')}</strong><br><code>${line}</code></div>`;
+    } else {
+      const f = p.fields;
+      const typeClass = f.deal_type==='K'?'f-type-k':f.deal_type==='P'?'f-type-p':'f-type-u';
+      const typeLabel = f.deal_type==='K'?'KACHHA':f.deal_type==='P'?'PAKKA':'UNCLASSIFIED';
+      const dirClass = f.direction==='sell'?'f-dir-sell':'f-dir-buy';
+      const qty = f.qty_grams>=1000?(f.qty_grams/1000).toFixed(2)+'kg':(f.qty_grams||'?')+'g';
+      const prem = f.premium_value!=null ? `<span class="field" style="color:#666">${f.premium_value>0?'+':''}${f.premium_value}${f.premium_type==='percent'?'%':''}</span>` : '';
+      html += `<div class="val-item val-ok">
+        ✓ <span class="field ${typeClass}">${typeLabel}</span>
+        <span class="field ${dirClass}">${(f.direction||'?').toUpperCase()}</span>
+        <span class="field f-metal">${qty} ${(f.metal||'?').toUpperCase()}</span>
+        <span class="field" style="color:#888">${f.purity||''}</span>
+        <span class="field f-rate">@${f.rate_usd_per_oz||'?'}</span>
+        ${prem}
+        <span class="field f-party">${f.party_alias||''}</span>
+      </div>`;
+    }
+  });
+
+  if (!allValid) {
+    html += '<div class="format-guide" style="margin-top:12px"><div class="label">Correct Format</div>';
+    html += '<div class="ex">#NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG</div>';
+    html += '<div class="ex">#NTK BUY 50KG SILVER 999 @70.51 +1.2 SAPAN</div>';
+    html += '<div style="margin-top:8px;font-size:11px;color:#b45309">Fix the errors above and validate again.</div></div>';
+  }
+
+  html += '</div>';
+  $('validationArea').innerHTML = html;
+  validated = allValid;
+  $('btnSubmit').disabled = !allValid;
+}
+
+// ─── Submit ───────────────────────────────────────
 async function submitTrades() {
-  if (!state.text.trim()) return;
-  setState({ results: 'submitting' });
+  const text = $('tradeInput').value.trim();
+  if (!text || !validated) return;
+  $('btnSubmit').disabled = true;
+  $('btnSubmit').textContent = 'Sending…';
+
   try {
-    const r = await fetch('/api/trade-entry', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: state.text })
-    });
+    const r = await fetch('/api/trade-entry', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
     const d = await r.json();
-    setState({ results: d.results || [], text: '' });
-    loadRecent();
-  } catch { setState({ results: [{ line: state.text, ok: false, errors: ['Network error'] }] }); }
+    let html = '';
+    (d.results||[]).forEach(r => {
+      html += `<div class="result-item ${r.ok?'result-ok':'result-fail'}">${r.ok?'✓ Trade sent':'✗ '+(r.errors||['Failed']).join(', ')} — ${r.line}</div>`;
+    });
+    $('resultsArea').innerHTML = html;
+    $('validationArea').innerHTML = '';
+    if (d.ok) { $('tradeInput').value = ''; validated = false; $('btnValidate').disabled = true; loadRecent(); }
+  } catch {
+    $('resultsArea').innerHTML = '<div class="result-item result-fail">✗ Network error</div>';
+  }
+
+  $('btnSubmit').textContent = 'Send Trade';
+  $('btnSubmit').disabled = true;
 }
 
+// ─── Recent ───────────────────────────────────────
 async function loadRecent() {
   try {
     const r = await fetch('/api/trade-entry?limit=15');
     const d = await r.json();
-    setState({ recent: d.entries || [] });
+    const entries = d.entries || [];
+    if (entries.length === 0) { $('recentArea').innerHTML = ''; return; }
+    let html = '<div class="recent"><div class="section-label">My Recent Entries</div><div class="recent-list">';
+    entries.forEach(e => {
+      const sc = e.status==='approved'?'status-approved':e.status==='rejected'?'status-rejected':'status-pending';
+      const time = new Date(e.received_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
+      html += `<div class="recent-item"><div class="recent-msg">${e.raw_message}</div><div class="recent-meta"><span class="recent-status ${sc}">${e.status}</span><span class="recent-time">${time}</span></div></div>`;
+    });
+    html += '</div></div>';
+    $('recentArea').innerHTML = html;
   } catch {}
 }
 
-// ─── PIN pad handler ──────────────────────────────
-function pinDigit(d) {
-  if (state.pin.length >= 6) return;
-  setState({ pinError: false });
-  const next = state.pin + d;
-  setState({ pin: next });
-  if (next.length === 6) setTimeout(() => doLogin(next), 100);
-}
-function pinDel() { setState({ pin: state.pin.slice(0, -1), pinError: false }); }
-
-// ─── Keyboard for PIN ─────────────────────────────
-document.addEventListener('keydown', function(e) {
-  if (state.screen !== 'login') return;
-  if (/^[0-9]$/.test(e.key)) { e.preventDefault(); pinDigit(e.key); }
-  else if (e.key === 'Backspace') { e.preventDefault(); pinDel(); }
-});
-
-// ─── Render ───────────────────────────────────────
-function render() {
-  const app = document.getElementById('app');
-
-  if (state.screen === 'loading') {
-    app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100dvh"><div style="width:32px;height:32px;border:2px solid #f59e0b;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></div></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
-    return;
-  }
-
-  if (state.screen === 'login') {
-    const dots = Array.from({length: 6}, (_, i) =>
-      `<div class="pin-dot ${i < state.pin.length ? (state.pinError ? 'error' : 'filled') : ''}"></div>`
-    ).join('');
-    const digits = ['1','2','3','4','5','6','7','8','9','','0','del'];
-    const btns = digits.map(d => {
-      if (d === '') return '<div></div>';
-      if (d === 'del') return `<button class="pin-btn del" onclick="pinDel()">&#9003;</button>`;
-      return `<button class="pin-btn" onclick="pinDigit('${d}')">${d}</button>`;
-    }).join('');
-
-    app.innerHTML = `
-      <div class="header">
-        <div><h1>JINYI GOLD HK</h1><div class="sub">Trade Desk</div></div>
-      </div>
-      <div class="login-screen">
-        <div class="login-title">Trade Desk</div>
-        <div class="login-sub">Enter PIN</div>
-        <div class="pin-dots">${dots}</div>
-        <div class="pin-error">${state.pinError ? 'Wrong PIN. Try again.' : ''}</div>
-        <div class="pin-grid">${btns}</div>
-      </div>`;
-    return;
-  }
-
-  // ── Main screen ──
-  // Parse preview
-  let previewHtml = '';
-  if (state.text.trim() && !state.results) {
-    const lines = state.text.split('\n').filter(l => l.trim());
-    previewHtml = '<div class="preview"><div class="section-label">Preview</div>' +
-      lines.map(line => {
-        const p = parseDealCode(line.trim());
-        if (!p.is_deal_code) return `<div class="preview-item preview-err">✗ Not a deal code — must start with #NTK, #NTP, or #NT</div>`;
-        const f = p.fields;
-        const typeClass = f.deal_type === 'K' ? 'f-type-k' : f.deal_type === 'P' ? 'f-type-p' : 'f-type-u';
-        const typeLabel = f.deal_type === 'K' ? 'KACHHA' : f.deal_type === 'P' ? 'PAKKA' : 'UNCLASSIFIED';
-        const dirClass = f.direction === 'sell' ? 'f-dir-sell' : 'f-dir-buy';
-        const metalClass = 'f-metal-' + (f.metal || 'gold');
-        const qty = f.qty_grams >= 1000 ? (f.qty_grams/1000).toFixed(2) + 'kg' : (f.qty_grams || '?') + 'g';
-        const errHtml = p.errors.length ? ` <span class="f-error">⚠ ${p.errors.join(', ')}</span>` : '';
-        const premHtml = f.premium_value != null ? `<span class="field f-premium">${f.premium_value > 0 ? '+' : ''}${f.premium_value}${f.premium_type === 'percent' ? '%' : ''}</span>` : '';
-        return `<div class="preview-item ${p.parsed ? 'preview-ok' : 'preview-warn'}">
-          <span class="field ${typeClass}">${typeLabel}</span>
-          <span class="field ${dirClass}">${(f.direction || '?').toUpperCase()}</span>
-          <span class="field" style="color:#fff">${qty}</span>
-          <span class="field ${metalClass}">${(f.metal || '?').toUpperCase()}</span>
-          <span class="field f-purity">${f.purity || ''}</span>
-          <span class="field f-rate">@${f.rate_usd_per_oz || '?'}</span>
-          ${premHtml}
-          <span class="field f-party">${f.party_alias || ''}</span>
-          ${errHtml}
-        </div>`;
-      }).join('') + '</div>';
-  }
-
-  // Results
-  let resultsHtml = '';
-  if (state.results === 'submitting') {
-    resultsHtml = '<div style="text-align:center;padding:20px;color:#888">Submitting…</div>';
-  } else if (Array.isArray(state.results)) {
-    resultsHtml = '<div style="margin-top:16px"><div class="section-label">Result</div>' +
-      state.results.map(r =>
-        `<div class="result-item ${r.ok ? 'result-ok' : 'result-fail'}">${r.ok ? '✓' : '✗'} ${r.ok ? 'Trade submitted' : (r.errors || ['Failed']).join(', ')} — ${r.line}</div>`
-      ).join('') + '</div>';
-  }
-
-  // Recent
-  let recentHtml = '';
-  if (state.recent.length > 0) {
-    recentHtml = `<div class="recent">
-      <div class="section-label">My Recent Entries</div>
-      <div class="recent-list">
-        ${state.recent.map(e => {
-          const statusClass = e.status === 'approved' ? 'status-approved' : e.status === 'rejected' ? 'status-rejected' : 'status-pending';
-          const time = new Date(e.received_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true });
-          return `<div class="recent-item">
-            <div class="recent-msg">${e.raw_message}</div>
-            <div class="recent-meta">
-              <span class="recent-status ${statusClass}">${e.status}</span>
-              <span class="recent-time">${time}</span>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  }
-
-  // Reference
-  const refHtml = `
-    <button class="ref-toggle" onclick="setState({refOpen:!state.refOpen})">
-      ${state.refOpen ? '▾' : '▸'} Format Reference
-    </button>
-    <div class="ref-content ${state.refOpen ? 'open' : ''}">
-      <div class="label">Syntax</div>
-      <div class="ex">&lt;TRIGGER&gt; &lt;BUY/SELL&gt; &lt;QTY&gt;&lt;UNIT&gt; &lt;METAL&gt; [PURITY] @&lt;RATE&gt; [PREMIUM] &lt;PARTY&gt;</div>
-      <div class="label">Examples</div>
-      <div class="ex">#NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG</div>
-      <div class="ex">#NTK BUY 50KG SILVER 999 @70.51 +1.2 SAPAN</div>
-      <div class="ex">#NT SELL 2KG PLATINUM 999 @979.25 -4 SHAH</div>
-      <div class="label">Triggers</div>
-      <div><span class="f-type-p">#NTP</span> = Pakka &nbsp; <span class="f-type-k">#NTK</span> = Kachha &nbsp; <span class="f-type-u">#NT</span> = Decide later</div>
-    </div>`;
-
-  app.innerHTML = `
-    <div class="header">
-      <div><h1>JINYI GOLD HK</h1><div class="sub">Trade Desk</div></div>
-      <div class="right">
-        <span class="user">${state.user}</span>
-        <button class="btn-logout" onclick="doLogout()">Logout</button>
-      </div>
-    </div>
-    <div class="main">
-      <div class="section-label">Enter Trade Code</div>
-      <textarea class="trade-input" id="tradeInput" rows="3"
-        placeholder="#NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG"
-        oninput="setState({text:this.value, results:null})"
-        onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();submitTrades()}"
-      >${state.text}</textarea>
-      <div class="input-footer">
-        <span class="input-hint">One trade per line · Ctrl+Enter to submit</span>
-        <button class="btn-submit" onclick="submitTrades()" ${!state.text.trim() ? 'disabled' : ''}>
-          Submit Trade
-        </button>
-      </div>
-      ${previewHtml}
-      ${resultsHtml}
-      ${refHtml}
-      ${recentHtml}
-    </div>`;
-
-  // Restore cursor position in textarea
-  const ta = document.getElementById('tradeInput');
-  if (ta && document.activeElement !== ta && state.text) {
-    // Don't steal focus
-  }
+function toggleRef() {
+  const c = $('refContent');
+  c.classList.toggle('open');
+  $('refArrow').textContent = c.classList.contains('open') ? '▾' : '▸';
 }
 
 // ─── Boot ─────────────────────────────────────────
 checkAuth();
-// Poll recent entries every 10s
-setInterval(() => { if (state.screen === 'main') loadRecent(); }, 10000);
+// Attach input listener after main screen shows
+const _origShowScreen = showScreen;
+showScreen = function(name) {
+  _origShowScreen(name);
+  if (name === 'main') setTimeout(attachInputListener, 50);
+};
+setInterval(() => { if (!$('mainScreen').classList.contains('hidden')) loadRecent(); }, 10000);
 </script>
 </body>
 </html>
