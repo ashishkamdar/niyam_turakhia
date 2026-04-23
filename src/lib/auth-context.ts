@@ -34,7 +34,7 @@ import type { NextRequest } from "next/server";
 import type Database from "better-sqlite3";
 import { getDb } from "@/lib/db";
 
-export type Role = "super_admin" | "admin" | "staff";
+export type Role = "super_admin" | "admin" | "staff" | "trade_desk";
 
 export type CurrentUser = {
   pin_id: string;
@@ -78,6 +78,7 @@ export function getCurrentUser(req: NextRequest): CurrentUser | null {
 export function normalizeRole(raw: string | null | undefined): Role {
   if (raw === "super_admin") return "super_admin";
   if (raw === "admin") return "admin";
+  if (raw === "trade_desk") return "trade_desk";
   return "staff";
 }
 
@@ -89,7 +90,7 @@ export function normalizeRole(raw: string | null | undefined): Role {
  */
 export function canCreateRole(actor: Role, target: Role): boolean {
   if (actor === "super_admin") return true;
-  if (actor === "admin") return target === "admin" || target === "staff";
+  if (actor === "admin") return target === "admin" || target === "staff" || target === "trade_desk";
   return false;
 }
 
@@ -99,7 +100,7 @@ export function canCreateRole(actor: Role, target: Role): boolean {
  */
 export function canModifyPin(actor: Role, target: Role): boolean {
   if (actor === "super_admin") return true;
-  if (actor === "admin") return target === "admin" || target === "staff";
+  if (actor === "admin") return target === "admin" || target === "staff" || target === "trade_desk";
   return false;
 }
 

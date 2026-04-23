@@ -66,7 +66,7 @@ function clearAttempts(ip: string): void {
 }
 
 export async function POST(req: NextRequest) {
-  const { pin, action } = await req.json();
+  const { pin, action, source } = await req.json();
   const db = getDb();
 
   if (action === "logout") {
@@ -112,6 +112,17 @@ export async function POST(req: NextRequest) {
   if (!match) {
     recordFailedAttempt(ip);
     return NextResponse.json({ ok: false, error: "Wrong PIN" }, { status: 401 });
+  }
+
+  // Trade Desk users can only log in via /nt/staff/trade/. The Trade
+  // Desk HTML sends source:"trade_desk" in the login body. If a
+  // trade_desk role user tries to log in from the mother app (no
+  // source field), block them.
+  if (match.role === "trade_desk" && source !== "trade_desk") {
+    return NextResponse.json(
+      { ok: false, error: "Access restricted to Trade Desk" },
+      { status: 403 }
+    );
   }
 
   // Successful login — clear any accumulated failed attempts for this IP.

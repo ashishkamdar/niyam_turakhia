@@ -9,6 +9,7 @@ import {
   normalizeRole,
   type Role,
 } from "@/lib/auth-context";
+import { addAccessEmail, removeAccessEmail } from "@/lib/cloudflare-access";
 
 type PinRow = {
   id: string;
@@ -16,6 +17,7 @@ type PinRow = {
   pin: string;
   role: string;
   locked: number;
+  email: string | null;
   created_at: string;
 };
 
@@ -27,6 +29,7 @@ type PinRow = {
 function parseIncomingRole(raw: unknown): Role {
   if (raw === "super_admin") return "super_admin";
   if (raw === "admin") return "admin";
+  if (raw === "trade_desk") return "trade_desk";
   return "staff";
 }
 
@@ -41,7 +44,7 @@ export async function GET(_req: NextRequest) {
   const db = getDb();
   const pins = db
     .prepare(
-      "SELECT id, label, pin, role, locked, created_at FROM auth_pins ORDER BY created_at ASC"
+      "SELECT id, label, pin, role, locked, email, created_at FROM auth_pins ORDER BY created_at ASC"
     )
     .all() as PinRow[];
 
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { label, pin } = body as { label?: string; pin?: string; role?: string };
+  const { label, pin, email } = body as { label?: string; pin?: string; role?: string; email?: string };
   const requestedRole = parseIncomingRole(body.role);
 
   if (!label || !pin) {
@@ -114,9 +117,15 @@ export async function POST(req: NextRequest) {
   const db = getDb();
   const id = randomUUID();
   const now = new Date().toISOString();
+  const emailVal = email?.trim() || null;
   db.prepare(
-    "INSERT INTO auth_pins (id, label, pin, role, created_at) VALUES (?, ?, ?, ?, ?)"
-  ).run(id, label.trim(), pin, requestedRole, now);
+    "INSERT INTO auth_pins (id, label, pin, role, email, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, label.trim(), pin, requestedRole, emailVal, now);
+
+  // Sync email to Cloudflare Access (best-effort, don't block on failure)
+  if (emailVal) {
+    addAccessEmail(db, emailVal).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true, id });
 }
@@ -141,12 +150,13 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { id, label, pin, locked } = body as {
+  const { id, label, pin, locked, email } = body as {
     id?: string;
     label?: string;
     pin?: string;
     role?: string;
     locked?: boolean;
+    email?: string | null;
   };
 
   if (!id) {
@@ -161,8 +171,8 @@ export async function PUT(req: NextRequest) {
 
   const db = getDb();
   const existing = db
-    .prepare("SELECT id, role FROM auth_pins WHERE id = ?")
-    .get(id) as { id: string; role: string } | undefined;
+    .prepare("SELECT id, role, email FROM auth_pins WHERE id = ?")
+    .get(id) as { id: string; role: string; email: string | null } | undefined;
   if (!existing) {
     return NextResponse.json({ ok: false, error: "PIN not found" }, { status: 404 });
   }
@@ -218,6 +228,10 @@ export async function PUT(req: NextRequest) {
     updates.push("role = ?");
     params.push(nextRole);
   }
+  if (email !== undefined) {
+    updates.push("email = ?");
+    params.push(email?.trim() || null as unknown as string);
+  }
   if (locked !== undefined) {
     // SQLite has no BOOL — store as 0/1 INTEGER.
     updates.push("locked = ?");
@@ -228,6 +242,21 @@ export async function PUT(req: NextRequest) {
   }
   params.push(id);
   db.prepare(`UPDATE auth_pins SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+
+  // Cloudflare Access sync for lock/unlock (best-effort)
+  const finalEmail = email !== undefined ? (email?.trim() || null) : existing.email;
+  if (finalEmail && locked !== undefined) {
+    if (locked) {
+      removeAccessEmail(db, finalEmail).catch(() => {});
+    } else {
+      addAccessEmail(db, finalEmail).catch(() => {});
+    }
+  }
+  // If email changed, remove old and add new
+  if (email !== undefined && existing.email && email !== existing.email) {
+    removeAccessEmail(db, existing.email).catch(() => {});
+    if (email?.trim()) addAccessEmail(db, email.trim()).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true });
 }
@@ -258,8 +287,8 @@ export async function DELETE(req: NextRequest) {
 
   const db = getDb();
   const target = db
-    .prepare("SELECT id, role FROM auth_pins WHERE id = ?")
-    .get(id) as { id: string; role: string } | undefined;
+    .prepare("SELECT id, role, email FROM auth_pins WHERE id = ?")
+    .get(id) as { id: string; role: string; email: string | null } | undefined;
   if (!target) {
     return NextResponse.json({ ok: false, error: "PIN not found" }, { status: 404 });
   }
@@ -282,5 +311,11 @@ export async function DELETE(req: NextRequest) {
   }
 
   db.prepare("DELETE FROM auth_pins WHERE id = ?").run(id);
+
+  // Remove from Cloudflare Access (best-effort)
+  if (target.email) {
+    removeAccessEmail(db, target.email).catch(() => {});
+  }
+
   return NextResponse.json({ ok: true });
 }

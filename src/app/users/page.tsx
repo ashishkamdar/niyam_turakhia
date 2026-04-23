@@ -35,7 +35,7 @@ type Session = {
   is_active: boolean;
 };
 
-type Role = "super_admin" | "admin" | "staff";
+type Role = "super_admin" | "admin" | "staff" | "trade_desk";
 
 type Pin = {
   id: string;
@@ -43,6 +43,7 @@ type Pin = {
   pin: string;
   role: Role;
   locked: boolean;
+  email: string | null;
   created_at: string;
   active_sessions: number;
 };
@@ -55,6 +56,7 @@ type Pin = {
 function coerceRole(raw: string | null | undefined): Role {
   if (raw === "super_admin") return "super_admin";
   if (raw === "admin") return "admin";
+  if (raw === "trade_desk") return "trade_desk";
   return "staff";
 }
 
@@ -63,12 +65,12 @@ function coerceRole(raw: string | null | undefined): Role {
 // is still the source of truth — these helpers only decide what to show.
 function canCreateRoleUi(actor: Role, target: Role): boolean {
   if (actor === "super_admin") return true;
-  if (actor === "admin") return target === "admin" || target === "staff";
+  if (actor === "admin") return target === "admin" || target === "staff" || target === "trade_desk";
   return false;
 }
 function canModifyPinUi(actor: Role, target: Role): boolean {
   if (actor === "super_admin") return true;
-  if (actor === "admin") return target === "admin" || target === "staff";
+  if (actor === "admin") return target === "admin" || target === "staff" || target === "trade_desk";
   return false;
 }
 
@@ -87,6 +89,10 @@ const ROLE_META: Record<Role, { label: string; pillClass: string }> = {
   staff: {
     label: "Staff",
     pillClass: "bg-gray-500/20 text-gray-400",
+  },
+  trade_desk: {
+    label: "Trade Desk",
+    pillClass: "bg-sky-500/15 text-sky-300",
   },
 };
 
@@ -153,6 +159,20 @@ export default function UsersPage() {
   // role options show in the add/edit dropdowns. Server is still the
   // source of truth — this is only for optimistic UI gating.
   const [currentRole, setCurrentRole] = useState<Role>("staff");
+  const [cfEnforced, setCfEnforced] = useState(false);
+  const [cfConfigured, setCfConfigured] = useState(false);
+  const [cfToggling, setCfToggling] = useState(false);
+
+  const loadCfStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cloudflare-access");
+      const json = await res.json();
+      if (json.ok) {
+        setCfConfigured(json.configured);
+        setCfEnforced(json.enforced);
+      }
+    } catch {}
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -185,9 +205,10 @@ export default function UsersPage() {
 
   useEffect(() => {
     load();
+    loadCfStatus();
     const poll = setInterval(load, 5000);
     return () => clearInterval(poll);
-  }, [load]);
+  }, [load, loadCfStatus]);
 
   // Group active sessions by (label, ip) so when multiple staff log in
   // with the same PIN from the same office WiFi, we collapse them into
@@ -322,6 +343,63 @@ export default function UsersPage() {
           Print / PDF
         </button>
       </div>
+
+      {/* Cloudflare Access toggle — admin/super_admin only */}
+      {(currentRole === "super_admin" || currentRole === "admin") && cfConfigured && (
+        <section className="print:hidden">
+          <div className="flex items-center justify-between rounded-lg border border-white/5 bg-gray-900 px-4 py-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                Cloudflare Access
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                  cfEnforced
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : "bg-gray-500/20 text-gray-400"
+                }`}>
+                  {cfEnforced ? "Enforced" : "Bypassed"}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {cfEnforced
+                  ? "Email OTP required — only users with emails can access the site"
+                  : "Bypassed — anyone can access, only PIN login protects the app"}
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                setCfToggling(true);
+                try {
+                  const res = await fetch("/api/cloudflare-access", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ enforced: !cfEnforced }),
+                  });
+                  const json = await res.json();
+                  if (json.ok) {
+                    setCfEnforced(json.enforced ?? !cfEnforced);
+                  } else {
+                    alert(json.error || "Failed to toggle");
+                  }
+                } catch {
+                  alert("Network error");
+                } finally {
+                  setCfToggling(false);
+                }
+              }}
+              disabled={cfToggling}
+              className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${
+                cfEnforced ? "bg-emerald-600" : "bg-gray-600"
+              } ${cfToggling ? "opacity-50" : ""}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 inline-block size-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                  cfEnforced ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Active sessions section */}
       <section>
@@ -521,8 +599,8 @@ export default function UsersPage() {
  * rejects any attempt to bypass the UI.
  */
 function roleOptionsFor(actor: Role): Role[] {
-  if (actor === "super_admin") return ["super_admin", "admin", "staff"];
-  if (actor === "admin") return ["admin", "staff"];
+  if (actor === "super_admin") return ["super_admin", "admin", "staff", "trade_desk"];
+  if (actor === "admin") return ["admin", "staff", "trade_desk"];
   return [];
 }
 
@@ -539,6 +617,7 @@ function PinManager({
   const canManage = currentRole === "super_admin" || currentRole === "admin";
   const [newLabel, setNewLabel] = useState("");
   const [newPin, setNewPin] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<Role>(
     creatableRoles.includes("staff") ? "staff" : creatableRoles[0] ?? "staff"
   );
@@ -556,7 +635,7 @@ function PinManager({
       const res = await fetch("/api/pins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: newLabel, pin: newPin, role: newRole }),
+        body: JSON.stringify({ label: newLabel, pin: newPin, role: newRole, email: newEmail || undefined }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
@@ -564,6 +643,7 @@ function PinManager({
       } else {
         setNewLabel("");
         setNewPin("");
+        setNewEmail("");
         setNewRole("staff");
         onChange();
       }
@@ -574,7 +654,7 @@ function PinManager({
 
   async function updatePin(
     id: string,
-    patch: Partial<Pick<Pin, "label" | "pin" | "role" | "locked">>
+    patch: Partial<Pick<Pin, "label" | "pin" | "role" | "locked">> & { email?: string | null }
   ) {
     setBusy(true);
     try {
@@ -656,6 +736,18 @@ function PinManager({
               ))}
             </select>
           </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">
+              Email (for Cloudflare)
+            </label>
+            <input
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="user@example.com"
+              type="email"
+              className="w-full rounded border border-white/10 bg-gray-900 px-2 py-1.5 text-sm text-white placeholder:text-gray-600 focus:border-amber-500/50 focus:outline-none"
+            />
+          </div>
           <button
             onClick={addPin}
             disabled={busy || !newLabel || !newPin}
@@ -675,6 +767,7 @@ function PinManager({
               <th className="px-3 py-2 text-left font-semibold">Label</th>
               <th className="px-3 py-2 text-left font-semibold">PIN</th>
               <th className="px-3 py-2 text-left font-semibold">Role</th>
+              <th className="px-3 py-2 text-left font-semibold">Email</th>
               <th className="px-3 py-2 text-left font-semibold">Status</th>
               <th className="px-3 py-2 text-left font-semibold">Active</th>
               <th className="px-3 py-2 text-right font-semibold">Actions</th>
@@ -715,7 +808,7 @@ function PinRow({
   busy: boolean;
   onUpdate: (
     id: string,
-    patch: Partial<Pick<Pin, "label" | "pin" | "role" | "locked">>
+    patch: Partial<Pick<Pin, "label" | "pin" | "role" | "locked">> & { email?: string | null }
   ) => void;
   onDelete: (id: string, label: string) => void;
 }) {
@@ -734,9 +827,10 @@ function PinRow({
   const [label, setLabel] = useState(pin.label);
   const [value, setValue] = useState(pin.pin);
   const [role, setRole] = useState<Role>(pin.role);
+  const [emailVal, setEmailVal] = useState(pin.email || "");
 
   function save() {
-    onUpdate(pin.id, { label, pin: value, role });
+    onUpdate(pin.id, { label, pin: value, role, email: emailVal || null });
     setEditing(false);
   }
 
@@ -744,6 +838,7 @@ function PinRow({
     setLabel(pin.label);
     setValue(pin.pin);
     setRole(pin.role);
+    setEmailVal(pin.email || "");
     setEditing(false);
   }
 
@@ -794,6 +889,21 @@ function PinRow({
             className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${roleMeta.pillClass}`}
           >
             {roleMeta.label}
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-2 align-middle">
+        {editing ? (
+          <input
+            value={emailVal}
+            onChange={(e) => setEmailVal(e.target.value)}
+            placeholder="email@example.com"
+            type="email"
+            className="w-full min-w-[140px] rounded border border-white/10 bg-gray-950 px-2 py-1 text-sm text-white focus:border-amber-500/50 focus:outline-none"
+          />
+        ) : (
+          <span className="text-xs text-gray-400">
+            {pin.email || <span className="text-gray-600">—</span>}
           </span>
         )}
       </td>

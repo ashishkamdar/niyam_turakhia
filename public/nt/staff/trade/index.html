@@ -306,7 +306,7 @@ async function checkAuth() {
 }
 
 async function doLogin(p) {
-  const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pin:p}) });
+  const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pin:p, source:'trade_desk'}) });
   const d = await r.json();
   if (d.ok) { user = d.label || ''; pin = ''; pinError = false; showScreen('main'); }
   else { pinError = true; pin = ''; renderPinPad(); }

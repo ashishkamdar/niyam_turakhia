@@ -189,6 +189,7 @@ function initSchema(db: Database.Database) {
       pin TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'staff',
       locked INTEGER NOT NULL DEFAULT 0,
+      email TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -473,6 +474,13 @@ function runMigrations(db: Database.Database) {
       description: "Add notifications table for in-app bell icon feed",
       up: () => {
         // Table is created by CREATE TABLE IF NOT EXISTS above.
+      },
+    },
+    {
+      version: 17,
+      description: "Add email column to auth_pins for Cloudflare Access sync",
+      up: () => {
+        addColumnIfNotExists(db, "auth_pins", "email", "TEXT");
       },
     },
   ];
