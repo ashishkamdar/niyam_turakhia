@@ -181,6 +181,14 @@ export default function UsersPage() {
   const [cfEnforced, setCfEnforced] = useState(false);
   const [cfConfigured, setCfConfigured] = useState(false);
   const [cfToggling, setCfToggling] = useState(false);
+  const [cfSessionDuration, setCfSessionDuration] = useState("24h");
+
+  const SESSION_OPTIONS = [
+    { value: "24h", label: "24 Hours" },
+    { value: "168h", label: "1 Week" },
+    { value: "720h", label: "1 Month" },
+    { value: "8760h", label: "1 Year" },
+  ];
 
   const loadCfStatus = useCallback(async () => {
     try {
@@ -189,6 +197,7 @@ export default function UsersPage() {
       if (json.ok) {
         setCfConfigured(json.configured);
         setCfEnforced(json.enforced);
+        if (json.sessionDuration) setCfSessionDuration(json.sessionDuration);
       }
     } catch {}
   }, []);
@@ -385,6 +394,36 @@ export default function UsersPage() {
                   ? "Email OTP required — only users with emails can access the site"
                   : "Bypassed — anyone can access, only PIN login protects the app"}
               </p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">Session:</span>
+                {SESSION_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={async () => {
+                      setCfToggling(true);
+                      try {
+                        const res = await fetch("/api/cloudflare-access", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ sessionDuration: opt.value }),
+                        });
+                        const json = await res.json();
+                        if (json.ok) setCfSessionDuration(opt.value);
+                        else alert(json.error || "Failed");
+                      } catch { alert("Network error"); }
+                      finally { setCfToggling(false); }
+                    }}
+                    disabled={cfToggling}
+                    className={`rounded px-2 py-0.5 text-[10px] font-semibold transition ${
+                      cfSessionDuration === opt.value
+                        ? "bg-amber-500/20 text-amber-300"
+                        : "bg-white/5 text-gray-500 hover:text-gray-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <button
               onClick={async () => {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth-context";
-import { getAccessPolicy, setAccessEnforced } from "@/lib/cloudflare-access";
+import { getAccessPolicy, setAccessEnforced, setSessionDuration } from "@/lib/cloudflare-access";
 
 /**
  * GET /api/cloudflare-access
@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
     configured: true,
     enforced: state.enforced,
     emails: state.emails,
+    sessionDuration: state.sessionDuration,
   });
 }
 
@@ -45,12 +46,28 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
   }
 
-  const { enforced } = await req.json();
+  const db = getDb();
+  const body = await req.json();
+  const { enforced, sessionDuration } = body as { enforced?: boolean; sessionDuration?: string };
+
+  // Handle session duration change
+  if (sessionDuration !== undefined) {
+    const valid = ["24h", "168h", "720h", "8760h"];
+    if (!valid.includes(sessionDuration)) {
+      return NextResponse.json({ ok: false, error: "Invalid session duration" }, { status: 400 });
+    }
+    const result = await setSessionDuration(db, sessionDuration);
+    if (!result.ok) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
+    }
+    if (enforced === undefined) {
+      return NextResponse.json({ ok: true, sessionDuration });
+    }
+  }
+
   if (typeof enforced !== "boolean") {
     return NextResponse.json({ ok: false, error: "enforced must be boolean" }, { status: 400 });
   }
-
-  const db = getDb();
 
   if (enforced) {
     // Collect all emails from non-locked auth_pins

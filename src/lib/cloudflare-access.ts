@@ -16,6 +16,7 @@ import type Database from "better-sqlite3";
 type CfConfig = {
   token: string;
   accountId: string;
+  appId: string;
   policyId: string;
 };
 
@@ -25,14 +26,19 @@ function getCfConfig(db: Database.Database): CfConfig | null {
 
   const token = get("cloudflare_api_token");
   const accountId = get("cloudflare_account_id");
+  const appId = get("cloudflare_access_app_id");
   const policyId = get("cloudflare_access_policy_id");
 
-  if (!token || !accountId || !policyId) return null;
-  return { token, accountId, policyId };
+  if (!token || !accountId || !appId || !policyId) return null;
+  return { token, accountId, appId, policyId };
 }
 
 function policyUrl(cfg: CfConfig): string {
   return `https://api.cloudflare.com/client/v4/accounts/${cfg.accountId}/access/policies/${cfg.policyId}`;
+}
+
+function appUrl(cfg: CfConfig): string {
+  return `https://api.cloudflare.com/client/v4/accounts/${cfg.accountId}/access/apps/${cfg.appId}`;
 }
 
 function headers(cfg: CfConfig): Record<string, string> {
@@ -47,17 +53,23 @@ function headers(cfg: CfConfig): Record<string, string> {
 export type PolicyState = {
   enforced: boolean;       // true = allow (email OTP), false = bypass
   emails: string[];        // list of allowed emails (only meaningful when enforced)
+  sessionDuration: string; // e.g. "24h", "168h", "720h", "8760h"
 };
 
 export async function getAccessPolicy(db: Database.Database): Promise<PolicyState | null> {
   const cfg = getCfConfig(db);
   if (!cfg) return null;
 
-  const res = await fetch(policyUrl(cfg), { headers: headers(cfg) });
-  const data = await res.json();
-  if (!data.success) return null;
+  // Fetch policy and app in parallel
+  const [policyRes, appRes] = await Promise.all([
+    fetch(policyUrl(cfg), { headers: headers(cfg) }),
+    fetch(appUrl(cfg), { headers: headers(cfg) }),
+  ]);
+  const policyData = await policyRes.json();
+  const appData = await appRes.json();
+  if (!policyData.success) return null;
 
-  const policy = data.result;
+  const policy = policyData.result;
   const enforced = policy.decision === "allow";
   const emails: string[] = [];
 
@@ -65,7 +77,9 @@ export async function getAccessPolicy(db: Database.Database): Promise<PolicyStat
     if (rule.email?.email) emails.push(rule.email.email);
   }
 
-  return { enforced, emails };
+  const sessionDuration = appData.success ? (appData.result.session_duration || "24h") : "24h";
+
+  return { enforced, emails, sessionDuration };
 }
 
 // ── Toggle enforce / bypass ─────────────────────────────────────────
@@ -117,6 +131,34 @@ export async function addAccessEmail(
   if (state.emails.some((e) => e.toLowerCase() === lower)) return { ok: true }; // already present
 
   return setAccessEnforced(db, true, [...state.emails, email]);
+}
+
+// ── Session duration ────────────────────────────────────────────────
+
+export async function setSessionDuration(
+  db: Database.Database,
+  duration: string
+): Promise<{ ok: boolean; error?: string }> {
+  const cfg = getCfConfig(db);
+  if (!cfg) return { ok: false, error: "Cloudflare Access not configured" };
+
+  const res = await fetch(appUrl(cfg), {
+    method: "PUT",
+    headers: headers(cfg),
+    body: JSON.stringify({
+      name: "nt",
+      domain: "nt.areakpi.in",
+      type: "self_hosted",
+      session_duration: duration,
+      self_hosted_domains: ["nt.areakpi.in"],
+    }),
+  });
+  const data = await res.json();
+
+  if (!data.success) {
+    return { ok: false, error: data.errors?.[0]?.message || "Cloudflare API error" };
+  }
+  return { ok: true };
 }
 
 export async function removeAccessEmail(
