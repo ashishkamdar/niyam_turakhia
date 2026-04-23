@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#f8f9fa">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { overflow-x: hidden; max-width: 100vw; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #f5f6f8; color: #1a1a1a; min-height: 100dvh;
@@ -52,7 +53,7 @@
   .pin-btn.del { font-size: 14px; color: #888; }
 
   /* Main */
-  .main { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
+  .main { max-width: 640px; margin: 0 auto; padding: 24px 16px; overflow-x: hidden; }
   .section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #888; font-weight: 600; margin-bottom: 8px; }
 
   .trade-input {
@@ -87,6 +88,7 @@
   .val-item {
     padding: 10px 14px; border-radius: 8px; margin-bottom: 6px;
     font-size: 12px; border: 1px solid; line-height: 1.6;
+    overflow-wrap: break-word; word-break: break-word;
   }
   .val-ok { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
   .val-warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
@@ -108,7 +110,7 @@
     border-radius: 10px; padding: 14px 16px; font-size: 12px; color: #666; line-height: 1.8;
   }
   .format-guide .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #999; margin: 6px 0 2px; font-weight: 600; }
-  .format-guide .ex { color: #333; font-family: monospace; }
+  .format-guide .ex { color: #333; font-family: monospace; word-break: break-all; overflow-wrap: break-word; }
   .format-guide .trigger { font-weight: 700; }
 
   /* Results */
@@ -127,7 +129,7 @@
     display: flex; align-items: center; justify-content: space-between;
   }
   .recent-item:last-child { border-bottom: none; }
-  .recent-msg { font-family: monospace; font-size: 12px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 10px; }
+  .recent-msg { font-family: monospace; font-size: 12px; color: #333; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 10px; word-break: break-all; }
   .recent-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
   .recent-status { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
   .status-pending { color: #b45309; }
