@@ -334,7 +334,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1800px] space-y-6">
+    <div className="mx-auto w-full max-w-[1800px] space-y-6 overflow-x-hidden">
       <ReportLetterhead
         title="Currently Logged In Users"
         subtitle={`${activeCount} active session${activeCount === 1 ? "" : "s"}${generatedAt ? ` · updated ${timeAgo(generatedAt)}` : ""}`}
@@ -436,8 +436,8 @@ export default function UsersPage() {
             No one is currently logged in.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-white/5 bg-gray-900 print:border-gray-300 print:bg-gray-50">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-white/5 bg-gray-900 print:border-gray-300 print:bg-gray-50">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400 print:bg-gray-100 print:text-gray-600">
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold">User</th>
@@ -529,8 +529,8 @@ export default function UsersPage() {
               · last 24 hours
             </span>
           </h2>
-          <div className="overflow-hidden rounded-lg border border-white/5 bg-gray-900 print:border-gray-300 print:bg-gray-50">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-white/5 bg-gray-900 print:border-gray-300 print:bg-gray-50">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400 print:bg-gray-100 print:text-gray-600">
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold">User</th>
@@ -787,8 +787,8 @@ function PinManager({
       </div>
 
       {/* Existing PINs table */}
-      <div className="overflow-hidden rounded-md border border-white/5">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-md border border-white/5">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400">
             <tr>
               <th className="px-3 py-2 text-left font-semibold">Label</th>
