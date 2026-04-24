@@ -498,11 +498,10 @@ async function loadRecent() {
 // ─── Demo Seed ───────────────────────────────────
 // Party names matching OroSoft demo customer accounts
 const SEED_PARTIES = ['AXIOM LIMITED','AMARAA DMCC','JINYI JEWELLERY DMCC','VAMOR GOLD LLC','Prestige USA','PrismHK','Angel 1','J S K JEWELLEERY LLC','Orosoft Demo Account','TEST'];
+// Only gold is available in OroSoft demo (2026 FY).
+// Silver/platinum/palladium stock codes not set up yet.
 const SEED_METALS = [
   { metal: 'GOLD', purity: '24K', rateMin: 2400, rateMax: 2700 },
-  { metal: 'GOLD', purity: '995', rateMin: 2380, rateMax: 2680 },
-  { metal: 'SILVER', purity: '999', rateMin: 28, rateMax: 35 },
-  { metal: 'PLATINUM', purity: '999', rateMin: 950, rateMax: 1050 },
 ];
 const SEED_QTYS = ['1KG','2KG','5KG','10KG','50KG','100OZ','500G'];
 
