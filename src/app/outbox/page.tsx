@@ -603,6 +603,8 @@ function DestinationPanel({
     count: number;
     response: string;
     deals: Deal[];
+    failed?: boolean;
+    failures?: Array<{ id: string; error: string }>;
   } | null>(null);
 
   // Track the "stage" through the fake pipeline animation so we can show
@@ -620,47 +622,68 @@ function DestinationPanel({
 
   async function sendAll() {
     if (queue.length === 0 || phase === "sending") return;
-    // Hard guard — if another operator holds the lock, don't even
-    // attempt the POST. The server will 409 anyway but this avoids
-    // the round-trip and keeps the UI feeling responsive.
     if (blocked) return;
 
     setPhase("sending");
     setStage(0);
 
-    // Fake staged progress. Each setTimeout bumps the stage index so
-    // the UI can tick through "Authenticating → Formatting → Transmitting
-    // → Confirmed" independent of the actual HTTP round-trip (which is
-    // basically instant against our own backend).
-    stageTimers.current = [
-      setTimeout(() => setStage(1), 500),
-      setTimeout(() => setStage(2), 1000),
-      setTimeout(() => setStage(3), 1500),
-    ];
+    // Stage 0: Validating
+    // Small delay so the user sees "Validating" before it jumps ahead
+    await new Promise((r) => setTimeout(r, 300));
+    setStage(1); // Authenticating
 
     try {
+      // Stage 1→2→3 happen server-side (auth, map, submit).
+      // We show "Authenticating" while the request is in flight.
       const res = await fetch("/api/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target, ids: queue.map((d) => d.id) }),
       });
       const json = await res.json();
-      // Wait for the staged animation to finish before flipping to
-      // "done" so the user sees the full checklist complete.
-      setTimeout(() => {
+
+      if (!res.ok && !json.batch_id) {
+        // Validation or auth failure — show error and reset
         setLastBatch({
-          id: json.batch_id,
-          count: json.dispatched,
-          response: json.response ?? "",
-          deals: json.deals ?? [],
+          id: null,
+          count: 0,
+          response: json.error || "Dispatch failed",
+          deals: [],
+          failed: true,
         });
         setStage(4);
         setPhase("done");
         onDispatched();
-      }, 1800);
+        return;
+      }
+
+      // Server responded — advance through remaining stages quickly
+      setStage(2); // Transmitting
+      await new Promise((r) => setTimeout(r, 400));
+      setStage(3); // Processing response
+      await new Promise((r) => setTimeout(r, 400));
+
+      setLastBatch({
+        id: json.batch_id,
+        count: json.dispatched,
+        response: json.response ?? "",
+        deals: json.deals ?? [],
+        failed: json.ok === false,
+        failures: json.failures,
+      });
+      setStage(4); // Confirmed
+      setPhase("done");
+      onDispatched();
     } catch {
-      setPhase("idle");
-      setStage(0);
+      setLastBatch({
+        id: null,
+        count: 0,
+        response: "Network error — could not reach server",
+        deals: [],
+        failed: true,
+      });
+      setStage(4);
+      setPhase("done");
     }
   }
 
@@ -729,20 +752,45 @@ function DestinationPanel({
           </>
         )}
         {phase === "done" && lastBatch && (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+          <div className={`rounded-lg border p-4 ${
+            lastBatch.failed
+              ? "border-rose-500/30 bg-rose-500/5"
+              : "border-emerald-500/30 bg-emerald-500/5"
+          }`}>
             <div className="flex items-center gap-3">
-              <div className="flex size-8 items-center justify-center rounded-full bg-emerald-500 animate-check-pop">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} className="size-5 text-white">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
+              <div className={`flex size-8 items-center justify-center rounded-full animate-check-pop ${
+                lastBatch.failed ? "bg-rose-500" : "bg-emerald-500"
+              }`}>
+                {lastBatch.failed ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} className="size-5 text-white">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} className="size-5 text-white">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-emerald-200">
-                  {lastBatch.count} deal{lastBatch.count === 1 ? "" : "s"} delivered
+                <div className={`text-sm font-semibold ${lastBatch.failed ? "text-rose-200" : "text-emerald-200"}`}>
+                  {lastBatch.failed
+                    ? "Dispatch failed"
+                    : `${lastBatch.count} deal${lastBatch.count === 1 ? "" : "s"} delivered`}
                 </div>
-                <div className="truncate text-xs text-emerald-300/80">{lastBatch.response}</div>
+                <div className={`truncate text-xs ${lastBatch.failed ? "text-rose-300/80" : "text-emerald-300/80"}`}>
+                  {lastBatch.response}
+                </div>
               </div>
             </div>
+            {lastBatch.failures && lastBatch.failures.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {lastBatch.failures.map((f, i) => (
+                  <div key={i} className="rounded bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300">
+                    {f.id?.slice(0, 8)}: {f.error}
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               {target === "sbs" && lastBatch.id && (
                 <a
