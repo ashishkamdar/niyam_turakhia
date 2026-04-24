@@ -369,9 +369,174 @@ export default function OutboxPage() {
         )}
       </section>
 
+      {/* ── OroSoft Balances (collapsible) ──────────────────────────── */}
+      <OroSoftBalances />
+
       {/* ── Developer Info (collapsible) ─────────────────────────────── */}
       <DeveloperInfo />
     </div>
+  );
+}
+
+// ─── OroSoftBalances ────────────────────────────────────────────────────
+
+type StockBalance = { stockCode: string; piecesQty: number; grossQty: number; pureQty: number };
+type AccountBalance = { type: string; code: string; balance: number };
+type BalancesData = {
+  ok: boolean;
+  asOnDate?: string;
+  stockBalances?: Array<{ commodity: string; balances: StockBalance[] }>;
+  accountBalances?: Array<{ accountCode: string; accountName: string; balances: AccountBalance[] }>;
+};
+
+const COMMODITY_LABELS: Record<string, string> = { XAU: "Gold", XAG: "Silver", XPT: "Platinum", XPD: "Palladium" };
+
+function OroSoftBalances() {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<BalancesData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function loadData() {
+    if (data) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/orosoft/balances");
+      setData(await res.json());
+    } catch {
+      setData({ ok: false });
+    }
+    setLoading(false);
+  }
+
+  return (
+    <section className="print:hidden">
+      <button
+        onClick={() => { setOpen((v) => !v); if (!open) loadData(); }}
+        className="flex w-full items-center justify-between rounded-lg border border-white/5 bg-gray-900 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/5"
+      >
+        <span className="flex items-center gap-2">
+          OroSoft Balances
+          <span className="text-xs font-normal text-gray-500">
+            · live stock & account positions from Neo Financials
+          </span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+          className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-4 rounded-lg border border-white/5 bg-gray-900 p-4">
+          {loading ? (
+            <div className="text-center text-sm text-gray-500">Loading balances from OroSoft…</div>
+          ) : data?.ok ? (
+            <>
+              {/* Refresh button */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                  As of {data.asOnDate ? `${data.asOnDate.slice(0,4)}-${data.asOnDate.slice(4,6)}-${data.asOnDate.slice(6,8)}` : "now"}
+                </span>
+                <button
+                  onClick={() => { setData(null); loadData(); }}
+                  className="rounded border border-white/10 px-2 py-1 text-[10px] font-semibold text-gray-400 hover:text-white"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {/* Stock Balances */}
+              {data.stockBalances && data.stockBalances.length > 0 && (
+                <div className="rounded-md border border-white/5 bg-gray-950 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Stock Inventory
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[400px] text-xs">
+                      <thead className="text-gray-500">
+                        <tr>
+                          <th className="pb-1 text-left font-semibold">Commodity</th>
+                          <th className="pb-1 text-left font-semibold">Stock Code</th>
+                          <th className="pb-1 text-right font-semibold">Pieces</th>
+                          <th className="pb-1 text-right font-semibold">Gross (OZ)</th>
+                          <th className="pb-1 text-right font-semibold">Pure (OZ)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-gray-300">
+                        {data.stockBalances.map((s) =>
+                          s.balances.map((b, i) => (
+                            <tr key={`${s.commodity}-${i}`}>
+                              {i === 0 && (
+                                <td className="py-1.5 font-semibold text-amber-300" rowSpan={s.balances.length}>
+                                  {COMMODITY_LABELS[s.commodity] || s.commodity}
+                                </td>
+                              )}
+                              <td className="py-1.5 font-mono text-emerald-300/80">{b.stockCode}</td>
+                              <td className={`py-1.5 text-right tabular-nums ${b.piecesQty < 0 ? "text-rose-300" : ""}`}>
+                                {b.piecesQty.toLocaleString()}
+                              </td>
+                              <td className={`py-1.5 text-right tabular-nums ${b.grossQty < 0 ? "text-rose-300" : ""}`}>
+                                {b.grossQty.toLocaleString(undefined, { minimumFractionDigits: 3 })}
+                              </td>
+                              <td className={`py-1.5 text-right tabular-nums ${b.pureQty < 0 ? "text-rose-300" : ""}`}>
+                                {b.pureQty.toLocaleString(undefined, { minimumFractionDigits: 3 })}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Account Balances */}
+              {data.accountBalances && data.accountBalances.length > 0 && (
+                <div className="rounded-md border border-white/5 bg-gray-950 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Customer Account Balances
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[400px] text-xs">
+                      <thead className="text-gray-500">
+                        <tr>
+                          <th className="pb-1 text-left font-semibold">Account</th>
+                          <th className="pb-1 text-right font-semibold">USD</th>
+                          <th className="pb-1 text-right font-semibold">Gold (OZ)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-gray-300">
+                        {data.accountBalances.map((a) => {
+                          const usd = a.balances.find((b) => b.code === "USD");
+                          const gld = a.balances.find((b) => b.code === "GLD");
+                          return (
+                            <tr key={a.accountCode}>
+                              <td className="py-1.5">
+                                <span className="font-semibold text-white">{a.accountName}</span>
+                                <span className="ml-1.5 font-mono text-[10px] text-gray-500">{a.accountCode}</span>
+                              </td>
+                              <td className={`py-1.5 text-right tabular-nums ${usd && usd.balance < 0 ? "text-rose-300" : ""}`}>
+                                {usd ? `$${usd.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                              </td>
+                              <td className={`py-1.5 text-right tabular-nums ${gld && gld.balance < 0 ? "text-rose-300" : ""}`}>
+                                {gld ? gld.balance.toLocaleString(undefined, { minimumFractionDigits: 3 }) : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center text-sm text-rose-400">
+              {data?.ok === false ? "Failed to load OroSoft balances" : "No data"}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
