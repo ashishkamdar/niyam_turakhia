@@ -173,12 +173,15 @@ export async function submitFixingTrade(
 
   if (!result.ok) return result;
 
-  // Response is the document number — could be a plain string or { exid: "..." }
-  const docNumber = typeof result.data === "string"
-    ? result.data
-    : typeof result.data === "object" && result.data?.exid
-      ? result.data.exid
-      : JSON.stringify(result.data);
+  // OroSoft returns: {"result":{"EXID":"FCT/2026/000012"}}
+  const d = result.data as Record<string, unknown>;
+  let docNumber: string;
+  if (typeof d === "object" && d !== null) {
+    const inner = (d.result ?? d) as Record<string, unknown>;
+    docNumber = (inner.EXID ?? inner.exid ?? inner.Exid ?? JSON.stringify(d)) as string;
+  } else {
+    docNumber = String(d);
+  }
 
   return { ok: true, data: { docNumber } };
 }
