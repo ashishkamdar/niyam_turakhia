@@ -18,21 +18,18 @@ import { DEFAULT_FY_START, parseFyStart } from "@/lib/financial-year";
  * sane MM-DD via parseFyStart before we'll accept it.
  */
 
-type KnownKey = "financial_year_start" | "orosoft_auth_url" | "orosoft_base_url" | "orosoft_username" | "orosoft_password" | "orosoft_company_code" | "orosoft_enabled" | "orosoft_default_account";
+type KnownKey = "financial_year_start"
+  | "orosoft_auth_url" | "orosoft_base_url" | "orosoft_username" | "orosoft_password" | "orosoft_company_code" | "orosoft_enabled" | "orosoft_default_account"
+  | "sbs_base_url" | "sbs_username" | "sbs_password" | "sbs_api_key" | "sbs_enabled";
 
 const KNOWN_KEYS: readonly KnownKey[] = [
   "financial_year_start",
-  "orosoft_auth_url",
-  "orosoft_base_url",
-  "orosoft_username",
-  "orosoft_password",
-  "orosoft_company_code",
-  "orosoft_enabled",
-  "orosoft_default_account",
+  "orosoft_auth_url", "orosoft_base_url", "orosoft_username", "orosoft_password",
+  "orosoft_company_code", "orosoft_enabled", "orosoft_default_account",
+  "sbs_base_url", "sbs_username", "sbs_password", "sbs_api_key", "sbs_enabled",
 ];
 
-// Keys whose values must never be returned via GET
-const MASKED_KEYS = new Set(["orosoft_password"]);
+const MASKED_KEYS = new Set(["orosoft_password", "sbs_password"]);
 
 function readAll(): Record<string, string> {
   const db = getDb();

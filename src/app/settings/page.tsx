@@ -138,8 +138,17 @@ export default function SettingsPage() {
   const [oroTesting, setOroTesting] = useState(false);
   const [oroTestResult, setOroTestResult] = useState<string | null>(null);
 
+  // SBS config state
+  const [sbsBaseUrl, setSbsBaseUrl] = useState("");
+  const [sbsUsername, setSbsUsername] = useState("");
+  const [sbsPassword, setSbsPassword] = useState("");
+  const [sbsApiKey, setSbsApiKey] = useState("");
+  const [sbsEnabled, setSbsEnabled] = useState(false);
+  const [sbsSaving, setSbsSaving] = useState(false);
+  const [sbsSaveStatus, setSbsSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+
   useEffect(() => {
-    // Load OroSoft config from settings
+    // Load OroSoft + SBS config from settings
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data: { settings?: Record<string, string> }) => {
@@ -149,8 +158,13 @@ export default function SettingsPage() {
         if (s.orosoft_username) setOroUsername(s.orosoft_username);
         if (s.orosoft_company_code) setOroCompanyCode(s.orosoft_company_code);
         setOroEnabled(s.orosoft_enabled === "true");
-        // Password is never returned — show placeholder if username exists
         if (s.orosoft_username) setOroPassword("••••••••");
+        // SBS
+        if (s.sbs_base_url) setSbsBaseUrl(s.sbs_base_url);
+        if (s.sbs_username) setSbsUsername(s.sbs_username);
+        if (s.sbs_api_key) setSbsApiKey(s.sbs_api_key);
+        setSbsEnabled(s.sbs_enabled === "true");
+        if (s.sbs_username) setSbsPassword("••••••••");
       })
       .catch(() => {});
   }, []);
@@ -202,6 +216,35 @@ export default function SettingsPage() {
       setOroTestResult("✗ Network error");
     }
     setOroTesting(false);
+  }
+
+  async function handleSbsSave() {
+    setSbsSaving(true);
+    setSbsSaveStatus("idle");
+    try {
+      const keys: Record<string, string> = {
+        sbs_base_url: sbsBaseUrl,
+        sbs_username: sbsUsername,
+        sbs_api_key: sbsApiKey,
+        sbs_enabled: sbsEnabled ? "true" : "false",
+      };
+      if (sbsPassword && sbsPassword !== "••••••••") {
+        keys.sbs_password = sbsPassword;
+      }
+      for (const [key, value] of Object.entries(keys)) {
+        await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, value }),
+        });
+      }
+      setSbsSaveStatus("saved");
+    } catch {
+      setSbsSaveStatus("error");
+    } finally {
+      setSbsSaving(false);
+      setTimeout(() => setSbsSaveStatus("idle"), 3000);
+    }
   }
 
   const WEBHOOK_URL = "https://nt.areakpi.in/api/whatsapp/webhook";
@@ -547,6 +590,70 @@ export default function SettingsPage() {
             {oroTestResult}
           </div>
         )}
+      </div>
+
+      {/* SBS */}
+      <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10 sm:p-6">
+        <div className="flex items-center gap-2">
+          <div className="flex size-5 items-center justify-center rounded bg-sky-500/20 text-[9px] font-bold text-sky-300">API</div>
+          <h2 className="text-sm font-semibold text-white">SBS</h2>
+          <span className={`ml-auto rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
+            sbsEnabled ? "bg-sky-500/15 text-sky-300" : "bg-gray-500/20 text-gray-400"
+          }`}>
+            {sbsEnabled ? "Live" : "Disabled"}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-gray-400">Connect to SBS for Kachha deal dispatch. Credentials will be provided by the SBS vendor.</p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Base URL</label>
+            <input value={sbsBaseUrl} onChange={(e) => setSbsBaseUrl(e.target.value)} placeholder="https://api.sbs-vendor.com" className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Username</label>
+              <input value={sbsUsername} onChange={(e) => setSbsUsername(e.target.value)} placeholder="username" className={inputCls} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Password</label>
+              <input value={sbsPassword} onChange={(e) => setSbsPassword(e.target.value)} type="password" placeholder="••••••••" className={inputCls} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">API Key</label>
+              <input value={sbsApiKey} onChange={(e) => setSbsApiKey(e.target.value)} placeholder="optional" className={inputCls} />
+            </div>
+            <div className="flex items-end">
+              <label className="flex cursor-pointer items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSbsEnabled((v) => !v)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                    sbsEnabled ? "bg-sky-600" : "bg-gray-600"
+                  }`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 inline-block size-5 rounded-full bg-white shadow transition-transform ${
+                    sbsEnabled ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+                <span className="text-xs text-gray-400">{sbsEnabled ? "Dispatch enabled" : "Dispatch disabled"}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button onClick={handleSbsSave} disabled={sbsSaving} className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50">
+            {sbsSaving ? "Saving…" : "Save"}
+          </button>
+          {sbsSaveStatus === "saved" && <span className="text-xs text-sky-400">✓ Saved</span>}
+          {sbsSaveStatus === "error" && <span className="text-xs text-rose-400">✗ Save failed</span>}
+        </div>
+        <div className="mt-2 rounded-md bg-amber-500/5 px-3 py-2 text-xs text-amber-300/80">
+          Awaiting API credentials from SBS vendor. Once received, enter them here and enable dispatch.
+        </div>
       </div>
 
       {/* Data Management */}
