@@ -685,7 +685,6 @@ function DestinationPanel({
           failures: json.failures as Array<{ id: string; error: string }>,
         });
         setPhase("done");
-        onDispatched();
         return;
       }
     } catch {
@@ -728,7 +727,9 @@ function DestinationPanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${meta.accentBg} ${meta.accentText}`}>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+            queue.length > 0 ? `${meta.accentBg} ${meta.accentText}` : "bg-white/5 text-gray-500"
+          }`}>
             {queue.length} waiting
           </span>
         </div>
