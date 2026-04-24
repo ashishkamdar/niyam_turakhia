@@ -774,16 +774,78 @@ Entire `nt.areakpi.in` domain behind Cloudflare Access with toggle control from 
 | v18 | Add `country` column to `auth_sessions` for geo display |
 | v19 | Seed OroSoft NeoConnect demo credentials in settings |
 
+### Additional Phase D features (Apr 24, continued)
+
+| Feature | Status | Details |
+|---|---|---|
+| OroSoft Balances on Outbox | ✅ Live | Live stock inventory + customer account positions from NeoConnect |
+| OroSoft settings on Settings page | ✅ Live | Auth URL, Base URL, Username, Password (masked), Company Code, Enable/Disable toggle, Test Connection button |
+| SBS settings on Settings page | ✅ Live | Same pattern — ready for SBS vendor credentials |
+| Auto-sync parties on dispatch | ✅ Live | If party not found during dispatch, auto-fetches AccountsList from OroSoft, inserts new parties, retries. Shows "New party found — syncing from OroSoft…" message |
+| Reset All Trade Data button | ✅ Live | Clears 11 tables (pending_deals, dispatch_log, audit_log, notifications, etc.). Keeps users, parties, credentials, prices. Confirmation dialog lists everything. |
+| Review Approved tab cleanup | ✅ Live | Dispatched trades hidden from Approved tab — shown only in Outbox's Dispatched Trades |
+| Outbox tables scrollable | ✅ Live | All tables horizontally scrollable, no page overflow |
+| Trade Desk warm pastel palette | ✅ Live | Warm cream/beige tones instead of stark white |
+
 **Current operational status (Apr 24):**
-- ✅ **OroSoft Pakka dispatch LIVE** — real API, real document numbers
+- ✅ **OroSoft Pakka dispatch LIVE** — real API, real document numbers (FCT/2026/000010–000012)
 - ✅ **Trade Desk operational** — staff can enter trades at `/nt/staff/trade/`
 - ✅ **Cloudflare Access ready** — toggle to enforce when going live
 - ✅ **Inbound trades working** — WhatsApp + Trade Desk → Review → Approve → Dispatch
 - ✅ **Full pipeline end-to-end** — trade entry → review → dispatch to OroSoft → doc number back → balances visible
-- ⏳ **OroSoft UI credentials** — email sent to verify trades visually
-- ⏳ **Silver/platinum support** — waiting on OroSoft to set up stock codes
+- ✅ **Settings page complete** — OroSoft + SBS credentials editable from UI, no code changes needed for production swap
+- ✅ **Auto-sync parties** — new OroSoft parties auto-discovered on dispatch
+- ✅ **Reset for go-live** — one-click cleanup of all test data
+- ⏳ **OroSoft UI credentials** — email sent to Avdhesh to verify trades visually
+- ⏳ **Silver/platinum support** — waiting on OroSoft to set up stock codes in 2026 FY
 - ⏳ **SBS/Kachha integration** — waiting on SBS vendor credentials
 - ❌ **WhatsApp outbound** — WABA still restricted
+
+---
+
+### Rebuild from Source
+
+The macbook holds the complete source code. To rebuild the entire application on any server:
+
+```bash
+# 1. Clone
+git clone https://github.com/ashishkamdar/niyam_turakhia.git
+cd niyam_turakhia
+
+# 2. Install dependencies
+npm install
+
+# 3. Build
+npm run build
+
+# 4. Run with PM2
+pm2 start npm --name nt-metals -- start
+
+# 5. Configure nginx reverse proxy (see INSTALL.md for full details)
+```
+
+**What's in git (everything needed):**
+- `src/` — Next.js app source (TypeScript, React, Tailwind)
+- `public/nt/staff/trade/` — standalone Trade Desk HTML
+- `docs/` — API docs (OroSoft Swagger PDF), guides, specs
+- `PROJECT-PLAN.md` — this file
+- `TECHNICAL-SPECIFICATION.md` — full reference
+- `INSTALL.md` — detailed installation guide with nginx config
+- `deploy.sh` — deployment script (git pull → build → PM2 restart)
+- `package.json` + `package-lock.json` — dependency manifest
+
+**What's NOT in git (regenerated automatically):**
+- `node_modules/` — rebuilt by `npm install`
+- `.next/` — rebuilt by `npm run build`
+- `data.db` — SQLite database (created on first run, migrations auto-apply)
+- `screenshots/` — WhatsApp image attachments (empty on fresh install)
+
+**What lives only on the server (not in git):**
+- `data.db` — production database with real trades, parties, credentials
+- `screenshots/` — uploaded images
+- nginx config at `/etc/nginx/sites-enabled/nt.areakpi.in`
+- PM2 process config
+- OroSoft/Cloudflare/WhatsApp credentials (stored in `data.db` settings table)
 
 The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
 
