@@ -181,6 +181,23 @@ export default function SettingsPage() {
   const inputCls = "block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500 focus:outline-2 focus:-outline-offset-2 focus:outline-amber-500";
 
   async function handleReset() {
+    const ok = confirm(
+      "⚠️ RESET ALL TRADE DATA\n\n" +
+      "This will permanently delete:\n" +
+      "• All trades (pending, approved, dispatched)\n" +
+      "• Dispatch history & OroSoft doc numbers\n" +
+      "• Audit log\n" +
+      "• Notifications\n" +
+      "• Opening stock register\n" +
+      "• WhatsApp message log\n\n" +
+      "These will be KEPT:\n" +
+      "✓ Users & sessions\n" +
+      "✓ Parties & OroSoft mappings\n" +
+      "✓ API credentials (OroSoft, WhatsApp, Cloudflare)\n" +
+      "✓ Prices\n\n" +
+      "This cannot be undone. Continue?"
+    );
+    if (!ok) return;
     setResetting(true);
     await fetch("/api/simulator", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset" }) });
     setResetting(false);
@@ -382,10 +399,24 @@ export default function SettingsPage() {
       {/* Data Management */}
       <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10 sm:p-6">
         <h2 className="text-sm font-semibold text-white">Data Management</h2>
-        <p className="mt-1 text-xs text-gray-400">Reset all demo data and re-seed with fresh transactions.</p>
+        <p className="mt-1 text-xs text-gray-400">
+          Clear all trade data for go-live. Removes all trades, dispatches, audit log, and notifications.
+          Keeps users, parties, credentials, and prices.
+        </p>
+        <div className="mt-3 rounded-md border border-white/5 bg-gray-950 p-3 text-xs text-gray-500">
+          <div className="mb-1 font-semibold text-gray-400">Will be cleared:</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+            <span>• Pending / approved trades</span>
+            <span>• Dispatch log & doc numbers</span>
+            <span>• Audit trail</span>
+            <span>• Notifications</span>
+            <span>• Opening stock register</span>
+            <span>• WhatsApp messages</span>
+          </div>
+        </div>
         <div className="mt-4">
           <button onClick={handleReset} disabled={resetting} className="rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-50">
-            {resetting ? "Resetting..." : "Reset All Data"}
+            {resetting ? "Resetting..." : "Reset All Trade Data"}
           </button>
         </div>
       </div>

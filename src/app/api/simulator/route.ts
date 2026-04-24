@@ -14,16 +14,30 @@ export async function POST(req: NextRequest) {
   const { action } = await req.json();
   const db = getDb();
   if (action === "reset") {
-    db.prepare("DELETE FROM whatsapp_messages").run();
-    db.prepare("DELETE FROM settlements").run();
-    db.prepare("DELETE FROM deliveries").run();
-    db.prepare("DELETE FROM payments").run();
-    db.prepare("DELETE FROM deals").run();
-    db.prepare("DELETE FROM prices").run();
-    // Seed prices only — zero positions, zero deals
-    const { seedDemoPrices } = await import("@/lib/prices");
-    seedDemoPrices();
-    return NextResponse.json({ status: "reset" });
+    // Clear ALL trade data for go-live cleanup.
+    // Keeps: prices, parties, auth (pins/sessions), settings (credentials), meta_config.
+    const tables = [
+      "pending_deals",     // main trade pipeline (review → approve → dispatch)
+      "dispatch_log",      // OroSoft/SBS sync history + doc numbers
+      "audit_log",         // audit trail of test actions
+      "notifications",     // in-app notification feed
+      "whatsapp_messages", // WhatsApp message log
+      "deals",             // old demo deals
+      "payments",          // demo payments
+      "settlements",       // demo settlements
+      "deliveries",        // demo deliveries
+      "stock_opening",     // test opening stock register
+      "parsed_deals",      // legacy bot parsed deals
+    ];
+    const txn = db.transaction(() => {
+      for (const table of tables) {
+        db.prepare(`DELETE FROM ${table}`).run();
+      }
+      // Clear stale dispatch lock
+      db.prepare("DELETE FROM settings WHERE key = 'dispatch_lock'").run();
+    });
+    txn();
+    return NextResponse.json({ status: "reset", cleared: tables });
   }
   if (action === "reset-demo") {
     // Clear WhatsApp data and WhatsApp-created deals + payments
