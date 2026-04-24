@@ -12,7 +12,7 @@
   html, body { overflow-x: hidden; max-width: 100vw; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f1f5f9; color: #334155; min-height: 100dvh;
+    background: #eee9e0; color: #3b3530; min-height: 100dvh;
   }
 
   /* ── Header ─────────────────────────────────── */
@@ -37,10 +37,10 @@
   .login-screen {
     display: flex; flex-direction: column; align-items: center;
     justify-content: center; min-height: 80dvh; padding: 20px;
-    background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+    background: linear-gradient(180deg, #eee9e0 0%, #e4ddd4 100%);
   }
   .login-card {
-    background: #fff; border-radius: 16px; padding: 40px 36px 32px;
+    background: #faf8f5; border-radius: 16px; padding: 40px 36px 32px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
     width: 100%; max-width: 340px;
   }
@@ -48,7 +48,7 @@
   .login-sub { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 28px; text-align: center; }
   .pin-dots { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
   .pin-dot {
-    width: 13px; height: 13px; border-radius: 50%; background: #e2e8f0;
+    width: 13px; height: 13px; border-radius: 50%; background: #ddd7ce;
     transition: 0.2s; border: 2px solid #cbd5e1;
   }
   .pin-dot.filled { background: #d97706; border-color: #b45309; }
@@ -57,20 +57,20 @@
   .pin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
   .pin-btn {
     height: 52px; border-radius: 10px; border: 1px solid #e2e8f0;
-    background: #f8fafc; color: #1e293b; font-size: 20px; font-weight: 500;
+    background: #faf8f5; color: #1e293b; font-size: 20px; font-weight: 500;
     cursor: pointer; transition: 0.15s;
   }
-  .pin-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
-  .pin-btn:active { background: #e2e8f0; transform: scale(0.97); }
+  .pin-btn:hover { background: #f0ebe4; border-color: #cbd5e1; }
+  .pin-btn:active { background: #ddd7ce; transform: scale(0.97); }
   .pin-btn.del { font-size: 14px; color: #94a3b8; }
 
   /* ── Main ───────────────────────────────────── */
   .main { max-width: 640px; margin: 0 auto; padding: 28px 16px; overflow-x: hidden; }
 
   .card {
-    background: #fff; border-radius: 12px;
+    background: #faf8f5; border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 2px 12px rgba(0,0,0,0.04);
-    border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 16px;
+    border: 1px solid #ddd7ce; padding: 20px; margin-bottom: 16px;
   }
   .section-label {
     font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
@@ -78,23 +78,23 @@
   }
 
   .trade-input {
-    width: 100%; background: #f8fafc; border: 1px solid #cbd5e1;
+    width: 100%; background: #f5f1ec; border: 1px solid #d1cac0;
     border-radius: 8px; padding: 14px 16px; color: #1e293b;
     font-family: 'SF Mono','Fira Code','Courier New', monospace;
     font-size: 14px; line-height: 1.7; resize: vertical; min-height: 80px;
     outline: none; transition: 0.2s;
   }
   .trade-input::placeholder { color: #94a3b8; }
-  .trade-input:focus { background: #fff; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+  .trade-input:focus { background: #faf8f5; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
 
   .btn-row { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 8px; flex-wrap: wrap; }
   .input-hint { font-size: 10px; color: #94a3b8; }
   .btn-validate {
-    background: #fff; color: #1d4ed8; border: 1.5px solid #3b82f6;
+    background: #faf8f5; color: #1d4ed8; border: 1.5px solid #3b82f6;
     padding: 10px 20px; border-radius: 8px; font-size: 13px;
     font-weight: 600; cursor: pointer; transition: 0.2s;
   }
-  .btn-validate:hover { background: #eff6ff; }
+  .btn-validate:hover { background: #eef0f8; }
   .btn-validate:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-submit {
     background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: none;
@@ -128,7 +128,7 @@
 
   /* ── Format guide ───────────────────────────── */
   .format-guide {
-    margin-top: 14px; background: #f8fafc; border: 1px solid #e2e8f0;
+    margin-top: 14px; background: #f5f1ec; border: 1px solid #ddd7ce;
     border-radius: 10px; padding: 16px; font-size: 12px; color: #64748b; line-height: 1.8;
   }
   .format-guide .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin: 6px 0 2px; font-weight: 700; }
@@ -146,11 +146,11 @@
   /* ── Recent ──────────────────────────────────── */
   .recent { margin-top: 20px; }
   .recent-list {
-    background: #fff; border-radius: 10px; border: 1px solid #e2e8f0;
+    background: #faf8f5; border-radius: 10px; border: 1px solid #ddd7ce;
     overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
   .recent-item {
-    padding: 12px 14px; border-bottom: 1px solid #f1f5f9;
+    padding: 12px 14px; border-bottom: 1px solid #eee9e0;
     display: flex; align-items: center; justify-content: space-between;
   }
   .recent-item:last-child { border-bottom: none; }
@@ -163,12 +163,12 @@
   .recent-time { font-size: 10px; color: #94a3b8; }
 
   .ref-toggle {
-    width: 100%; background: #f8fafc; border: 1px solid #e2e8f0;
+    width: 100%; background: #f5f1ec; border: 1px solid #ddd7ce;
     border-radius: 10px; padding: 12px 14px; color: #64748b;
     font-size: 12px; cursor: pointer; text-align: left; margin-top: 16px;
     transition: 0.2s;
   }
-  .ref-toggle:hover { background: #f1f5f9; color: #475569; }
+  .ref-toggle:hover { background: #eee9e0; color: #475569; }
   #refContent { display: none; }
   #refContent.open { display: block; }
 
