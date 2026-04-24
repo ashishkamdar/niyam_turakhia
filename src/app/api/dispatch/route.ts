@@ -4,6 +4,13 @@ import { getDb } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth-context";
 import { logAudit } from "@/lib/audit";
 import { createNotification } from "@/lib/notifications";
+import {
+  getOroSoftConfig,
+  getOroSoftToken,
+  submitFixingTrade,
+  invalidateToken,
+} from "@/lib/orosoft-client";
+import { mapDealToFixingTrade, type DispatchableDeal as MappableDeal } from "@/lib/orosoft-mapper";
 
 /**
  * Dispatch lock — co-ordinates concurrent dispatches across multiple
@@ -283,25 +290,129 @@ export async function POST(req: NextRequest) {
 
   const batchId = randomUUID();
   const now = new Date().toISOString();
-  // Fake response strings — in production these would be the parsed
-  // body of the OroSoft API response or the filename the Excel writer
-  // produced. Keeping them human-readable so the UI can just print them.
-  const response =
-    target === "orosoft"
-      ? `OroSoft Neo · accepted · doc #${batchId.slice(0, 8).toUpperCase()}`
-      : `SBS Excel · row batch ${batchId.slice(0, 8).toUpperCase()} appended`;
 
-  const update = db.prepare(
-    `UPDATE pending_deals
-        SET dispatched_at = ?, dispatched_to = ?, dispatch_response = ?, dispatch_batch_id = ?
-      WHERE id = ?`
-  );
-  const txn = db.transaction((rows: { id: string }[]) => {
-    for (const row of rows) {
-      update.run(now, target, response, batchId, row.id);
+  // ── OroSoft real API dispatch ───────────────────────────────────
+  const oroConfig = target === "orosoft" ? getOroSoftConfig(db) : null;
+  const useRealOroSoft = target === "orosoft" && oroConfig?.enabled;
+
+  let response = "";
+  let batchStatus: "success" | "failed" | "partial" = "success";
+  let batchHttpStatus = 200;
+  let batchErrorMessage: string | null = null;
+  const perDealResults: Array<{ id: string; ok: boolean; docNumber?: string; error?: string }> = [];
+
+  if (useRealOroSoft && oroConfig) {
+    // Fetch full deal data for mapping
+    const idList = eligible.map((r) => r.id);
+    const ph = idList.map(() => "?").join(",");
+    const fullDeals = db.prepare(
+      `SELECT id, deal_type, direction, qty_grams, metal, purity,
+              rate_usd_per_oz, premium_type, premium_value, party_alias, received_at
+         FROM pending_deals WHERE id IN (${ph})`
+    ).all(...idList) as MappableDeal[];
+
+    // Pre-validate all deals
+    const mappedPayloads: Array<{ id: string; payload: import("@/lib/orosoft-client").FixingTradePayload }> = [];
+    const validationErrors: Array<{ id: string; errors: string[] }> = [];
+
+    for (const deal of fullDeals) {
+      const mapped = mapDealToFixingTrade(db, deal);
+      if (mapped.ok) {
+        mappedPayloads.push({ id: deal.id, payload: mapped.payload });
+      } else {
+        validationErrors.push({ id: deal.id, errors: mapped.errors });
+      }
     }
-  });
-  txn(eligible);
+
+    if (validationErrors.length > 0) {
+      // Clear lock since we're not dispatching
+      db.prepare("DELETE FROM settings WHERE key = ?").run(LOCK_KEY);
+      return NextResponse.json({
+        ok: false,
+        error: "Validation failed for some deals",
+        failures: validationErrors,
+      }, { status: 422 });
+    }
+
+    // Authenticate
+    const authResult = await getOroSoftToken(oroConfig);
+    if (!authResult.ok) {
+      db.prepare("DELETE FROM settings WHERE key = ?").run(LOCK_KEY);
+      return NextResponse.json({
+        ok: false,
+        error: `OroSoft authentication failed: ${authResult.error}`,
+      }, { status: 502 });
+    }
+    let token = authResult.token;
+
+    // Submit deals one by one
+    for (const { id, payload } of mappedPayloads) {
+      let result = await submitFixingTrade(oroConfig, token, payload);
+
+      // Retry on 401 (token expired)
+      if (!result.ok && result.httpStatus === 401) {
+        invalidateToken();
+        const reauth = await getOroSoftToken(oroConfig);
+        if (reauth.ok) {
+          token = reauth.token;
+          result = await submitFixingTrade(oroConfig, token, payload);
+        }
+      }
+
+      if (result.ok) {
+        perDealResults.push({ id, ok: true, docNumber: result.data.docNumber });
+      } else {
+        perDealResults.push({ id, ok: false, error: result.error });
+      }
+    }
+
+    const succeeded = perDealResults.filter((r) => r.ok);
+    const failed = perDealResults.filter((r) => !r.ok);
+
+    if (succeeded.length === 0) batchStatus = "failed";
+    else if (failed.length > 0) batchStatus = "partial";
+    else batchStatus = "success";
+
+    batchHttpStatus = batchStatus === "success" ? 200 : batchStatus === "partial" ? 207 : 502;
+    batchErrorMessage = failed.length > 0
+      ? failed.map((f) => `${f.id.slice(0, 8)}: ${f.error}`).join("; ")
+      : null;
+    response = succeeded.length > 0
+      ? `OroSoft Neo · ${succeeded.length} accepted · ${succeeded.map((s) => s.docNumber).join(", ")}`
+      : `OroSoft Neo · all ${failed.length} failed`;
+
+    // Only mark succeeded deals as dispatched
+    const updateStmt = db.prepare(
+      `UPDATE pending_deals
+          SET dispatched_at = ?, dispatched_to = ?, dispatch_response = ?, dispatch_batch_id = ?
+        WHERE id = ?`
+    );
+    const txn = db.transaction(() => {
+      for (const s of succeeded) {
+        updateStmt.run(now, target, `OroSoft Neo doc #${s.docNumber}`, batchId, s.id);
+      }
+    });
+    txn();
+
+  } else {
+    // ── Simulation fallback (SBS or OroSoft disabled) ──────────────
+    response =
+      target === "orosoft"
+        ? `OroSoft Neo · simulated · doc #${batchId.slice(0, 8).toUpperCase()}`
+        : `SBS Excel · row batch ${batchId.slice(0, 8).toUpperCase()} appended`;
+
+    const update = db.prepare(
+      `UPDATE pending_deals
+          SET dispatched_at = ?, dispatched_to = ?, dispatch_response = ?, dispatch_batch_id = ?
+        WHERE id = ?`
+    );
+    const txn = db.transaction((rows: { id: string }[]) => {
+      for (const row of rows) {
+        update.run(now, target, response, batchId, row.id);
+      }
+    });
+    txn(eligible);
+  }
 
   // Return the freshly updated rows so the UI can slot them into the
   // history list immediately without re-fetching.
@@ -323,23 +434,16 @@ export async function POST(req: NextRequest) {
     action: "dispatch",
     targetTable: "pending_deals",
     targetId: batchId,
-    summary: `Dispatched ${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"} to ${target === "orosoft" ? "OroSoft" : "SBS"}`,
-    newValues: { batch_id: batchId, target, deal_ids: eligible.map((r) => r.id) },
+    summary: `Dispatched ${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"} to ${target === "orosoft" ? "OroSoft" : "SBS"}${batchStatus !== "success" ? ` (${batchStatus})` : ""}`,
+    newValues: { batch_id: batchId, target, deal_ids: eligible.map((r) => r.id), status: batchStatus },
     metadata: { response },
   });
 
-  // Write a sync log entry so the full history of API calls to the
-  // external system is preserved — including retries and failures
-  // once the real endpoints are wired up. The sequential integer id
-  // gives a human-readable sync number (SYNC-0001, SYNC-0002, …).
   const dealSummaries = updated.slice(0, 5).map(
     (d) => `${d.direction ?? "?"} ${d.qty_grams ?? "?"}g ${d.metal ?? "?"}`
   );
   const requestSummary = `${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"}: ${dealSummaries.join(", ")}${updated.length > 5 ? "…" : ""}`;
 
-  // For now the dispatch is simulated so we record http_status=200
-  // and status='success'. When the real SBS/OroSoft endpoints are
-  // wired up, these will come from the actual HTTP response.
   db.prepare(
     `INSERT INTO dispatch_log
        (timestamp, target, deal_count, deal_ids, batch_id, request_summary,
@@ -352,39 +456,38 @@ export async function POST(req: NextRequest) {
     JSON.stringify(eligible.map((r) => r.id)),
     batchId,
     requestSummary,
-    200,           // simulated — will be real HTTP status later
-    response,      // simulated — will be real response body later
-    "success",     // simulated — will be 'success'|'failed'|'partial' later
-    null,          // no error
+    batchHttpStatus,
+    response,
+    batchStatus,
+    batchErrorMessage,
     actorLabel,
     actor?.pin_id ?? null
   );
 
-  // Read back the auto-generated sync number for the response.
   const syncRow = db
     .prepare("SELECT id FROM dispatch_log WHERE batch_id = ? ORDER BY id DESC LIMIT 1")
     .get(batchId) as { id: number } | undefined;
   const syncNumber = syncRow?.id ?? null;
-
   const syncRef = syncNumber ? `SYNC-${String(syncNumber).padStart(4, "0")}` : null;
 
   createNotification(db, {
     type: "dispatch",
-    title: `${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"} dispatched to ${target === "orosoft" ? "OroSoft" : "SBS"}`,
+    title: `${eligible.length} ${target === "orosoft" ? "Pakka" : "Kachha"} deal${eligible.length === 1 ? "" : "s"} dispatched to ${target === "orosoft" ? "OroSoft" : "SBS"}${batchStatus !== "success" ? ` (${batchStatus})` : ""}`,
     body: syncRef ?? undefined,
-    icon: "📦",
+    icon: batchStatus === "success" ? "📦" : batchStatus === "partial" ? "⚠️" : "❌",
     href: "/outbox",
     createdBy: actorLabel,
   });
 
   return NextResponse.json({
-    ok: true,
+    ok: batchStatus !== "failed",
     batch_id: batchId,
     sync_number: syncNumber,
     sync_ref: syncRef,
-    dispatched: eligible.length,
+    dispatched: perDealResults.filter((r) => r.ok).length || eligible.length,
     deals: updated,
     response,
     lock: newLock,
+    ...(perDealResults.some((r) => !r.ok) ? { failures: perDealResults.filter((r) => !r.ok) } : {}),
   });
 }

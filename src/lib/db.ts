@@ -491,6 +491,20 @@ function runMigrations(db: Database.Database) {
         addColumnIfNotExists(db, "auth_sessions", "country", "TEXT");
       },
     },
+    {
+      version: 19,
+      description: "Seed OroSoft NeoConnect demo credentials into settings",
+      up: () => {
+        const set = (k: string, v: string) =>
+          db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)").run(k, v);
+        set("orosoft_auth_url", "https://auth.neofinancials.com/v1_2/auth/token");
+        set("orosoft_base_url", "https://prismgold-neoconnect.neofinancials.com");
+        set("orosoft_username", "nc.pmgd");
+        set("orosoft_password", "mi@r19#d");
+        set("orosoft_company_code", "default");
+        set("orosoft_enabled", "false");
+      },
+    },
   ];
 
   for (const migration of migrations) {
