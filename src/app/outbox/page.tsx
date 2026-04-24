@@ -213,12 +213,14 @@ export default function OutboxPage() {
         <DestinationPanel
           target="orosoft"
           queue={data.pakka_outbox}
+          dispatched={data.history.filter((d) => d.dispatched_to === "orosoft")}
           othersLock={othersLock}
           onDispatched={load}
         />
         <DestinationPanel
           target="sbs"
           queue={data.kachha_outbox}
+          dispatched={data.history.filter((d) => d.dispatched_to === "sbs")}
           othersLock={othersLock}
           onDispatched={load}
         />
@@ -577,11 +579,13 @@ function DeveloperInfo() {
 function DestinationPanel({
   target,
   queue,
+  dispatched,
   othersLock,
   onDispatched,
 }: {
   target: Target;
   queue: Deal[];
+  dispatched: Deal[];
   othersLock: Lock | null;
   onDispatched: () => void;
 }) {
@@ -810,7 +814,91 @@ function DestinationPanel({
           </button>
         </div>
       )}
+
+      {/* ── Dispatched deals log (collapsible) ──────────────────────── */}
+      {dispatched.length > 0 && (
+        <DispatchedLog deals={dispatched} target={target} />
+      )}
     </section>
+  );
+}
+
+function DispatchedLog({ deals, target }: { deals: Deal[]; target: Target }) {
+  const [open, setOpen] = useState(false);
+  const meta = TARGET_META[target];
+
+  function extractDocNumber(response: string | null): string {
+    if (!response) return "—";
+    // "OroSoft Neo doc #FCT/2025/000001" → "FCT/2025/000001"
+    const match = response.match(/doc #(.+)$/);
+    if (match) return match[1];
+    // "OroSoft Neo · accepted · doc #..." or "OroSoft Neo · simulated · doc #..."
+    const match2 = response.match(/doc #([A-Z0-9/-]+)/);
+    if (match2) return match2[1];
+    return response;
+  }
+
+  return (
+    <div className="border-t border-white/5">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-5 py-3 text-left text-xs font-semibold text-gray-400 hover:text-gray-200 transition"
+      >
+        <span className="flex items-center gap-2">
+          Dispatched Trades
+          <span className="text-gray-600">· {deals.length}</span>
+        </span>
+        <svg
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+          className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="overflow-x-auto border-t border-white/5 bg-gray-950/40">
+          <table className="w-full min-w-[500px] text-xs">
+            <thead className="bg-white/5 text-[10px] uppercase tracking-wider text-gray-500">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold">Doc #</th>
+                <th className="px-3 py-2 text-left font-semibold">Trade</th>
+                <th className="px-3 py-2 text-left font-semibold">Party</th>
+                <th className="px-3 py-2 text-right font-semibold">Amount</th>
+                <th className="px-3 py-2 text-left font-semibold">Dispatched</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {deals.map((d) => {
+                const docNum = extractDocNumber(d.dispatch_response);
+                return (
+                  <tr key={d.id}>
+                    <td className="px-3 py-2">
+                      <span className={`inline-block rounded px-2 py-0.5 font-mono text-[11px] font-bold ${meta.accentBg} ${meta.accentText}`}>
+                        {docNum}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-gray-300">
+                      {formatDealLine(d)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-400">
+                      {d.party_alias ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-gray-200">
+                      {formatAmount(d)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">
+                      {d.dispatched_at ? new Date(d.dispatched_at).toLocaleString("en-IN", {
+                        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true,
+                      }) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
