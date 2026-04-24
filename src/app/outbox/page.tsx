@@ -778,6 +778,7 @@ function DestinationPanel({
   // runs in about 2 seconds — long enough to feel real, short enough
   // that Niyam isn't tapping his foot.
   const [stage, setStage] = useState(0);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const stageTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -792,6 +793,7 @@ function DestinationPanel({
 
     setPhase("sending");
     setLastBatch(null);
+    setSyncMsg(null);
     const dealIds = queue.map((d) => d.id);
 
     // ── Step 1: Authenticate ────────────────────────────────
@@ -820,9 +822,18 @@ function DestinationPanel({
       });
       const valJson = await valRes.json();
       if (!valRes.ok || !valJson.ok) {
-        setLastBatch({ id: null, count: 0, deals: [], response: valJson.error || "Validation failed", failed: true, failedAtStage: 1, failures: valJson.failures });
-        setPhase("done");
-        return;
+        // Check if it's a party-not-found error — the actual dispatch will auto-sync
+        const isPartyError = valJson.failures?.some((f: { errors?: string[] }) =>
+          f.errors?.some((e: string) => e.includes("No party found"))
+        );
+        if (isPartyError) {
+          // Show syncing message — the real dispatch (Step 3) will auto-sync and retry
+          setSyncMsg("New party found — syncing from OroSoft…");
+        } else {
+          setLastBatch({ id: null, count: 0, deals: [], response: valJson.error || "Validation failed", failed: true, failedAtStage: 1, failures: valJson.failures });
+          setPhase("done");
+          return;
+        }
       }
     } catch {
       setLastBatch({ id: null, count: 0, deals: [], response: "Network error during validation", failed: true, failedAtStage: 1 });
@@ -876,6 +887,7 @@ function DestinationPanel({
     setPhase("idle");
     setStage(0);
     setLastBatch(null);
+    setSyncMsg(null);
   }
 
   return (
@@ -912,6 +924,17 @@ function DestinationPanel({
           failedAtStage={lastBatch?.failedAtStage ?? -1}
         />
       </div>
+
+      {/* Sync message */}
+      {syncMsg && phase === "sending" && (
+        <div className="mx-5 mb-2 flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
+          <svg className="size-4 animate-spin shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+            <path d="M4 12a8 8 0 018-8" strokeLinecap="round" />
+          </svg>
+          {syncMsg}
+        </div>
+      )}
 
       {/* Queue list */}
       <div className="space-y-2 p-5">

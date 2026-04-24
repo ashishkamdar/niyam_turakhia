@@ -9,6 +9,7 @@ import {
   getOroSoftToken,
   submitFixingTrade,
   invalidateToken,
+  fetchAccountsList,
 } from "@/lib/orosoft-client";
 import { mapDealToFixingTrade, type DispatchableDeal as MappableDeal } from "@/lib/orosoft-mapper";
 
@@ -312,16 +313,51 @@ export async function POST(req: NextRequest) {
          FROM pending_deals WHERE id IN (${ph})`
     ).all(...idList) as MappableDeal[];
 
-    // Pre-validate all deals
-    const mappedPayloads: Array<{ id: string; payload: import("@/lib/orosoft-client").FixingTradePayload }> = [];
-    const validationErrors: Array<{ id: string; errors: string[] }> = [];
+    // Pre-validate all deals — with auto-sync retry on missing party
+    function validateDeals(deals: MappableDeal[]) {
+      const mapped: Array<{ id: string; payload: import("@/lib/orosoft-client").FixingTradePayload }> = [];
+      const errors: Array<{ id: string; errors: string[] }> = [];
+      for (const deal of deals) {
+        const result = mapDealToFixingTrade(db, deal);
+        if (result.ok) mapped.push({ id: deal.id, payload: result.payload });
+        else errors.push({ id: deal.id, errors: result.errors });
+      }
+      return { mapped, errors };
+    }
 
-    for (const deal of fullDeals) {
-      const mapped = mapDealToFixingTrade(db, deal);
-      if (mapped.ok) {
-        mappedPayloads.push({ id: deal.id, payload: mapped.payload });
-      } else {
-        validationErrors.push({ id: deal.id, errors: mapped.errors });
+    let { mapped: mappedPayloads, errors: validationErrors } = validateDeals(fullDeals);
+
+    // If any errors mention missing party, auto-sync from OroSoft and retry once
+    const hasPartyErrors = validationErrors.some((e) =>
+      e.errors.some((msg) => msg.includes("No party found"))
+    );
+
+    if (hasPartyErrors && !dryRun) {
+      // Sync parties from OroSoft
+      const authForSync = await getOroSoftToken(oroConfig);
+      if (authForSync.ok) {
+        const accountsResult = await fetchAccountsList(oroConfig, authForSync.token);
+        if (accountsResult.ok) {
+          const now = new Date().toISOString();
+          const { randomUUID: syncUuid } = await import("crypto");
+          for (const acct of accountsResult.data) {
+            if (acct.accountType !== "C" && acct.accountType !== "S") continue;
+            const existing = db.prepare(
+              "SELECT id FROM parties WHERE orosoft_party_code = ?"
+            ).get(acct.accountCode);
+            if (!existing) {
+              const partyType = acct.accountType === "C" ? "customer" : "supplier";
+              db.prepare(
+                `INSERT INTO parties (id, name, short_code, type, orosoft_party_code, active, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
+              ).run(syncUuid(), acct.accountName, acct.accountCode, partyType, acct.accountCode, now, now);
+            }
+          }
+          // Retry validation after sync
+          const retry = validateDeals(fullDeals);
+          mappedPayloads = retry.mapped;
+          validationErrors = retry.errors;
+        }
       }
     }
 
@@ -331,6 +367,7 @@ export async function POST(req: NextRequest) {
         ok: false,
         error: "Validation failed for some deals",
         failures: validationErrors,
+        synced: hasPartyErrors ? true : undefined,
       }, { status: 422 });
     }
 
