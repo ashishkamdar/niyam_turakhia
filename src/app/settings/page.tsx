@@ -126,6 +126,84 @@ export default function SettingsPage() {
   const [metaSaveStatus, setMetaSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [webhookCopied, setWebhookCopied] = useState(false);
 
+  // OroSoft NeoConnect config state
+  const [oroAuthUrl, setOroAuthUrl] = useState("");
+  const [oroBaseUrl, setOroBaseUrl] = useState("");
+  const [oroUsername, setOroUsername] = useState("");
+  const [oroPassword, setOroPassword] = useState("");
+  const [oroCompanyCode, setOroCompanyCode] = useState("default");
+  const [oroEnabled, setOroEnabled] = useState(false);
+  const [oroSaving, setOroSaving] = useState(false);
+  const [oroSaveStatus, setOroSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [oroTesting, setOroTesting] = useState(false);
+  const [oroTestResult, setOroTestResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load OroSoft config from settings
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data: { settings?: Record<string, string> }) => {
+        const s = data.settings ?? {};
+        if (s.orosoft_auth_url) setOroAuthUrl(s.orosoft_auth_url);
+        if (s.orosoft_base_url) setOroBaseUrl(s.orosoft_base_url);
+        if (s.orosoft_username) setOroUsername(s.orosoft_username);
+        if (s.orosoft_company_code) setOroCompanyCode(s.orosoft_company_code);
+        setOroEnabled(s.orosoft_enabled === "true");
+        // Password is never returned — show placeholder if username exists
+        if (s.orosoft_username) setOroPassword("••••••••");
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleOroSave() {
+    setOroSaving(true);
+    setOroSaveStatus("idle");
+    try {
+      const keys: Record<string, string> = {
+        orosoft_auth_url: oroAuthUrl,
+        orosoft_base_url: oroBaseUrl,
+        orosoft_username: oroUsername,
+        orosoft_company_code: oroCompanyCode,
+        orosoft_enabled: oroEnabled ? "true" : "false",
+      };
+      // Only update password if user changed it from the placeholder
+      if (oroPassword && oroPassword !== "••••••••") {
+        keys.orosoft_password = oroPassword;
+      }
+      for (const [key, value] of Object.entries(keys)) {
+        await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, value }),
+        });
+      }
+      setOroSaveStatus("saved");
+    } catch {
+      setOroSaveStatus("error");
+    } finally {
+      setOroSaving(false);
+      setTimeout(() => setOroSaveStatus("idle"), 3000);
+    }
+  }
+
+  async function handleOroTest() {
+    setOroTesting(true);
+    setOroTestResult(null);
+    try {
+      const res = await fetch("/api/orosoft/test");
+      const d = await res.json();
+      if (d.ok) {
+        const custCount = typeof d.accounts === "object" && d.accounts?.customers;
+        setOroTestResult(`✓ Connected — ${custCount || 0} customers, auth successful`);
+      } else {
+        setOroTestResult(`✗ ${d.error || "Connection failed"}`);
+      }
+    } catch {
+      setOroTestResult("✗ Network error");
+    }
+    setOroTesting(false);
+  }
+
   const WEBHOOK_URL = "https://nt.areakpi.in/api/whatsapp/webhook";
 
   useEffect(() => {
@@ -392,6 +470,81 @@ export default function SettingsPage() {
           <div className="mt-4">
             <label className="block text-xs font-medium text-gray-400">goldapi.io API Key</label>
             <input type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Enter API key..." className={`mt-1 ${inputCls}`} />
+          </div>
+        )}
+      </div>
+
+      {/* OroSoft NeoConnect */}
+      <div className="rounded-lg bg-gray-900 p-4 outline outline-1 outline-white/10 sm:p-6">
+        <div className="flex items-center gap-2">
+          <div className="flex size-5 items-center justify-center rounded bg-emerald-500/20 text-[9px] font-bold text-emerald-300">API</div>
+          <h2 className="text-sm font-semibold text-white">OroSoft NeoConnect</h2>
+          <span className={`ml-auto rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
+            oroEnabled ? "bg-emerald-500/15 text-emerald-300" : "bg-gray-500/20 text-gray-400"
+          }`}>
+            {oroEnabled ? "Live" : "Disabled"}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-gray-400">Connect to OroSoft Neo Financials for Pakka deal dispatch.</p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Auth URL</label>
+            <input value={oroAuthUrl} onChange={(e) => setOroAuthUrl(e.target.value)} placeholder="https://auth.neofinancials.com/v1_2/auth/token" className={inputCls} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Base URL</label>
+            <input value={oroBaseUrl} onChange={(e) => setOroBaseUrl(e.target.value)} placeholder="https://prismgold-neoconnect.neofinancials.com" className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Username</label>
+              <input value={oroUsername} onChange={(e) => setOroUsername(e.target.value)} placeholder="nc.pmgd" className={inputCls} />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Password</label>
+              <input value={oroPassword} onChange={(e) => setOroPassword(e.target.value)} type="password" placeholder="••••••••" className={inputCls} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Company Code</label>
+              <input value={oroCompanyCode} onChange={(e) => setOroCompanyCode(e.target.value)} placeholder="default" className={inputCls} />
+            </div>
+            <div className="flex items-end">
+              <label className="flex cursor-pointer items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOroEnabled((v) => !v)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                    oroEnabled ? "bg-emerald-600" : "bg-gray-600"
+                  }`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 inline-block size-5 rounded-full bg-white shadow transition-transform ${
+                    oroEnabled ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+                <span className="text-xs text-gray-400">{oroEnabled ? "Dispatch enabled" : "Dispatch disabled"}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button onClick={handleOroSave} disabled={oroSaving} className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
+            {oroSaving ? "Saving…" : "Save"}
+          </button>
+          <button onClick={handleOroTest} disabled={oroTesting} className="rounded-md border border-white/10 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:bg-white/5 disabled:opacity-50">
+            {oroTesting ? "Testing…" : "Test Connection"}
+          </button>
+          {oroSaveStatus === "saved" && <span className="text-xs text-emerald-400">✓ Saved</span>}
+          {oroSaveStatus === "error" && <span className="text-xs text-rose-400">✗ Save failed</span>}
+        </div>
+        {oroTestResult && (
+          <div className={`mt-2 rounded-md px-3 py-2 text-xs ${
+            oroTestResult.startsWith("✓") ? "bg-emerald-500/10 text-emerald-300" : "bg-rose-500/10 text-rose-300"
+          }`}>
+            {oroTestResult}
           </div>
         )}
       </div>

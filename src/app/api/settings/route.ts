@@ -18,9 +18,21 @@ import { DEFAULT_FY_START, parseFyStart } from "@/lib/financial-year";
  * sane MM-DD via parseFyStart before we'll accept it.
  */
 
-type KnownKey = "financial_year_start";
+type KnownKey = "financial_year_start" | "orosoft_auth_url" | "orosoft_base_url" | "orosoft_username" | "orosoft_password" | "orosoft_company_code" | "orosoft_enabled" | "orosoft_default_account";
 
-const KNOWN_KEYS: readonly KnownKey[] = ["financial_year_start"];
+const KNOWN_KEYS: readonly KnownKey[] = [
+  "financial_year_start",
+  "orosoft_auth_url",
+  "orosoft_base_url",
+  "orosoft_username",
+  "orosoft_password",
+  "orosoft_company_code",
+  "orosoft_enabled",
+  "orosoft_default_account",
+];
+
+// Keys whose values must never be returned via GET
+const MASKED_KEYS = new Set(["orosoft_password"]);
 
 function readAll(): Record<string, string> {
   const db = getDb();
@@ -35,16 +47,16 @@ function readAll(): Record<string, string> {
 export async function GET(_req: NextRequest) {
   const stored = readAll();
 
-  // Always return the known keys with sensible defaults so the client
-  // can render without a "loading" dance. The underlying DB row may
-  // still be absent — that's fine, the default wins until someone saves.
   const fyStart = stored.financial_year_start ?? DEFAULT_FY_START;
 
+  // Mask sensitive keys — never return raw passwords via API
+  const safe: Record<string, string> = { ...stored, financial_year_start: fyStart };
+  for (const k of MASKED_KEYS) {
+    if (safe[k]) safe[k] = "••••••••";
+  }
+
   return NextResponse.json({
-    settings: {
-      ...stored,
-      financial_year_start: fyStart,
-    },
+    settings: safe,
     defaults: {
       financial_year_start: DEFAULT_FY_START,
     },
@@ -66,6 +78,11 @@ export async function PUT(req: NextRequest) {
       { ok: false, error: `Unknown settings key: ${key}` },
       { status: 400 }
     );
+  }
+
+  // Don't save masked placeholder back as the real value
+  if (MASKED_KEYS.has(key) && value === "••••••••") {
+    return NextResponse.json({ ok: true, key, value: "••••••••" });
   }
 
   // Per-key validation. The settings table is stringly-typed on
