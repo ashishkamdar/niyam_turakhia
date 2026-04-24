@@ -195,7 +195,7 @@ export default function OutboxPage() {
     data.lock && data.lock.started_by !== currentLabel ? data.lock : null;
 
   return (
-    <div className="mx-auto w-full max-w-[1800px] space-y-6">
+    <div className="mx-auto w-full max-w-[1800px] space-y-6 overflow-x-hidden">
       {/* ── Header ───────────────────────────────────────────────────── */}
       <header className="border-b border-white/10 pb-4">
         <h1 className="text-2xl font-bold text-white">Outbox</h1>
@@ -234,8 +234,8 @@ export default function OutboxPage() {
             Nothing has been dispatched yet. Approved trades will appear here once sent.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-white/5 bg-gray-900">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-white/5 bg-gray-900">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400">
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold">Target</th>
@@ -295,8 +295,8 @@ export default function OutboxPage() {
             No syncs yet. Each &quot;Send all&quot; creates a numbered sync entry here.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-white/5 bg-gray-900">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-white/5 bg-gray-900">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400">
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold">Sync #</th>
@@ -891,7 +891,7 @@ function DestinationPanel({
   }
 
   return (
-    <section className={`overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br ${meta.accent} shadow-lg`}>
+    <section className={`overflow-x-auto rounded-xl border border-white/10 bg-gradient-to-br ${meta.accent} shadow-lg`}>
       {/* Panel header */}
       <div className="flex items-center justify-between border-b border-white/10 bg-gray-950/60 px-5 py-4 backdrop-blur">
         <div className="flex items-center gap-3">
@@ -1360,7 +1360,7 @@ function SbsVisual({
   return (
     <div className="space-y-3">
       {/* Window chrome to sell the "Excel" illusion */}
-      <div className="overflow-hidden rounded-lg border border-white/10 bg-gray-950 shadow-inner">
+      <div className="overflow-x-auto rounded-lg border border-white/10 bg-gray-950 shadow-inner">
         <div className="flex items-center gap-1.5 border-b border-white/10 bg-gray-900/80 px-3 py-1.5">
           <span className="size-2 rounded-full bg-rose-400/70" />
           <span className="size-2 rounded-full bg-amber-400/70" />
