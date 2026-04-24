@@ -206,11 +206,6 @@ export function mapDealToFixingTrade(
   const piecesQty = gramsToUnit(deal.qty_grams, stockCode);
   const dealFlag = deal.direction.toLowerCase() === "buy" ? 1 : 0;
 
-  // Date from received_at (YYYYMMDD format)
-  const docDate = deal.received_at
-    ? deal.received_at.slice(0, 10).replace(/-/g, "")
-    : new Date().toISOString().slice(0, 10).replace(/-/g, "");
-
   const payload: FixingTradePayload = {
     accountCode,
     cmdtyPair: cmdtyPair!,
@@ -219,7 +214,9 @@ export function mapDealToFixingTrade(
     price: Math.round(deal.rate_usd_per_oz * 10000000) / 10000000, // max 7 decimals
     stockCode,
     documentType: "FCT",
-    docDate,
+    // Let OroSoft default docDate to current date — avoids date
+    // validation issues with demo environments that may have a
+    // different financial year range.
     priceType: "OZ",
     referenceNo: `PX-${deal.id.slice(0, 8).toUpperCase()}`,
     remarks: `PrismX deal ${deal.id}`,
