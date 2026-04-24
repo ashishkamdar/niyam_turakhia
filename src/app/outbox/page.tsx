@@ -366,7 +366,205 @@ export default function OutboxPage() {
           </div>
         )}
       </section>
+
+      {/* ── Developer Info (collapsible) ─────────────────────────────── */}
+      <DeveloperInfo />
     </div>
+  );
+}
+
+// ─── DeveloperInfo ──────────────────────────────────────────────────────
+
+function DeveloperInfo() {
+  const [open, setOpen] = useState(false);
+  const [info, setInfo] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function loadInfo() {
+    if (info) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/orosoft/test");
+      const d = await res.json();
+      setInfo(d);
+    } catch {
+      setInfo({ ok: false, error: "Failed to load" });
+    }
+    setLoading(false);
+  }
+
+  return (
+    <section className="print:hidden">
+      <button
+        onClick={() => { setOpen((v) => !v); if (!open) loadInfo(); }}
+        className="flex w-full items-center justify-between rounded-lg border border-white/5 bg-gray-900 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-white/5"
+      >
+        <span className="flex items-center gap-2">
+          Developer Info
+          <span className="text-xs font-normal text-gray-500">
+            · OroSoft NeoConnect field mappings & connection status
+          </span>
+        </span>
+        <svg
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+          className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-4 rounded-lg border border-white/5 bg-gray-900 p-4">
+          {loading ? (
+            <div className="text-center text-sm text-gray-500">Loading OroSoft data…</div>
+          ) : info ? (
+            <>
+              {/* Connection */}
+              <div className="rounded-md border border-white/5 bg-gray-950 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Connection Status
+                </div>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    info.ok ? "bg-emerald-500/10 text-emerald-300" : "bg-rose-500/10 text-rose-300"
+                  }`}>
+                    Auth: {info.ok ? "Connected" : "Failed"}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    info.enabled ? "bg-emerald-500/10 text-emerald-300" : "bg-amber-500/10 text-amber-300"
+                  }`}>
+                    Dispatch: {info.enabled ? "Enabled (Live)" : "Disabled (Simulated)"}
+                  </span>
+                  {Boolean(info.ok) && typeof info.accounts === "object" && info.accounts !== null && "total" in (info.accounts as Record<string, unknown>) && (
+                    <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-gray-400">
+                      {String((info.accounts as Record<string, unknown>).customers)} customers · {String((info.accounts as Record<string, unknown>).suppliers)} suppliers
+                    </span>
+                  )}
+                </div>
+                {!info.ok && info.error ? (
+                  <p className="mt-2 text-xs text-rose-400">{String(info.error)}</p>
+                ) : null}
+              </div>
+
+              {/* Field Mapping */}
+              <div className="rounded-md border border-white/5 bg-gray-950 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  FixingTrade Field Mapping (PrismX → NeoConnect)
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[500px] text-xs">
+                    <thead className="text-gray-500">
+                      <tr>
+                        <th className="pb-1 text-left font-semibold">PrismX Field</th>
+                        <th className="pb-1 text-left font-semibold">NeoConnect Field</th>
+                        <th className="pb-1 text-left font-semibold">Required</th>
+                        <th className="pb-1 text-left font-semibold">Transformation</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-gray-300">
+                      {[
+                        ["party_alias", "accountCode", "Yes", "Lookup parties.orosoft_party_code by alias match"],
+                        ["metal", "cmdtyPair", "Yes", "gold→XAUUSD, silver→XAGUSD, platinum→XPTUSD, palladium→XPDUSD"],
+                        ["direction", "deal", "Yes", "buy→1, sell→0"],
+                        ["qty_grams", "piecesQty", "Yes", "Convert to stockCode unit (÷1000 for KG, ÷31.1035 for OZ)"],
+                        ["rate_usd_per_oz", "price", "Yes", "Direct (max 7 decimals)"],
+                        ["purity", "stockCode", "Yes", "24K/9999→KG 4X9, 995→KG 995, default→OZ"],
+                        ["premium_value", "prmRate", "No", "Direct pass-through"],
+                        ["premium_type", "prmRateType", "No", "absolute→OZ"],
+                        ["received_at", "docDate", "No", "YYYYMMDD format"],
+                        ["—", "valueDate", "No", "Default: T+2 (OroSoft default)"],
+                        ["deal id", "referenceNo", "No", "PX-{id first 8 chars}"],
+                        ["—", "documentType", "No", "FCT (Fixing Confirm Trade)"],
+                        ["—", "priceType", "No", "OZ (price per troy ounce)"],
+                      ].map(([px, nc, req, transform], i) => (
+                        <tr key={i}>
+                          <td className="py-1.5 font-mono text-amber-300/80">{px}</td>
+                          <td className="py-1.5 font-mono text-emerald-300/80">{nc}</td>
+                          <td className="py-1.5">
+                            <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                              req === "Yes" ? "bg-rose-500/10 text-rose-300" : "bg-white/5 text-gray-500"
+                            }`}>{req}</span>
+                          </td>
+                          <td className="py-1.5 text-gray-400">{transform}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* OroSoft Customer Accounts */}
+              {info.ok && typeof info.accounts === "object" && info.accounts !== null && "customer_list" in (info.accounts as Record<string, unknown>) && (
+                <div className="rounded-md border border-white/5 bg-gray-950 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    OroSoft Customer Accounts (for accountCode mapping)
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="text-gray-500">
+                        <tr>
+                          <th className="pb-1 text-left font-semibold">Account Code</th>
+                          <th className="pb-1 text-left font-semibold">Account Name</th>
+                          <th className="pb-1 text-left font-semibold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-gray-300">
+                        {((info.accounts as Record<string, unknown>).customer_list as Array<{ code: string; name: string; active: boolean }>)?.map((a) => (
+                          <tr key={a.code}>
+                            <td className="py-1 font-mono text-emerald-300/80">{a.code}</td>
+                            <td className="py-1">{a.name}</td>
+                            <td className="py-1">
+                              <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                                a.active ? "bg-emerald-500/10 text-emerald-300" : "bg-rose-500/10 text-rose-300"
+                              }`}>{a.active ? "Active" : "Inactive"}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Fixing Stock Codes */}
+              {info.ok && Array.isArray(info.fixing_stocks) && (
+                <div className="rounded-md border border-white/5 bg-gray-950 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Fixing Stock Codes (for stockCode mapping)
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(info.fixing_stocks as Array<{ commodity: string; stockCode: string; convFactor: number }>).map((s, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-xs">
+                        <span className="font-semibold text-amber-300">{s.commodity}</span>
+                        <span className="text-gray-400">→</span>
+                        <span className="font-mono text-white">{s.stockCode}</span>
+                        <span className="text-gray-600">(×{s.convFactor})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Locations */}
+              {info.ok && Array.isArray(info.locations) && (
+                <div className="rounded-md border border-white/5 bg-gray-950 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Locations
+                  </div>
+                  <div className="flex gap-2">
+                    {(info.locations as Array<{ locationCode: string; locationName: string }>).map((l) => (
+                      <span key={l.locationCode} className="rounded bg-white/5 px-2 py-1 text-xs">
+                        <span className="font-mono text-emerald-300/80">{l.locationCode}</span>
+                        <span className="ml-1 text-gray-400">{l.locationName}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+      )}
+    </section>
   );
 }
 
