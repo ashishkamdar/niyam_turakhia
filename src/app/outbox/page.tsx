@@ -604,6 +604,7 @@ function DestinationPanel({
     response: string;
     deals: Deal[];
     failed?: boolean;
+    failedAtStage?: number;
     failures?: Array<{ id: string; error: string }>;
   } | null>(null);
 
@@ -643,13 +644,17 @@ function DestinationPanel({
       const json = await res.json();
 
       if (!res.ok && !json.batch_id) {
-        // Validation or auth failure — show error and reset
+        // Validation or auth failure
+        const authFailed = res.status === 502;
+        const validationFailed = res.status === 422;
         setLastBatch({
           id: null,
           count: 0,
           response: json.error || "Dispatch failed",
           deals: [],
           failed: true,
+          failedAtStage: authFailed ? 0 : validationFailed ? 1 : 2,
+          failures: json.failures,
         });
         setStage(4);
         setPhase("done");
@@ -669,6 +674,7 @@ function DestinationPanel({
         response: json.response ?? "",
         deals: json.deals ?? [],
         failed: json.ok === false,
+        failedAtStage: json.ok === false ? 2 : -1,
         failures: json.failures,
       });
       setStage(4); // Confirmed
@@ -681,6 +687,7 @@ function DestinationPanel({
         response: "Network error — could not reach server",
         deals: [],
         failed: true,
+        failedAtStage: 0,
       });
       setStage(4);
       setPhase("done");
@@ -721,6 +728,8 @@ function DestinationPanel({
           stage={stage}
           destLabel={meta.title}
           accentColor={target === "orosoft" ? "emerald" : "sky"}
+          failed={lastBatch?.failed ?? false}
+          failedAtStage={lastBatch?.failedAtStage ?? -1}
         />
       </div>
 
@@ -968,11 +977,15 @@ function ApiFlowVisual({
   stage,
   destLabel = "OroSoft Neo",
   accentColor = "emerald",
+  failed = false,
+  failedAtStage = -1,
 }: {
   phase: "idle" | "sending" | "done";
   stage: number;
   destLabel?: string;
   accentColor?: "emerald" | "sky";
+  failed?: boolean;
+  failedAtStage?: number;
 }) {
   const stages = [
     "Authenticate",
@@ -1021,29 +1034,43 @@ function ApiFlowVisual({
       {/* Stage checklist */}
       <div className="grid grid-cols-4 gap-2">
         {stages.map((label, i) => {
-          const done = stage > i || phase === "done";
+          const isFailed = failed && phase === "done" && i === failedAtStage;
+          const succeeded = !failed && (stage > i || phase === "done");
+          const succeededBefore = failed && phase === "done" && i < failedAtStage;
+          const notReached = failed && phase === "done" && i > failedAtStage;
+          const done = succeeded || succeededBefore;
           const active = phase === "sending" && stage === i;
           return (
             <div
               key={label}
               className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-center transition ${
-                done
+                isFailed
+                  ? "border-rose-500/40 bg-rose-500/10"
+                  : done
                   ? "border-emerald-500/40 bg-emerald-500/10"
                   : active
                   ? "border-amber-500/40 bg-amber-500/10"
+                  : notReached
+                  ? "border-white/5 bg-gray-950/40 opacity-40"
                   : "border-white/5 bg-gray-950/40"
               }`}
             >
               <div
                 className={`flex size-5 items-center justify-center rounded-full ${
-                  done
+                  isFailed
+                    ? "bg-rose-500 text-white"
+                    : done
                     ? "bg-emerald-500 text-white"
                     : active
                     ? "bg-amber-500 text-gray-950"
                     : "bg-white/10 text-gray-500"
                 }`}
               >
-                {done ? (
+                {isFailed ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} className="size-3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : done ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} className="size-3">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
@@ -1056,7 +1083,7 @@ function ApiFlowVisual({
                   <span className="text-[9px] font-semibold">{i + 1}</span>
                 )}
               </div>
-              <span className={`text-[10px] ${done || active ? "text-white" : "text-gray-500"}`}>
+              <span className={`text-[10px] ${isFailed ? "text-rose-300" : done || active ? "text-white" : "text-gray-500"}`}>
                 {label}
               </span>
             </div>
