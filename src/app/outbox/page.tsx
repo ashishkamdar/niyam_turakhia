@@ -816,9 +816,7 @@ function DestinationPanel({
       )}
 
       {/* ── Dispatched deals log (collapsible) ──────────────────────── */}
-      {dispatched.length > 0 && (
-        <DispatchedLog deals={dispatched} target={target} />
-      )}
+      <DispatchedLog deals={dispatched} target={target} />
     </section>
   );
 }
@@ -857,6 +855,11 @@ function DispatchedLog({ deals, target }: { deals: Deal[]; target: Target }) {
       </button>
       {open && (
         <div className="overflow-x-auto border-t border-white/5 bg-gray-950/40">
+          {deals.length === 0 ? (
+            <div className="px-5 py-6 text-center text-xs text-gray-600">
+              No trades dispatched to {TARGET_META[target].title} yet.
+            </div>
+          ) : (
           <table className="w-full min-w-[500px] text-xs">
             <thead className="bg-white/5 text-[10px] uppercase tracking-wider text-gray-500">
               <tr>
@@ -896,6 +899,7 @@ function DispatchedLog({ deals, target }: { deals: Deal[]; target: Target }) {
               })}
             </tbody>
           </table>
+          )}
         </div>
       )}
     </div>
