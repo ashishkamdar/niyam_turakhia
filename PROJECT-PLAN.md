@@ -659,30 +659,131 @@ PROJECT-PLAN.md                                    (this file — Phase C sectio
 
 ---
 
-### What's NEXT (Apr 22 onwards)
+### What's NEXT (Apr 24 onwards)
 
 | Phase | Status | Blocked on |
 |---|---|---|
 | **Meta Business Verification resubmission** | ⏳ Niyam gathering documents | Need correct document types (CI/BR/bank statement). See `docs/Meta-Business-Verification-Guide.html` |
 | **WABA restriction appeal** | ⏳ Under Meta review | Submitted Apr 22. Expected resolution: 24-48 hours. Likely auto-lifts once Business Verification completes. |
-| **OroSoft sandbox credentials** | ⏳ Waiting on OroSoft | They confirmed APIs exist (Apr 13 meeting). Sandbox being created. |
+| **OroSoft Neo Financials UI credentials** | ⏳ Email sent to Avdhesh (Apr 24) | Need login to visually verify trades in OroSoft's web UI |
+| **OroSoft silver stock codes** | ⏳ Requested from OroSoft | Silver (XAG) not set up in demo 2026 FY. Only gold (XAU) works currently. |
 | **SBS REST API credentials** | ⏳ Waiting on SBS vendor | SBS vendor agreed to REST APIs on Apr 11. |
-| **Pakka → OroSoft API writer (real HTTP)** | ⏳ Blocked on sandbox | ~50-line swap once credentials arrive |
-| **Kachha → SBS API writer (real HTTP)** | ⏳ Blocked on SBS credentials | Same ~50-line swap pattern |
+| **Kachha → SBS API writer (real HTTP)** | ⏳ Blocked on SBS credentials | Same pattern as OroSoft integration |
 | **Niyam's dedicated HK/Indian number** | ⏳ Niyam buying a new number | Will replace the US test number (+1 555 653 5708). Staff messages the new number. |
-| **App publishing** | ⏳ After Business Verification | Required for production webhooks from a real business number. Not needed for the test number. |
-| **Fix Settings page truncation bug** | Medium | The meta_config display truncates long values. Saving overwrites DB with truncated strings. Caused a production issue on Apr 21 (corrupted verify_token + ocr_provider). |
+| **Real party alias mapping** | ⏳ Niyam to confirm | Lock code aliases (TAKFUNG, SAPAN, etc.) → OroSoft account codes. Currently using demo accounts with fallback. |
+| **Fix Settings page truncation bug** | Medium | The meta_config display truncates long values. |
 | **Reports page switch from Demo → Live** | 💡 Optional | Reuse `/api/deals/live` math |
-| **Money Flow FY integration** | 💡 Optional | Low priority until real money-movement data lands |
 | **WhatsApp outbound re-enable** | 💡 After real number + WABA restriction lifted | Re-enable compose input in ChatThread |
 
-**Current operational status (Apr 22):**
-- ✅ **Inbound trades working** — staff can send `#NT` codes to `+1 555 653 5708` and they appear in `/review`
-- ✅ **Full pipeline operational** — review → approve → dispatch → sync log all working
-- ✅ **Permanent token** — never-expiring System User token installed
-- ❌ **Outbound blocked** — WABA restricted (was already disabled in PrismX UI anyway)
-- ⏳ **Business Verification** — rejected, resubmission pending with correct documents
-- ⏳ **OroSoft + SBS real API integration** — waiting on vendor sandbox credentials
+---
+
+## 🎯 PHASE D — Trade Desk + OroSoft Integration + Cloudflare Access (Apr 23-24, 2026)
+
+### Trade Desk (standalone staff interface)
+
+Built a completely separate trade entry interface at `https://nt.areakpi.in/nt/staff/trade/` — standalone HTML served by nginx, zero connection to PrismX. Staff sees only a simple trade entry form; they have no idea PrismX exists.
+
+| Feature | Status | File |
+|---|---|---|
+| Standalone HTML page (no Next.js) | ✅ Live | `public/nt/staff/trade/index.html` |
+| Professional light theme with dark header | ✅ Live | CSS redesign Apr 24 |
+| PIN pad login (sends `source: "trade_desk"`) | ✅ Live | Same `/api/auth` endpoint |
+| Trade code entry with validate-then-send flow | ✅ Live | Client-side parser mirrors server |
+| Demo Seed buttons (Pakka + Kachha) | ✅ Live | 10 random gold trades per click |
+| Recent entries list (last 15) | ✅ Live | Polls `/api/trade-entry` |
+| `trade_desk` role — can only login to Trade Desk, blocked from mother app | ✅ Live | Auth route checks `source` field |
+| nginx redirect `/staff/trade` → `/nt/staff/trade/` | ✅ Live | Prevents PrismX layout leak |
+
+### Cloudflare Zero Trust Access
+
+Entire `nt.areakpi.in` domain behind Cloudflare Access with toggle control from PrismX.
+
+| Feature | Status | File |
+|---|---|---|
+| Cloudflare Access covers full domain | ✅ Live | Was `/nt/staff` only, expanded Apr 23 |
+| Toggle enforce/bypass from Users page | ✅ Live | `src/app/api/cloudflare-access/route.ts` |
+| Session duration selector (24h/1w/1m/1y) | ✅ Live | Updates Access Application via API |
+| Auto-sync emails on user create/lock/delete | ✅ Live | `src/lib/cloudflare-access.ts` |
+| Email field on all users (for Cloudflare OTP) | ✅ Live | Migration v17, `auth_pins.email` column |
+| Currently **bypassed** (PIN-only auth) | ✅ | Flip toggle when ready to go live |
+
+### User Management Enhancements
+
+| Feature | Status | File |
+|---|---|---|
+| `trade_desk` role (4th role in hierarchy) | ✅ Live | `super_admin > admin > staff > trade_desk` |
+| Country flag + name under IP on Users page | ✅ Live | Captures `CF-IPCountry` header at login |
+| Horizontally scrollable tables on mobile | ✅ Live | `overflow-x-auto` + `min-w-[640px]` |
+| Mobile bottom nav reordered | ✅ Live | Home → Review → Outbox → Users → Settings |
+
+### OroSoft NeoConnect API Integration (Pakka Deals) — LIVE
+
+**This is the biggest delivery of Phase D.** OroSoft provided demo API access (email from Avdhesh Sharma, Apr 24). Built full integration in one session.
+
+| Feature | Status | File |
+|---|---|---|
+| OroSoft API client (JWT auth + token caching) | ✅ Live | `src/lib/orosoft-client.ts` |
+| Field mapper (pending_deals → FixingTrade) | ✅ Live | `src/lib/orosoft-mapper.ts` |
+| Real dispatch replaces simulation | ✅ Live | `src/app/api/dispatch/route.ts` (behind `orosoft_enabled` flag) |
+| Sequential visual cards wired to real API calls | ✅ Live | Authenticate → Format → POST → Confirm |
+| Red X on failed step, green only for passed | ✅ Live | No fake timers, real progress |
+| Dry-run validation (pre-flight without sending) | ✅ Live | `POST /api/dispatch { dry_run: true }` |
+| OroSoft test endpoint | ✅ Live | `GET /api/orosoft/test` |
+| Party sync from OroSoft AccountsList | ✅ Live | `GET /api/parties/sync?target=orosoft` — 23 accounts synced |
+| Default fallback account (OC0001) | ✅ Live | Unmapped parties use demo account |
+| OroSoft Balances section on Outbox | ✅ Live | Live stock inventory + customer account positions |
+| Developer Info section on Outbox | ✅ Live | Field mapping table, customer accounts, stock codes |
+| Dispatched Trades log per target | ✅ Live | Collapsible, doc # highlighted as first column |
+| Migration v19: OroSoft credentials | ✅ Live | Seeded in settings KV table |
+| `orosoft_enabled` toggle | ✅ Live | Currently **enabled** |
+
+**Verified against live OroSoft demo:** 3 trades successfully posted — FCT/2026/000010, FCT/2026/000011, FCT/2026/000012.
+
+**API endpoints discovered and integrated:**
+- Auth: `POST https://auth.neofinancials.com/v1_2/auth/token`
+- FixingTrade: `POST /v1_2/api/document/FixingTrade`
+- StockBalances: `GET /v1_2/api/reports/StockBalances`
+- AccountBalances: `GET /v1_2/api/reports/AccountBalances`
+- AccountsList: `GET /v1_2/api/details/AccountsList`
+- FixingStocks: `GET /v1_2/api/details/FixingStocks`
+- Locations: `GET /v1_2/api/details/Locations`
+
+**Key findings during integration:**
+- Stock codes in FixingTrade use NO spaces (`KG4X9`) but FixingStocks API returns them WITH spaces (`KG 4X9`)
+- `docDate` required in yyyyMMdd format, must fall within OroSoft's current financial year
+- Demo FY is 2026 — only gold (XAU) stock codes exist, silver/platinum/palladium not set up
+- Response wraps doc number in `{"result":{"EXID":"FCT/2026/000012"}}`
+- OroSoft demo has 16 customers, 7 suppliers, 2 locations
+
+### New files (Phase D)
+
+| File | Purpose |
+|---|---|
+| `src/lib/orosoft-client.ts` | OroSoft NeoConnect API client |
+| `src/lib/orosoft-mapper.ts` | Field mapping + party resolution |
+| `src/lib/cloudflare-access.ts` | Cloudflare Zero Trust API client |
+| `src/app/api/orosoft/test/route.ts` | OroSoft connectivity test |
+| `src/app/api/orosoft/balances/route.ts` | Stock + account balances proxy |
+| `src/app/api/cloudflare-access/route.ts` | Cloudflare toggle + session duration |
+
+### Schema migrations (Phase D)
+
+| Version | Description |
+|---|---|
+| v17 | Add `email` column to `auth_pins` for Cloudflare Access |
+| v18 | Add `country` column to `auth_sessions` for geo display |
+| v19 | Seed OroSoft NeoConnect demo credentials in settings |
+
+**Current operational status (Apr 24):**
+- ✅ **OroSoft Pakka dispatch LIVE** — real API, real document numbers
+- ✅ **Trade Desk operational** — staff can enter trades at `/nt/staff/trade/`
+- ✅ **Cloudflare Access ready** — toggle to enforce when going live
+- ✅ **Inbound trades working** — WhatsApp + Trade Desk → Review → Approve → Dispatch
+- ✅ **Full pipeline end-to-end** — trade entry → review → dispatch to OroSoft → doc number back → balances visible
+- ⏳ **OroSoft UI credentials** — email sent to verify trades visually
+- ⏳ **Silver/platinum support** — waiting on OroSoft to set up stock codes
+- ⏳ **SBS/Kachha integration** — waiting on SBS vendor credentials
+- ❌ **WhatsApp outbound** — WABA still restricted
 
 The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
 
