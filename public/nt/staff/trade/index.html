@@ -172,6 +172,19 @@
   #refContent { display: none; }
   #refContent.open { display: block; }
 
+  /* Seed buttons */
+  .seed-row { display: flex; gap: 8px; margin-top: 16px; }
+  .btn-seed {
+    flex: 1; padding: 10px; border-radius: 8px; font-size: 12px;
+    font-weight: 600; cursor: pointer; transition: 0.2s; border: 1.5px dashed;
+  }
+  .btn-seed:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-seed-pakka { background: #f0fdf4; color: #166534; border-color: #86efac; }
+  .btn-seed-pakka:hover:not(:disabled) { background: #dcfce7; }
+  .btn-seed-kachha { background: #eff6ff; color: #1e40af; border-color: #93c5fd; }
+  .btn-seed-kachha:hover:not(:disabled) { background: #dbeafe; }
+  #seedStatus { margin-top: 8px; font-size: 12px; text-align: center; }
+
   .hidden { display: none !important; }
 </style>
 </head>
@@ -233,6 +246,12 @@
       <div class="label">Triggers</div>
       <div><span class="f-type-p">#NTP</span> = Pakka &nbsp; <span class="f-type-k">#NTK</span> = Kachha &nbsp; <span class="f-type-u">#NT</span> = Decide later</div>
     </div>
+
+    <div class="seed-row">
+      <button class="btn-seed btn-seed-pakka" id="btnSeedPakka" onclick="seedTrades('P')">Demo Seed Pakka</button>
+      <button class="btn-seed btn-seed-kachha" id="btnSeedKachha" onclick="seedTrades('K')">Demo Seed Kachha</button>
+    </div>
+    <div id="seedStatus"></div>
 
     <div id="recentArea"></div>
   </div>
@@ -474,6 +493,59 @@ async function loadRecent() {
     html += '</div></div>';
     $('recentArea').innerHTML = html;
   } catch {}
+}
+
+// ─── Demo Seed ───────────────────────────────────
+const SEED_PARTIES = ['AXIOM','AMARAA','JINYI','VAMOR','PRESTIGE','PRISMHK','ANGEL','JSK','SAPAN','TAKFUNG'];
+const SEED_METALS = [
+  { metal: 'GOLD', purity: '24K', rateMin: 2400, rateMax: 2700 },
+  { metal: 'GOLD', purity: '995', rateMin: 2380, rateMax: 2680 },
+  { metal: 'SILVER', purity: '999', rateMin: 28, rateMax: 35 },
+  { metal: 'PLATINUM', purity: '999', rateMin: 950, rateMax: 1050 },
+];
+const SEED_QTYS = ['1KG','2KG','5KG','10KG','50KG','100OZ','500G'];
+
+function generateSeedTrades(type, count) {
+  const trigger = type === 'P' ? '#NTP' : '#NTK';
+  const lines = [];
+  for (let i = 0; i < count; i++) {
+    const dir = Math.random() > 0.5 ? 'BUY' : 'SELL';
+    const party = SEED_PARTIES[Math.floor(Math.random() * SEED_PARTIES.length)];
+    const m = SEED_METALS[Math.floor(Math.random() * SEED_METALS.length)];
+    const qty = SEED_QTYS[Math.floor(Math.random() * SEED_QTYS.length)];
+    const rate = (m.rateMin + Math.random() * (m.rateMax - m.rateMin)).toFixed(2);
+    const premSign = Math.random() > 0.5 ? '+' : '-';
+    const premVal = (Math.random() * 2).toFixed(1);
+    lines.push(`${trigger} ${dir} ${qty} ${m.metal} ${m.purity} @${rate} ${premSign}${premVal} ${party}`);
+  }
+  return lines.join('\n');
+}
+
+async function seedTrades(type) {
+  const label = type === 'P' ? 'Pakka' : 'Kachha';
+  const btn = type === 'P' ? $('btnSeedPakka') : $('btnSeedKachha');
+  btn.disabled = true;
+  btn.textContent = `Seeding ${label}…`;
+  $('seedStatus').innerHTML = '';
+
+  const text = generateSeedTrades(type, 10);
+  try {
+    const r = await fetch('/api/trade-entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const d = await r.json();
+    const ok = d.inserted || 0;
+    const fail = d.failed || 0;
+    $('seedStatus').innerHTML = `<span style="color:#166534">✓ ${ok} ${label} trades seeded${fail ? ` (${fail} failed)` : ''}</span>`;
+    loadRecent();
+  } catch {
+    $('seedStatus').innerHTML = '<span style="color:#991b1b">✗ Network error</span>';
+  }
+
+  btn.textContent = `Demo Seed ${label}`;
+  btn.disabled = false;
 }
 
 function toggleRef() {
