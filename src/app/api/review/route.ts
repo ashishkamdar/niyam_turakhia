@@ -59,6 +59,12 @@ export async function GET(req: NextRequest) {
       rows = db
         .prepare("SELECT * FROM pending_deals ORDER BY received_at DESC LIMIT ?")
         .all(limit) as Record<string, unknown>[];
+    } else if (statusParam === "approved") {
+      // Approved tab: only show deals NOT yet dispatched.
+      // Dispatched deals are visible in the Outbox's Dispatched Trades section.
+      rows = db
+        .prepare("SELECT * FROM pending_deals WHERE status = 'approved' AND dispatched_at IS NULL ORDER BY received_at DESC LIMIT ?")
+        .all(limit) as Record<string, unknown>[];
     } else {
       rows = db
         .prepare("SELECT * FROM pending_deals WHERE status = ? ORDER BY received_at DESC LIMIT ?")
@@ -91,11 +97,14 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Counts by status (used by tab badges) — includes both DB statuses and
-  // the live in-memory ignored count so the Ignored tab badge always matches.
+  // Counts by status (used by tab badges). Approved count excludes
+  // dispatched deals since those are shown in Outbox, not Review.
   const counts = db
     .prepare("SELECT status, COUNT(*) as count FROM pending_deals GROUP BY status")
     .all() as { status: string; count: number }[];
+  const approvedUndispatched = (db
+    .prepare("SELECT COUNT(*) as c FROM pending_deals WHERE status = 'approved' AND dispatched_at IS NULL")
+    .get() as { c: number }).c;
   const countMap: Record<string, number> = {
     pending: 0,
     approved: 0,
@@ -105,6 +114,8 @@ export async function GET(req: NextRequest) {
   for (const c of counts) {
     countMap[c.status] = c.count;
   }
+  // Override approved count to exclude dispatched
+  countMap.approved = approvedUndispatched;
 
   return NextResponse.json({ deals: normalised, counts: countMap });
 }
