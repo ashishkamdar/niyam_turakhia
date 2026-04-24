@@ -211,6 +211,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const target = body.target as "orosoft" | "sbs" | undefined;
   const ids = Array.isArray(body.ids) ? (body.ids as string[]) : null;
+  const dryRun = body.dry_run === true;
 
   if (target !== "orosoft" && target !== "sbs") {
     return NextResponse.json(
@@ -325,13 +326,23 @@ export async function POST(req: NextRequest) {
     }
 
     if (validationErrors.length > 0) {
-      // Clear lock since we're not dispatching
       db.prepare("DELETE FROM settings WHERE key = ?").run(LOCK_KEY);
       return NextResponse.json({
         ok: false,
         error: "Validation failed for some deals",
         failures: validationErrors,
       }, { status: 422 });
+    }
+
+    // Dry run — validation passed, return without sending
+    if (dryRun) {
+      db.prepare("DELETE FROM settings WHERE key = ?").run(LOCK_KEY);
+      return NextResponse.json({
+        ok: true,
+        dry_run: true,
+        validated: mappedPayloads.length,
+        payloads: mappedPayloads.map((p) => ({ id: p.id, accountCode: p.payload.accountCode, cmdtyPair: p.payload.cmdtyPair })),
+      });
     }
 
     // Authenticate

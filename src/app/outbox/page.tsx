@@ -626,72 +626,86 @@ function DestinationPanel({
     if (blocked) return;
 
     setPhase("sending");
+    setLastBatch(null);
+    const dealIds = queue.map((d) => d.id);
+
+    // ── Step 1: Authenticate ────────────────────────────────
     setStage(0);
-
-    // Stage 0: Validating
-    // Small delay so the user sees "Validating" before it jumps ahead
-    await new Promise((r) => setTimeout(r, 300));
-    setStage(1); // Authenticating
-
     try {
-      // Stage 1→2→3 happen server-side (auth, map, submit).
-      // We show "Authenticating" while the request is in flight.
+      const authRes = await fetch("/api/orosoft/test");
+      const authJson = await authRes.json();
+      if (!authJson.ok) {
+        setLastBatch({ id: null, count: 0, deals: [], response: authJson.error || "Authentication failed", failed: true, failedAtStage: 0 });
+        setPhase("done");
+        return;
+      }
+    } catch {
+      setLastBatch({ id: null, count: 0, deals: [], response: "Network error", failed: true, failedAtStage: 0 });
+      setPhase("done");
+      return;
+    }
+    setStage(1);
+
+    // ── Step 2: Validate / Format payload ───────────────────
+    try {
+      const valRes = await fetch("/api/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target, ids: dealIds, dry_run: true }),
+      });
+      const valJson = await valRes.json();
+      if (!valRes.ok || !valJson.ok) {
+        setLastBatch({ id: null, count: 0, deals: [], response: valJson.error || "Validation failed", failed: true, failedAtStage: 1, failures: valJson.failures });
+        setPhase("done");
+        return;
+      }
+    } catch {
+      setLastBatch({ id: null, count: 0, deals: [], response: "Network error during validation", failed: true, failedAtStage: 1 });
+      setPhase("done");
+      return;
+    }
+    setStage(2);
+
+    // ── Step 3: POST to OroSoft ─────────────────────────────
+    let json: Record<string, unknown> = {};
+    try {
       const res = await fetch("/api/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target, ids: queue.map((d) => d.id) }),
+        body: JSON.stringify({ target, ids: dealIds }),
       });
-      const json = await res.json();
-
-      if (!res.ok && !json.batch_id) {
-        // Validation or auth failure
-        const authFailed = res.status === 502;
-        const validationFailed = res.status === 422;
+      json = await res.json();
+      if ((!res.ok && !json.batch_id) || json.ok === false) {
         setLastBatch({
-          id: null,
-          count: 0,
-          response: json.error || "Dispatch failed",
-          deals: [],
-          failed: true,
-          failedAtStage: authFailed ? 0 : validationFailed ? 1 : 2,
-          failures: json.failures,
+          id: (json.batch_id as string) ?? null,
+          count: (json.dispatched as number) ?? 0,
+          deals: (json.deals as Deal[]) ?? [],
+          response: (json.error as string) || (json.response as string) || "OroSoft rejected the trades",
+          failed: true, failedAtStage: 2,
+          failures: json.failures as Array<{ id: string; error: string }>,
         });
-        setStage(4);
         setPhase("done");
         onDispatched();
         return;
       }
-
-      // Server responded — advance through remaining stages quickly
-      setStage(2); // Transmitting
-      await new Promise((r) => setTimeout(r, 400));
-      setStage(3); // Processing response
-      await new Promise((r) => setTimeout(r, 400));
-
-      setLastBatch({
-        id: json.batch_id,
-        count: json.dispatched,
-        response: json.response ?? "",
-        deals: json.deals ?? [],
-        failed: json.ok === false,
-        failedAtStage: json.ok === false ? 2 : -1,
-        failures: json.failures,
-      });
-      setStage(4); // Confirmed
-      setPhase("done");
-      onDispatched();
     } catch {
-      setLastBatch({
-        id: null,
-        count: 0,
-        response: "Network error — could not reach server",
-        deals: [],
-        failed: true,
-        failedAtStage: 0,
-      });
-      setStage(4);
+      setLastBatch({ id: null, count: 0, deals: [], response: "Network error during dispatch", failed: true, failedAtStage: 2 });
       setPhase("done");
+      return;
     }
+    setStage(3);
+
+    // ── Step 4: Confirm receipt ──────────────────────────────
+    await new Promise((r) => setTimeout(r, 500));
+    setLastBatch({
+      id: (json.batch_id as string) ?? null,
+      count: (json.dispatched as number) ?? 0,
+      response: (json.response as string) ?? "",
+      deals: (json.deals as Deal[]) ?? [],
+    });
+    setStage(4);
+    setPhase("done");
+    onDispatched();
   }
 
   function reset() {
