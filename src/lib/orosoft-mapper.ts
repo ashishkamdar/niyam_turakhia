@@ -45,20 +45,8 @@ const CMDTY_PAIR_MAP: Record<string, string> = {
 //   XPD: "OZ"(1.0), "KG"(32.15)
 
 function resolveStockCode(metal: string, purity: string | null): string {
-  const p = (purity || "").toUpperCase();
-  const m = metal.toLowerCase();
-
-  if (m === "gold") {
-    if (p === "9999" || p === "24K" || p === "4N") return "KG 4X9";
-    if (p === "995") return "KG 995";
-    return "KG 4X9"; // default for gold
-  }
-  if (m === "silver") {
-    if (p === "999" || p === "9999" || p === "4N") return "KG 4X9";
-    if (p === "995") return "KG 995";
-    return "KG 4X9";
-  }
-  // Platinum and palladium default to OZ
+  // OroSoft FixingTrade stockCode enum: OZ, GMS, KG4X9, KG995, LBS (NO spaces)
+  // Default to OZ — universally supported and matches priceType=OZ
   return "OZ";
 }
 
@@ -76,21 +64,8 @@ const CONV_FACTORS: Record<string, number> = {
   "TTB": 3.74625,
 };
 
-function gramsToUnit(grams: number, stockCode: string): number {
-  // stockCode unit is defined by its convFactor (how many OZ per unit).
-  // So 1 unit of "KG 4X9" = 32.15 OZ = 32.15 * 31.1035g = ~1000.18g
-  // piecesQty = grams / (convFactor * 31.1035)
-  // But for KG units, 1 KG = 1000g, so piecesQty = grams / 1000
-  // For OZ: piecesQty = grams / 31.1035
-  // For GMS: piecesQty = grams (since 1 GMS = 1 gram)
-
-  if (stockCode === "GMS") return Math.round(grams * 1000) / 1000;
-  if (stockCode === "OZ") return Math.round((grams / 31.1035) * 1000) / 1000;
-  if (stockCode.startsWith("KG")) return Math.round((grams / 1000) * 1000) / 1000;
-  if (stockCode === "TTB") return Math.round((grams / (3.74625 * 31.1035)) * 1000) / 1000;
-
-  // Fallback: convert to OZ
-  return Math.round((grams / 31.1035) * 1000) / 1000;
+function gramsToOz(grams: number): number {
+  return Math.round((grams / 31.1035) * 1000) / 1000; // max 3 decimals
 }
 
 // ── Party alias → accountCode ───────────────────────────────────────
@@ -203,8 +178,15 @@ export function mapDealToFixingTrade(
   }
 
   const stockCode = resolveStockCode(deal.metal, deal.purity);
-  const piecesQty = gramsToUnit(deal.qty_grams, stockCode);
+  const piecesQty = gramsToOz(deal.qty_grams);
   const dealFlag = deal.direction.toLowerCase() === "buy" ? 1 : 0;
+
+  // Date in yyyyMMdd format — OroSoft requires this explicitly
+  const now = new Date();
+  const docDate = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  // Value date = T+2
+  const vd = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+  const valueDate = `${vd.getFullYear()}${String(vd.getMonth() + 1).padStart(2, "0")}${String(vd.getDate()).padStart(2, "0")}`;
 
   const payload: FixingTradePayload = {
     accountCode,
@@ -214,9 +196,8 @@ export function mapDealToFixingTrade(
     price: Math.round(deal.rate_usd_per_oz * 10000000) / 10000000, // max 7 decimals
     stockCode,
     documentType: "FCT",
-    // Let OroSoft default docDate to current date — avoids date
-    // validation issues with demo environments that may have a
-    // different financial year range.
+    docDate,
+    valueDate,
     priceType: "OZ",
     referenceNo: `PX-${deal.id.slice(0, 8).toUpperCase()}`,
     remarks: `PrismX deal ${deal.id}`,
