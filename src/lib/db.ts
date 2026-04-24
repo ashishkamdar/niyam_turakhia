@@ -503,6 +503,7 @@ function runMigrations(db: Database.Database) {
         set("orosoft_password", "mi@r19#d");
         set("orosoft_company_code", "default");
         set("orosoft_enabled", "false");
+        set("orosoft_default_account", "OC0001");
       },
     },
   ];

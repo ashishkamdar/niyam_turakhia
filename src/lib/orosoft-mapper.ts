@@ -143,6 +143,15 @@ export function resolveAccountCode(
     }
   }
 
+  // Fallback: check if a default test account is configured
+  const fallback = (db.prepare(
+    "SELECT value FROM settings WHERE key = 'orosoft_default_account'"
+  ).get() as { value: string } | undefined)?.value;
+
+  if (fallback) {
+    return { ok: true, accountCode: fallback };
+  }
+
   return { ok: false, error: `No party found matching "${alias}". Add the party with an OroSoft account code first.` };
 }
 

@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
+import { getDb } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth-context";
+import {
+  getOroSoftConfig,
+  getOroSoftToken,
+  fetchAccountsList,
+} from "@/lib/orosoft-client";
 
 /**
  * GET /api/parties/sync?target=sbs|orosoft
  *
- * Stub endpoints for pulling party master data from the downstream
- * accounting systems. The software vendors (SBS and OroSoft) will
- * provide REST API documentation; until then these stubs return a
- * clear "not yet configured" response so the UI can show the sync
- * buttons with an honest status.
+ * For OroSoft: fetches AccountsList from NeoConnect, upserts into
+ * parties table matching on orosoft_party_code. Creates new parties
+ * for accounts not yet in PrismX.
  *
- * When the real APIs are available, this handler will:
- *   1. Read connection credentials from settings/meta_config
- *   2. Fetch the party list from the vendor endpoint
- *   3. Upsert into the parties table (matching on vendor party code)
- *   4. Return { ok, synced: N, created: N, updated: N }
- *
- * The stub shape matches the future success shape so the UI doesn't
- * need to change when the real implementation lands.
+ * SBS remains a stub until their API is available.
  */
 export async function GET(req: NextRequest) {
   const target = req.nextUrl.searchParams.get("target");
@@ -28,25 +27,108 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const label = target === "sbs" ? "SBS" : "OroSoft Neo";
+  const actor = getCurrentUser(req);
+  if (!actor || (actor.role !== "super_admin" && actor.role !== "admin")) {
+    return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
+  }
 
-  return NextResponse.json(
-    {
-      ok: false,
-      stub: true,
-      error: `${label} API integration is not yet configured. Once the vendor provides REST API credentials and documentation, this endpoint will pull the party master automatically.`,
-      target,
-      help: {
-        what_this_will_do: `Connect to ${label}'s API, fetch the full party/buyer/seller master list, and upsert into PrismX's parties table — matching on ${target === "sbs" ? "sbs_party_code" : "orosoft_party_code"}.`,
-        what_we_need_from_vendor: [
-          "REST API base URL",
-          "Authentication method (API key, OAuth, basic auth)",
-          "Endpoint path for listing parties/buyers/sellers",
-          "Response schema (field names for party code, name, type, contact details)",
-        ],
-        where_to_configure: "Once received, add the credentials in Settings → Data Source or contact the developer to wire the integration.",
+  // ── SBS stub ────────────────────────────────────────────────────
+  if (target === "sbs") {
+    return NextResponse.json(
+      {
+        ok: false,
+        stub: true,
+        error: "SBS API integration is not yet configured.",
+        target,
       },
-    },
-    { status: 501 }
+      { status: 501 }
+    );
+  }
+
+  // ── OroSoft real sync ───────────────────────────────────────────
+  const db = getDb();
+  const config = getOroSoftConfig(db);
+  if (!config) {
+    return NextResponse.json({
+      ok: false,
+      error: "OroSoft NeoConnect not configured. Check settings.",
+    });
+  }
+
+  const authResult = await getOroSoftToken(config);
+  if (!authResult.ok) {
+    return NextResponse.json({
+      ok: false,
+      error: `Authentication failed: ${authResult.error}`,
+    });
+  }
+
+  const accountsResult = await fetchAccountsList(config, authResult.token);
+  if (!accountsResult.ok) {
+    return NextResponse.json({
+      ok: false,
+      error: `Failed to fetch accounts: ${accountsResult.error}`,
+    });
+  }
+
+  // Only sync Customer (C) and Supplier (S) accounts — skip
+  // General ledger (G) and Bank (B) accounts.
+  const tradingAccounts = accountsResult.data.filter(
+    (a) => a.accountType === "C" || a.accountType === "S"
   );
+
+  const now = new Date().toISOString();
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  const upsert = db.transaction(() => {
+    for (const acct of tradingAccounts) {
+      // Check if party already exists by orosoft_party_code
+      const existing = db.prepare(
+        "SELECT id, name FROM parties WHERE orosoft_party_code = ?"
+      ).get(acct.accountCode) as { id: string; name: string } | undefined;
+
+      if (existing) {
+        // Update name if changed
+        if (existing.name !== acct.accountName) {
+          db.prepare(
+            "UPDATE parties SET name = ?, updated_at = ? WHERE id = ?"
+          ).run(acct.accountName, now, existing.id);
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
+        // Create new party
+        const partyType = acct.accountType === "C" ? "customer"
+          : acct.accountType === "S" ? "supplier"
+          : "both";
+
+        db.prepare(
+          `INSERT INTO parties (id, name, short_code, type, orosoft_party_code, active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 1, ?, ?)`
+        ).run(
+          randomUUID(),
+          acct.accountName,
+          acct.accountCode,  // use OroSoft code as short_code for easy reference
+          partyType,
+          acct.accountCode,
+          now,
+          now
+        );
+        created++;
+      }
+    }
+  });
+  upsert();
+
+  return NextResponse.json({
+    ok: true,
+    target: "orosoft",
+    total_fetched: tradingAccounts.length,
+    created,
+    updated,
+    skipped,
+  });
 }
