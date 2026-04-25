@@ -287,7 +287,7 @@
     <!-- ── Tab Bar ──────────────────────────────── -->
     <div class="tab-bar">
       <button class="tab-btn active" id="tabBtnCode" onclick="switchTab('code')">Code Entry</button>
-      <button class="tab-btn" id="tabBtnDirect" onclick="switchTab('direct')">Direct Entry</button>
+      <button class="tab-btn" id="tabBtnDirect" onclick="switchTab('direct')">OroSoft Entry</button>
     </div>
 
     <!-- ── Tab: Code Entry (existing) ──────────── -->
@@ -461,6 +461,12 @@
             <div class="de-label">Remarks</div>
             <input type="text" class="de-input" id="deRemarks" placeholder="Optional notes">
           </div>
+        </div>
+
+        <!-- Trade string preview -->
+        <div class="de-group" id="dePreviewGroup" style="display:none">
+          <div class="de-label">Generated Trade String</div>
+          <div id="dePreview" style="background:#f5f1ec;border:1px solid #d1cac0;border-radius:8px;padding:10px 14px;font-family:'SF Mono','Fira Code','Courier New',monospace;font-size:13px;color:#334155;line-height:1.6;word-break:break-all"></div>
         </div>
 
         <!-- Submit -->
@@ -814,6 +820,33 @@ function deValidateForm() {
     && $('deQty').value && parseFloat($('deQty').value) > 0
     && $('dePrice').value && parseFloat($('dePrice').value) > 0;
   $('deSubmitBtn').disabled = !valid;
+  updateDePreview();
+}
+
+function updateDePreview() {
+  var pg = $('dePreviewGroup');
+  var pv = $('dePreview');
+  if (!deState.metal || !deState.direction) { pg.style.display = 'none'; return; }
+  var dir = deState.direction.toUpperCase();
+  var qty = $('deQty').value || '?';
+  var unitLabel = deState.unit;
+  if (unitLabel === 'KG4X9' || unitLabel === 'KG995') unitLabel = 'KG';
+  else if (unitLabel === 'GMS') unitLabel = 'G';
+  var metalName = deState.metal.toUpperCase();
+  var purity = (deState.unit === 'KG995') ? '995' : '9999';
+  var price = $('dePrice').value || '?';
+  var party = $('deAccount').value || '?';
+  var premRate = $('dePremRate').value;
+  var premStr = '';
+  if (premRate) {
+    var pv2 = parseFloat(premRate);
+    premStr = (pv2 > 0 ? '+' : '') + pv2;
+  }
+  var line = '#NTP ' + dir + ' ' + qty + unitLabel + ' ' + metalName + ' ' + purity + ' @' + price;
+  if (premStr) line += ' ' + premStr;
+  line += ' ' + party;
+  pg.style.display = '';
+  pv.textContent = line.replace(/\s+/g, ' ').trim();
 }
 
 function attachDeListeners() {
@@ -887,7 +920,7 @@ async function submitDirectEntry() {
   else if (deState.unit === 'LBS') qtyStr = qty + 'LBS';
   else qtyStr = qty + 'KG';
 
-  var purity = (deState.unit === 'KG995') ? '995' : '24K';
+  var purity = (deState.unit === 'KG995') ? '995' : '9999';
   var party = $('deAccount').value;
   var premStr = premRate ? (premRate > 0 ? '+' + premRate : '' + premRate) : '';
 
