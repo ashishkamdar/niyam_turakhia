@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
     `INSERT INTO pending_deals (
        id, whatsapp_message_id, sender_phone, sender_name, raw_message, received_at,
        deal_type, direction, qty_grams, metal, purity, rate_usd_per_oz,
-       premium_type, premium_value, party_alias, parse_errors, status
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
+       premium_type, premium_value, party_alias, parse_errors, status, orosoft_doc_type
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
   );
 
   const txn = db.transaction(() => {
@@ -82,6 +82,9 @@ export async function POST(req: NextRequest) {
         ? JSON.stringify(parseResult.errors)
         : null;
 
+      // Extract [FBT] tag from the line to determine document type
+      const docType = /\[FBT\]/i.test(line) ? "FBT" : null;
+
       insert.run(
         id,
         `trade-desk-${id}`,   // marker prefix so Review can show source badge
@@ -98,7 +101,8 @@ export async function POST(req: NextRequest) {
         f.premium_type,
         f.premium_value,
         f.party_alias,
-        parseErrors
+        parseErrors,
+        docType
       );
 
       results.push({

@@ -22,6 +22,7 @@ export type DispatchableDeal = {
   premium_value: number | null;
   party_alias: string | null;
   received_at: string;
+  orosoft_doc_type: string | null;
 };
 
 export type MapResult =
@@ -190,7 +191,7 @@ export function mapDealToFixingTrade(
 
   // Field order matches OroSoft FixingTradeRequest spec exactly
   const payload: FixingTradePayload = {
-    documentType: "FCT",
+    documentType: deal.orosoft_doc_type || "FCT",
     docDate,
     accountCode,
     valueDate,

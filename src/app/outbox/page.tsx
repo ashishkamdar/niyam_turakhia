@@ -39,6 +39,7 @@ type Deal = {
   dispatched_to: string | null;
   dispatch_response: string | null;
   dispatch_batch_id: string | null;
+  orosoft_doc_type: string | null;
 };
 
 type Lock = {
@@ -117,6 +118,20 @@ const TARGET_META: Record<Target, {
 };
 
 const GRAMS_PER_TROY_OZ = 31.1034768;
+
+function DocTypeBadge({ deal }: { deal: Deal }) {
+  if (deal.deal_type !== "P") return null;
+  const isUnfix = deal.orosoft_doc_type === "FBT";
+  return (
+    <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+      isUnfix
+        ? "bg-amber-500/15 text-amber-300"
+        : "bg-emerald-500/15 text-emerald-300"
+    }`}>
+      {isUnfix ? "UNFIX" : "FIX"}
+    </span>
+  );
+}
 
 function formatDealLine(d: Deal): string {
   const dir = d.direction === "sell" ? "SELL" : d.direction === "buy" ? "BUY" : "—";
@@ -239,6 +254,7 @@ export default function OutboxPage() {
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400">
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold">Target</th>
+                  <th className="px-4 py-2 text-left font-semibold">Type</th>
                   <th className="px-4 py-2 text-left font-semibold">Deal</th>
                   <th className="px-4 py-2 text-right font-semibold">Amount</th>
                   <th className="px-4 py-2 text-left font-semibold">Party</th>
@@ -257,6 +273,9 @@ export default function OutboxPage() {
                           <span className={`size-1.5 rounded-full ${target === "orosoft" ? "bg-emerald-400" : "bg-sky-400"}`} />
                           {meta.destLabel}
                         </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <DocTypeBadge deal={d} />
                       </td>
                       <td className="px-4 py-2 font-mono text-xs text-gray-300">
                         {formatDealLine(d)}
@@ -954,7 +973,10 @@ function DestinationPanel({
               {queue.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-gray-900/60 px-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-mono text-xs text-white">{formatDealLine(d)}</div>
+                    <div className="flex items-center gap-1.5 truncate font-mono text-xs text-white">
+                      <DocTypeBadge deal={d} />
+                      {formatDealLine(d)}
+                    </div>
                     <div className="text-[10px] text-gray-500">
                       {d.party_alias ?? d.sender_name} · approved {timeAgo(d.reviewed_at)}
                     </div>
@@ -1177,6 +1199,7 @@ function DispatchedLog({ deals, target }: { deals: Deal[]; target: Target }) {
             <thead className="bg-white/5 text-[10px] uppercase tracking-wider text-gray-500">
               <tr>
                 <th className="px-3 py-2 text-left font-semibold">Doc #</th>
+                <th className="px-3 py-2 text-left font-semibold">Type</th>
                 <th className="px-3 py-2 text-left font-semibold">Trade</th>
                 <th className="px-3 py-2 text-left font-semibold">Party</th>
                 <th className="px-3 py-2 text-right font-semibold">Amount</th>
@@ -1192,6 +1215,9 @@ function DispatchedLog({ deals, target }: { deals: Deal[]; target: Target }) {
                       <span className={`inline-block rounded px-2 py-0.5 font-mono text-[11px] font-bold ${meta.accentBg} ${meta.accentText}`}>
                         {docNum}
                       </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <DocTypeBadge deal={d} />
                     </td>
                     <td className="px-3 py-2 font-mono text-gray-300">
                       {formatDealLine(d)}

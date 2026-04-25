@@ -506,6 +506,13 @@ function runMigrations(db: Database.Database) {
         set("orosoft_default_account", "OC0001");
       },
     },
+    {
+      version: 20,
+      description: "Add orosoft_doc_type column to pending_deals for FCT/FBT tracking",
+      up: () => {
+        db.prepare("ALTER TABLE pending_deals ADD COLUMN orosoft_doc_type TEXT").run();
+      },
+    },
   ];
 
   for (const migration of migrations) {

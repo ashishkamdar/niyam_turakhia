@@ -145,7 +145,7 @@ export async function GET(_req: NextRequest) {
       `SELECT id, sender_name, received_at, reviewed_at,
               deal_type, direction, metal, purity, qty_grams,
               rate_usd_per_oz, premium_type, premium_value, party_alias,
-              dispatched_at, dispatched_to, dispatch_response, dispatch_batch_id
+              dispatched_at, dispatched_to, dispatch_response, dispatch_batch_id, orosoft_doc_type
          FROM pending_deals
          WHERE status = 'approved' AND dispatched_at IS NULL
          ORDER BY reviewed_at ASC`
@@ -159,7 +159,7 @@ export async function GET(_req: NextRequest) {
       `SELECT id, sender_name, received_at, reviewed_at,
               deal_type, direction, metal, purity, qty_grams,
               rate_usd_per_oz, premium_type, premium_value, party_alias,
-              dispatched_at, dispatched_to, dispatch_response, dispatch_batch_id
+              dispatched_at, dispatched_to, dispatch_response, dispatch_batch_id, orosoft_doc_type
          FROM pending_deals
          WHERE dispatched_at IS NOT NULL
          ORDER BY dispatched_at DESC
@@ -309,7 +309,7 @@ export async function POST(req: NextRequest) {
     const ph = idList.map(() => "?").join(",");
     const fullDeals = db.prepare(
       `SELECT id, deal_type, direction, qty_grams, metal, purity,
-              rate_usd_per_oz, premium_type, premium_value, party_alias, received_at
+              rate_usd_per_oz, premium_type, premium_value, party_alias, received_at, orosoft_doc_type
          FROM pending_deals WHERE id IN (${ph})`
     ).all(...idList) as MappableDeal[];
 
@@ -470,7 +470,7 @@ export async function POST(req: NextRequest) {
       `SELECT id, sender_name, received_at, reviewed_at,
               deal_type, direction, metal, purity, qty_grams,
               rate_usd_per_oz, premium_type, premium_value, party_alias,
-              dispatched_at, dispatched_to, dispatch_response, dispatch_batch_id
+              dispatched_at, dispatched_to, dispatch_response, dispatch_batch_id, orosoft_doc_type
          FROM pending_deals
          WHERE id IN (${placeholders})
          ORDER BY dispatched_at DESC`
