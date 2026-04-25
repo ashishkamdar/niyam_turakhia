@@ -677,7 +677,7 @@ PROJECT-PLAN.md                                    (this file — Phase C sectio
 
 ---
 
-## 🎯 PHASE D — Trade Desk + OroSoft Integration + Cloudflare Access (Apr 23-24, 2026)
+## 🎯 PHASE D — Trade Desk + OroSoft Integration + Secure Access (Apr 23-25, 2026)
 
 ### Trade Desk (standalone staff interface)
 
@@ -694,17 +694,18 @@ Built a completely separate trade entry interface at `https://nt.areakpi.in/nt/s
 | `trade_desk` role — can only login to Trade Desk, blocked from mother app | ✅ Live | Auth route checks `source` field |
 | nginx redirect `/staff/trade` → `/nt/staff/trade/` | ✅ Live | Prevents PrismX layout leak |
 
-### Cloudflare Zero Trust Access
+### Secure Access (Cloudflare Zero Trust, branded as "Secure Access" in UI)
 
-Entire `nt.areakpi.in` domain behind Cloudflare Access with toggle control from PrismX.
+Entire `nt.areakpi.in` domain behind Cloudflare Access with toggle control from PrismX. All user-facing text says "Secure Access" — no vendor names exposed to Niyam.
 
 | Feature | Status | File |
 |---|---|---|
-| Cloudflare Access covers full domain | ✅ Live | Was `/nt/staff` only, expanded Apr 23 |
+| Full domain coverage | ✅ Live | Was `/nt/staff` only, expanded Apr 23 |
 | Toggle enforce/bypass from Users page | ✅ Live | `src/app/api/cloudflare-access/route.ts` |
 | Session duration selector (24h/1w/1m/1y) | ✅ Live | Updates Access Application via API |
 | Auto-sync emails on user create/lock/delete | ✅ Live | `src/lib/cloudflare-access.ts` |
-| Email field on all users (for Cloudflare OTP) | ✅ Live | Migration v17, `auth_pins.email` column |
+| Email field on all users (for Secure Access OTP) | ✅ Live | Migration v17, `auth_pins.email` column |
+| User-driven email list display on Users page | ✅ Live | Shows which PINs are synced, which lack email |
 | Currently **bypassed** (PIN-only auth) | ✅ | Flip toggle when ready to go live |
 
 ### User Management Enhancements
@@ -761,16 +762,16 @@ Entire `nt.areakpi.in` domain behind Cloudflare Access with toggle control from 
 |---|---|
 | `src/lib/orosoft-client.ts` | OroSoft NeoConnect API client |
 | `src/lib/orosoft-mapper.ts` | Field mapping + party resolution |
-| `src/lib/cloudflare-access.ts` | Cloudflare Zero Trust API client |
+| `src/lib/cloudflare-access.ts` | Secure Access (Cloudflare Zero Trust) API client |
 | `src/app/api/orosoft/test/route.ts` | OroSoft connectivity test |
 | `src/app/api/orosoft/balances/route.ts` | Stock + account balances proxy |
-| `src/app/api/cloudflare-access/route.ts` | Cloudflare toggle + session duration |
+| `src/app/api/cloudflare-access/route.ts` | Secure Access toggle + session duration + email add/remove |
 
 ### Schema migrations (Phase D)
 
 | Version | Description |
 |---|---|
-| v17 | Add `email` column to `auth_pins` for Cloudflare Access |
+| v17 | Add `email` column to `auth_pins` for Secure Access |
 | v18 | Add `country` column to `auth_sessions` for geo display |
 | v19 | Seed OroSoft NeoConnect demo credentials in settings |
 
@@ -787,15 +788,25 @@ Entire `nt.areakpi.in` domain behind Cloudflare Access with toggle control from 
 | Outbox tables scrollable | ✅ Live | All tables horizontally scrollable, no page overflow |
 | Trade Desk warm pastel palette | ✅ Live | Warm cream/beige tones instead of stark white |
 
-**Current operational status (Apr 24):**
-- ✅ **OroSoft Pakka dispatch LIVE** — real API, real document numbers (FCT/2026/000010–000012)
+### Additional Phase D features (Apr 25)
+
+| Feature | Status | Details |
+|---|---|---|
+| Outbox dual badges in sidebar + bottom nav | ✅ Live | Emerald pill = Pakka/OroSoft queue, Sky pill = Kachha/SBS queue. Polls `/api/dispatch` every 3s |
+| Outbox scrollbar flicker fix | ✅ Live | Removed `overflow-x-auto` from outbox tables — tables render fine at all resolutions without horizontal scroll |
+| Secure Access email list on Users page | ✅ Live | Shows which users are synced (green pills), locked (gray strikethrough), missing email (text note). Driven by PIN data, not a separate list |
+| "Cloudflare Access" → "Secure Access" rename | ✅ Live | All user-facing text vendor-neutral. Internal code unchanged |
+
+**Current operational status (Apr 25):**
+- ✅ **OroSoft Pakka dispatch LIVE** — real API, real document numbers (FCT/2026/000010–000014)
 - ✅ **Trade Desk operational** — staff can enter trades at `/nt/staff/trade/`
-- ✅ **Cloudflare Access ready** — toggle to enforce when going live
+- ✅ **Secure Access ready** — toggle to enforce when going live (Cloudflare credentials configured, API verified)
 - ✅ **Inbound trades working** — WhatsApp + Trade Desk → Review → Approve → Dispatch
 - ✅ **Full pipeline end-to-end** — trade entry → review → dispatch to OroSoft → doc number back → balances visible
 - ✅ **Settings page complete** — OroSoft + SBS credentials editable from UI, no code changes needed for production swap
 - ✅ **Auto-sync parties** — new OroSoft parties auto-discovered on dispatch
 - ✅ **Reset for go-live** — one-click cleanup of all test data
+- ✅ **Outbox badges** — sidebar/bottom nav show per-target pending counts
 - ⏳ **OroSoft UI credentials** — email sent to Avdhesh to verify trades visually
 - ⏳ **Silver/platinum support** — waiting on OroSoft to set up stock codes in 2026 FY
 - ⏳ **SBS/Kachha integration** — waiting on SBS vendor credentials
@@ -845,7 +856,7 @@ pm2 start npm --name nt-metals -- start
 - `screenshots/` — uploaded images
 - nginx config at `/etc/nginx/sites-enabled/nt.areakpi.in`
 - PM2 process config
-- OroSoft/Cloudflare/WhatsApp credentials (stored in `data.db` settings table)
+- OroSoft/Secure Access/WhatsApp credentials (stored in `data.db` settings table)
 
 The original "WhatsApp Bot" section below (Phase 1/2/3 with 63 historical deals, free-text parsing, multi-language negotiation detection) describes an earlier architecture that was obsoleted by the April 10 scope change. Key obsolete elements:
 
