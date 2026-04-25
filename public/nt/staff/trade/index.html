@@ -157,6 +157,14 @@
   .recent-msg { font-family: monospace; font-size: 12px; color: #334155; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 10px; word-break: break-all; }
   .recent-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
   .recent-status { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .recent-type {
+    display: inline-block; font-size: 8px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; padding: 1px 5px; border-radius: 3px; margin-bottom: 1px;
+  }
+  .type-fix { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+  .type-unfix { background: #fefce8; color: #854d0e; border: 1px solid #fde68a; }
+  .type-pakka { background: #f0fdf4; color: #047857; }
+  .type-kachha { background: #eff6ff; color: #1e40af; }
   .status-pending { color: #d97706; }
   .status-approved { color: #16a34a; }
   .status-rejected { color: #dc2626; }
@@ -715,14 +723,53 @@ async function loadRecent() {
     const d = await r.json();
     const entries = d.entries || [];
     if (entries.length === 0) { $('recentArea').innerHTML = ''; return; }
-    let html = '<div class="recent"><div class="section-label">My Recent Entries</div><div class="recent-list">';
-    entries.forEach(e => {
-      const sc = e.status==='approved'?'status-approved':e.status==='rejected'?'status-rejected':'status-pending';
-      const time = new Date(e.received_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
-      html += `<div class="recent-item"><div class="recent-msg">${e.raw_message}</div><div class="recent-meta"><span class="recent-status ${sc}">${e.status}</span><span class="recent-time">${time}</span></div></div>`;
+    var container = document.createElement('div');
+    container.className = 'recent';
+    var heading = document.createElement('div');
+    heading.className = 'section-label';
+    heading.textContent = 'My Recent Entries';
+    container.appendChild(heading);
+    var list = document.createElement('div');
+    list.className = 'recent-list';
+    entries.forEach(function(e) {
+      var sc = e.status==='approved'?'status-approved':e.status==='rejected'?'status-rejected':'status-pending';
+      var time = new Date(e.received_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
+      var isUnfix = (e.raw_message || '').indexOf('[FBT]') >= 0;
+      var isPakka = e.deal_type === 'P';
+      var isKachha = e.deal_type === 'K';
+
+      var row = document.createElement('div');
+      row.className = 'recent-item';
+      var msg = document.createElement('div');
+      msg.className = 'recent-msg';
+      msg.textContent = e.raw_message;
+      var meta = document.createElement('div');
+      meta.className = 'recent-meta';
+
+      // Trade type badge (FIX / UNFIX)
+      if (isPakka) {
+        var typeBadge = document.createElement('span');
+        typeBadge.className = 'recent-type ' + (isUnfix ? 'type-unfix' : 'type-fix');
+        typeBadge.textContent = isUnfix ? 'UNFIX' : 'FIX';
+        meta.appendChild(typeBadge);
+      }
+
+      var statusSpan = document.createElement('span');
+      statusSpan.className = 'recent-status ' + sc;
+      statusSpan.textContent = e.status;
+      meta.appendChild(statusSpan);
+
+      var timeSpan = document.createElement('span');
+      timeSpan.className = 'recent-time';
+      timeSpan.textContent = time;
+      meta.appendChild(timeSpan);
+
+      row.appendChild(msg);
+      row.appendChild(meta);
+      list.appendChild(row);
     });
-    html += '</div></div>';
-    $('recentArea').innerHTML = html;
+    container.appendChild(list);
+    $('recentArea').replaceChildren(container);
   } catch {}
 }
 
