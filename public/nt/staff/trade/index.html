@@ -238,7 +238,9 @@
   .de-input:focus { background: #faf8f5; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
   .de-input::placeholder { color: #94a3b8; }
   select.de-input { appearance: auto; }
-  .de-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .de-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .de-row > input { flex: 1; min-width: 120px; }
+  .de-row > div { flex-shrink: 0; }
   .de-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
   .de-hint { font-size: 10px; color: #94a3b8; margin-top: 3px; }
   .de-submit {
