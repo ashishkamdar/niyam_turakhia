@@ -186,6 +186,74 @@
   #seedStatus { margin-top: 8px; font-size: 12px; text-align: center; }
 
   .hidden { display: none !important; }
+
+  /* ── Tabs ───────────────────────────────────── */
+  .tab-bar {
+    display: flex; gap: 0; margin-bottom: 16px; border-radius: 10px;
+    overflow: hidden; border: 1px solid #d1cac0; background: #f5f1ec;
+  }
+  .tab-btn {
+    flex: 1; padding: 11px 0; font-size: 13px; font-weight: 600;
+    text-align: center; cursor: pointer; border: none; background: transparent;
+    color: #64748b; transition: 0.2s; letter-spacing: 0.3px;
+  }
+  .tab-btn.active { background: #1e293b; color: #f8fafc; }
+  .tab-btn:not(.active):hover { background: #eee9e0; }
+
+  /* ── Direct Entry Form ─────────────────────── */
+  .de-group { margin-bottom: 16px; }
+  .de-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: #64748b; font-weight: 700; margin-bottom: 6px;
+  }
+  .de-label .req { color: #dc2626; margin-left: 2px; }
+  .de-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .de-pill {
+    padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1.5px solid #d1cac0; background: #faf8f5;
+    color: #475569; transition: 0.15s; white-space: nowrap;
+  }
+  .de-pill:hover { background: #f0ebe4; border-color: #b8b0a5; }
+  .de-pill.active { background: #1e293b; color: #f8fafc; border-color: #1e293b; }
+  .de-pill.buy.active { background: #dc2626; border-color: #dc2626; color: #fff; }
+  .de-pill.sell.active { background: #059669; border-color: #059669; color: #fff; }
+  .de-pill.metal-gold.active { background: #b45309; border-color: #b45309; color: #fff; }
+  .de-pill.metal-silver.active { background: #64748b; border-color: #64748b; color: #fff; }
+  .de-pill.metal-platinum.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+  .de-pill.metal-palladium.active { background: #0891b2; border-color: #0891b2; color: #fff; }
+  .de-pill.metal-rhodium.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+  .de-input {
+    width: 100%; background: #f5f1ec; border: 1px solid #d1cac0;
+    border-radius: 8px; padding: 10px 14px; color: #1e293b;
+    font-size: 14px; outline: none; transition: 0.2s;
+  }
+  .de-input:focus { background: #faf8f5; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+  .de-input::placeholder { color: #94a3b8; }
+  select.de-input { appearance: auto; }
+  .de-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .de-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .de-hint { font-size: 10px; color: #94a3b8; margin-top: 3px; }
+  .de-submit {
+    width: 100%; padding: 14px; border-radius: 10px; font-size: 14px;
+    font-weight: 700; cursor: pointer; transition: 0.2s; border: none;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3); letter-spacing: 0.3px;
+  }
+  .de-submit:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
+  .de-submit:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+  .de-result {
+    margin-top: 12px; padding: 12px 14px; border-radius: 8px;
+    font-size: 12px; border: 1px solid;
+  }
+  .de-result.ok { border-color: #86efac; background: #f0fdf4; color: #166534; }
+  .de-result.err { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+  .de-optional-toggle {
+    width: 100%; background: #f5f1ec; border: 1px solid #ddd7ce;
+    border-radius: 8px; padding: 10px 14px; color: #64748b;
+    font-size: 12px; cursor: pointer; text-align: left; margin-bottom: 16px;
+    transition: 0.2s; font-weight: 600;
+  }
+  .de-optional-toggle:hover { background: #eee9e0; }
 </style>
 </head>
 <body>
@@ -216,42 +284,190 @@
     </div>
   </div>
   <div class="main">
-    <div class="card">
-      <div class="section-label">Enter Trade Code</div>
-      <textarea class="trade-input" id="tradeInput" rows="3"
-        placeholder="#NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG"></textarea>
+    <!-- ── Tab Bar ──────────────────────────────── -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabBtnCode" onclick="switchTab('code')">Code Entry</button>
+      <button class="tab-btn" id="tabBtnDirect" onclick="switchTab('direct')">Direct Entry</button>
+    </div>
 
-      <div class="btn-row">
-        <span class="input-hint">One trade per line</span>
-        <div style="display:flex;gap:8px">
-          <button class="btn-validate" id="btnValidate" onclick="validateTrades()" disabled>Validate</button>
-          <button class="btn-submit" id="btnSubmit" onclick="submitTrades()" disabled>Send Trade</button>
+    <!-- ── Tab: Code Entry (existing) ──────────── -->
+    <div id="tabCodeEntry">
+      <div class="card">
+        <div class="section-label">Enter Trade Code</div>
+        <textarea class="trade-input" id="tradeInput" rows="3"
+          placeholder="#NTP SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG"></textarea>
+
+        <div class="btn-row">
+          <span class="input-hint">One trade per line</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn-validate" id="btnValidate" onclick="validateTrades()" disabled>Validate</button>
+            <button class="btn-submit" id="btnSubmit" onclick="submitTrades()" disabled>Send Trade</button>
+          </div>
         </div>
+
+        <div id="validationArea"></div>
+        <div id="resultsArea"></div>
       </div>
 
-      <div id="validationArea"></div>
-      <div id="resultsArea"></div>
+      <button class="ref-toggle" onclick="toggleRef()">
+        <span id="refArrow">▸</span> Format Reference
+      </button>
+      <div id="refContent" class="format-guide">
+        <div class="label">Syntax</div>
+        <div class="ex">&lt;TRIGGER&gt; &lt;BUY/SELL&gt; &lt;QTY&gt;&lt;UNIT&gt; &lt;METAL&gt; [PURITY] @&lt;RATE&gt; [PREMIUM] &lt;PARTY&gt;</div>
+        <div class="label">Examples</div>
+        <div class="ex"><span class="trigger">#NTP</span> SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG</div>
+        <div class="ex"><span class="trigger">#NTK</span> BUY 50KG SILVER 999 @70.51 +1.2 SAPAN</div>
+        <div class="ex"><span class="trigger">#NT</span> SELL 2KG PLATINUM 999 @979.25 -4 SHAH</div>
+        <div class="label">Triggers</div>
+        <div><span class="f-type-p">#NTP</span> = Pakka &nbsp; <span class="f-type-k">#NTK</span> = Kachha &nbsp; <span class="f-type-u">#NT</span> = Decide later</div>
+      </div>
+
+      <div class="seed-row">
+        <button class="btn-seed btn-seed-pakka" id="btnSeedPakka" onclick="seedTrades('P')">Demo Seed Pakka</button>
+        <button class="btn-seed btn-seed-kachha" id="btnSeedKachha" onclick="seedTrades('K')">Demo Seed Kachha</button>
+      </div>
+      <div id="seedStatus"></div>
     </div>
 
-    <button class="ref-toggle" onclick="toggleRef()">
-      <span id="refArrow">▸</span> Format Reference
-    </button>
-    <div id="refContent" class="format-guide">
-      <div class="label">Syntax</div>
-      <div class="ex">&lt;TRIGGER&gt; &lt;BUY/SELL&gt; &lt;QTY&gt;&lt;UNIT&gt; &lt;METAL&gt; [PURITY] @&lt;RATE&gt; [PREMIUM] &lt;PARTY&gt;</div>
-      <div class="label">Examples</div>
-      <div class="ex"><span class="trigger">#NTP</span> SELL 10KG GOLD 24K @2566.80 -0.1 TAKFUNG</div>
-      <div class="ex"><span class="trigger">#NTK</span> BUY 50KG SILVER 999 @70.51 +1.2 SAPAN</div>
-      <div class="ex"><span class="trigger">#NT</span> SELL 2KG PLATINUM 999 @979.25 -4 SHAH</div>
-      <div class="label">Triggers</div>
-      <div><span class="f-type-p">#NTP</span> = Pakka &nbsp; <span class="f-type-k">#NTK</span> = Kachha &nbsp; <span class="f-type-u">#NT</span> = Decide later</div>
-    </div>
+    <!-- ── Tab: Direct Entry (new form) ────────── -->
+    <div id="tabDirectEntry" class="hidden">
+      <div class="card">
+        <!-- Metal -->
+        <div class="de-group">
+          <div class="de-label">Metal<span class="req">*</span></div>
+          <div class="de-pills" id="deMetalPills">
+            <button class="de-pill metal-gold" onclick="dePick('metal','gold',this)">Gold</button>
+            <button class="de-pill metal-silver" onclick="dePick('metal','silver',this)">Silver</button>
+            <button class="de-pill metal-platinum" onclick="dePick('metal','platinum',this)">Platinum</button>
+            <button class="de-pill metal-palladium" onclick="dePick('metal','palladium',this)">Palladium</button>
+            <button class="de-pill metal-rhodium" onclick="dePick('metal','rhodium',this)">Rhodium</button>
+            <select class="de-input" style="width:auto;min-width:90px;padding:8px 10px;font-size:12px;font-weight:600" onchange="dePickOther(this)">
+              <option value="">Other…</option>
+              <option value="iridium">Iridium</option>
+              <option value="ruthenium">Ruthenium</option>
+              <option value="osmium">Osmium</option>
+            </select>
+          </div>
+        </div>
 
-    <div class="seed-row">
-      <button class="btn-seed btn-seed-pakka" id="btnSeedPakka" onclick="seedTrades('P')">Demo Seed Pakka</button>
-      <button class="btn-seed btn-seed-kachha" id="btnSeedKachha" onclick="seedTrades('K')">Demo Seed Kachha</button>
+        <!-- Direction -->
+        <div class="de-group">
+          <div class="de-label">Direction<span class="req">*</span></div>
+          <div class="de-pills">
+            <button class="de-pill buy" onclick="dePick('direction','buy',this)" style="flex:1">BUY</button>
+            <button class="de-pill sell" onclick="dePick('direction','sell',this)" style="flex:1">SELL</button>
+          </div>
+        </div>
+
+        <!-- Type -->
+        <div class="de-group">
+          <div class="de-label">Trade Type</div>
+          <div class="de-pills">
+            <button class="de-pill active" onclick="dePick('docType','FCT',this)" style="flex:1">Fixing (FCT)</button>
+            <button class="de-pill" onclick="dePick('docType','FBT',this)" style="flex:1">Unfixing (FBT)</button>
+          </div>
+        </div>
+
+        <!-- Account -->
+        <div class="de-group">
+          <div class="de-label">Account / Party<span class="req">*</span></div>
+          <select class="de-input" id="deAccount">
+            <option value="">Select account…</option>
+          </select>
+        </div>
+
+        <!-- Quantity + Unit -->
+        <div class="de-group">
+          <div class="de-label">Quantity<span class="req">*</span></div>
+          <div class="de-row">
+            <input type="number" class="de-input" id="deQty" placeholder="e.g. 10" step="0.001" min="0">
+            <div>
+              <div class="de-pills" id="deUnitPills" style="flex-wrap:nowrap">
+                <button class="de-pill active" onclick="dePick('unit','KG4X9',this)" style="padding:8px 10px;font-size:11px">KG 4x9</button>
+                <button class="de-pill" onclick="dePick('unit','KG995',this)" style="padding:8px 10px;font-size:11px">KG 995</button>
+                <button class="de-pill" onclick="dePick('unit','OZ',this)" style="padding:8px 10px;font-size:11px">OZ</button>
+                <button class="de-pill" onclick="dePick('unit','GMS',this)" style="padding:8px 10px;font-size:11px">GMS</button>
+                <button class="de-pill" onclick="dePick('unit','LBS',this)" style="padding:8px 10px;font-size:11px">LBS</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Price + Price Type -->
+        <div class="de-group">
+          <div class="de-label">Price<span class="req">*</span></div>
+          <div class="de-row">
+            <input type="number" class="de-input" id="dePrice" placeholder="e.g. 2566.80" step="0.0000001" min="0">
+            <div>
+              <div class="de-pills" style="flex-wrap:nowrap">
+                <button class="de-pill active" onclick="dePick('priceType','OZ',this)" style="padding:8px 12px;font-size:11px">per OZ</button>
+                <button class="de-pill" onclick="dePick('priceType','GMS',this)" style="padding:8px 12px;font-size:11px">per GMS</button>
+                <button class="de-pill" onclick="dePick('priceType','KG',this)" style="padding:8px 12px;font-size:11px">per KG</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Premium -->
+        <div class="de-group">
+          <div class="de-label">Premium</div>
+          <div class="de-row">
+            <input type="number" class="de-input" id="dePremRate" placeholder="e.g. 1.5 (optional)" step="0.01">
+            <div>
+              <div class="de-pills" style="flex-wrap:nowrap">
+                <button class="de-pill active" onclick="dePick('premType','OZ',this)" style="padding:8px 12px;font-size:11px">per OZ</button>
+                <button class="de-pill" onclick="dePick('premType','GMS',this)" style="padding:8px 12px;font-size:11px">per GMS</button>
+                <button class="de-pill" onclick="dePick('premType','KG',this)" style="padding:8px 12px;font-size:11px">per KG</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Optional fields (collapsed) -->
+        <button class="de-optional-toggle" onclick="toggleDeOptional()">
+          <span id="deOptArrow">▸</span> Additional Fields
+        </button>
+        <div id="deOptionalFields" class="hidden">
+          <div class="de-group">
+            <div class="de-label">Reference No</div>
+            <input type="text" class="de-input" id="deRefNo" placeholder="Optional reference">
+          </div>
+          <div class="de-group">
+            <div class="de-row">
+              <div>
+                <div class="de-label">Doc Date</div>
+                <input type="date" class="de-input" id="deDocDate">
+              </div>
+              <div>
+                <div class="de-label">Value Date</div>
+                <input type="date" class="de-input" id="deValueDate">
+              </div>
+            </div>
+          </div>
+          <div class="de-group">
+            <div class="de-row">
+              <div>
+                <div class="de-label">Location</div>
+                <input type="text" class="de-input" id="deLocation" placeholder="Optional">
+              </div>
+              <div>
+                <div class="de-label">Salesman</div>
+                <input type="text" class="de-input" id="deSalesman" placeholder="Optional">
+              </div>
+            </div>
+          </div>
+          <div class="de-group">
+            <div class="de-label">Remarks</div>
+            <input type="text" class="de-input" id="deRemarks" placeholder="Optional notes">
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button class="de-submit" id="deSubmitBtn" onclick="submitDirectEntry()" disabled>Submit Trade</button>
+        <div id="deResultArea"></div>
+      </div>
     </div>
-    <div id="seedStatus"></div>
 
     <div id="recentArea"></div>
   </div>
@@ -554,13 +770,195 @@ function toggleRef() {
   $('refArrow').textContent = c.classList.contains('open') ? '▾' : '▸';
 }
 
+// ─── Tab switching ───────────────────────────────
+function switchTab(tab) {
+  $('tabBtnCode').classList.toggle('active', tab === 'code');
+  $('tabBtnDirect').classList.toggle('active', tab === 'direct');
+  $('tabCodeEntry').classList.toggle('hidden', tab !== 'code');
+  $('tabDirectEntry').classList.toggle('hidden', tab !== 'direct');
+  if (tab === 'direct' && !partiesLoaded) loadParties();
+}
+
+// ─── Direct Entry state ──────────────────────────
+const deState = { metal: null, direction: null, docType: 'FCT', unit: 'KG4X9', priceType: 'OZ', premType: 'OZ' };
+
+const METAL_CMDTY = {
+  gold: 'XAUUSD', silver: 'XAGUSD', platinum: 'XPTUSD',
+  palladium: 'XPDUSD', rhodium: 'XRHUSD',
+  iridium: 'XIRUSD', ruthenium: 'XRUUSD', osmium: 'XOSUSD'
+};
+
+function dePick(field, value, btn) {
+  deState[field] = value;
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.de-pill').forEach(function(p) { p.classList.remove('active'); });
+  btn.classList.add('active');
+  if (field === 'metal') {
+    const sel = parent.querySelector('select');
+    if (sel) sel.value = '';
+  }
+  deValidateForm();
+}
+
+function dePickOther(sel) {
+  if (!sel.value) return;
+  deState.metal = sel.value;
+  var parent = sel.parentElement;
+  parent.querySelectorAll('.de-pill').forEach(function(p) { p.classList.remove('active'); });
+  deValidateForm();
+}
+
+function deValidateForm() {
+  var valid = deState.metal && deState.direction
+    && $('deAccount').value
+    && $('deQty').value && parseFloat($('deQty').value) > 0
+    && $('dePrice').value && parseFloat($('dePrice').value) > 0;
+  $('deSubmitBtn').disabled = !valid;
+}
+
+function attachDeListeners() {
+  ['deAccount','deQty','dePrice','dePremRate'].forEach(function(id) {
+    var el = $(id);
+    if (el) el.addEventListener('input', deValidateForm);
+  });
+}
+
+function toggleDeOptional() {
+  var c = $('deOptionalFields');
+  c.classList.toggle('hidden');
+  $('deOptArrow').textContent = c.classList.contains('hidden') ? '\u25B8' : '\u25BE';
+}
+
+function setDefaultDates() {
+  var today = new Date();
+  var fmt = function(d) { return d.toISOString().slice(0,10); };
+  var el = $('deDocDate');
+  if (el && !el.value) el.value = fmt(today);
+  var t2 = new Date(today);
+  t2.setDate(t2.getDate() + 2);
+  var vd = $('deValueDate');
+  if (vd && !vd.value) vd.value = fmt(t2);
+}
+
+// ─── Load parties for dropdown ───────────────────
+var partiesLoaded = false;
+async function loadParties() {
+  try {
+    var r = await fetch('/api/parties');
+    var data = await r.json();
+    var parties = data.parties || data || [];
+    var sel = $('deAccount');
+    // Clear and rebuild with safe DOM methods
+    while (sel.options.length > 1) sel.remove(1);
+    parties.forEach(function(p) {
+      if (!p.active) return;
+      var code = p.orosoft_party_code || p.short_code || '';
+      var label = p.name + (code ? ' (' + code + ')' : '');
+      var opt = document.createElement('option');
+      opt.value = code || p.name;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+    partiesLoaded = true;
+  } catch(e) {}
+}
+
+// ─── Submit Direct Entry ─────────────────────────
+async function submitDirectEntry() {
+  var btn = $('deSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending\u2026';
+  $('deResultArea').textContent = '';
+
+  var cmdtyPair = METAL_CMDTY[deState.metal] || 'XAUUSD';
+  var deal = deState.direction === 'buy' ? 1 : 0;
+  var qty = parseFloat($('deQty').value);
+  var price = parseFloat($('dePrice').value);
+  var premRate = $('dePremRate').value ? parseFloat($('dePremRate').value) : undefined;
+  var docDate = $('deDocDate').value ? $('deDocDate').value.replace(/-/g,'') : undefined;
+  var valueDate = $('deValueDate').value ? $('deValueDate').value.replace(/-/g,'') : undefined;
+
+  var metalName = deState.metal.toUpperCase();
+  var dir = deState.direction.toUpperCase();
+  var qtyStr;
+  if (deState.unit === 'KG4X9' || deState.unit === 'KG995') qtyStr = qty + 'KG';
+  else if (deState.unit === 'OZ') qtyStr = qty + 'OZ';
+  else if (deState.unit === 'GMS') qtyStr = qty + 'G';
+  else if (deState.unit === 'LBS') qtyStr = qty + 'LBS';
+  else qtyStr = qty + 'KG';
+
+  var purity = (deState.unit === 'KG995') ? '995' : '24K';
+  var party = $('deAccount').value;
+  var premStr = premRate ? (premRate > 0 ? '+' + premRate : '' + premRate) : '';
+
+  var line = ('#NTP ' + dir + ' ' + qtyStr + ' ' + metalName + ' ' + purity + ' @' + price + ' ' + premStr + ' ' + party).replace(/\s+/g,' ').trim();
+
+  var orosoftMeta = {
+    documentType: deState.docType,
+    cmdtyPair: cmdtyPair,
+    deal: deal,
+    stockCode: deState.unit,
+    priceType: deState.priceType,
+    prmRateType: premRate ? deState.premType : undefined,
+    prmRate: premRate,
+    referenceNo: $('deRefNo').value || undefined,
+    docDate: docDate,
+    valueDate: valueDate,
+    location: $('deLocation').value || undefined,
+    salesman: $('deSalesman').value || undefined,
+    remarks: $('deRemarks').value || undefined,
+  };
+
+  try {
+    var r = await fetch('/api/trade-entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: line, orosoft_meta: orosoftMeta })
+    });
+    var d = await r.json();
+    if (d.ok || (d.inserted && d.inserted > 0)) {
+      var okDiv = document.createElement('div');
+      okDiv.className = 'de-result ok';
+      okDiv.textContent = '\u2713 Trade submitted for review';
+      $('deResultArea').replaceChildren(okDiv);
+      // Reset form
+      deState.metal = null; deState.direction = null;
+      document.querySelectorAll('#tabDirectEntry .de-pill.active').forEach(function(p) { p.classList.remove('active'); });
+      deState.docType = 'FCT'; deState.unit = 'KG4X9'; deState.priceType = 'OZ'; deState.premType = 'OZ';
+      $('deQty').value = ''; $('dePrice').value = ''; $('dePremRate').value = '';
+      $('deRefNo').value = ''; $('deRemarks').value = '';
+      $('deAccount').value = '';
+      setDefaultDates();
+      deValidateForm();
+      loadRecent();
+    } else {
+      var errMsg = d.error || 'Unknown error';
+      var errDiv = document.createElement('div');
+      errDiv.className = 'de-result err';
+      errDiv.textContent = '\u2717 ' + errMsg;
+      $('deResultArea').replaceChildren(errDiv);
+    }
+  } catch(e) {
+    var netDiv = document.createElement('div');
+    netDiv.className = 'de-result err';
+    netDiv.textContent = '\u2717 Network error';
+    $('deResultArea').replaceChildren(netDiv);
+  }
+
+  btn.textContent = 'Submit Trade';
+  deValidateForm();
+}
+
 // ─── Boot ─────────────────────────────────────────
 checkAuth();
 // Attach input listener after main screen shows
 const _origShowScreen = showScreen;
 showScreen = function(name) {
   _origShowScreen(name);
-  if (name === 'main') setTimeout(attachInputListener, 50);
+  if (name === 'main') {
+    setTimeout(attachInputListener, 50);
+    setTimeout(function() { attachDeListeners(); setDefaultDates(); }, 50);
+  }
 };
 setInterval(() => { if (!$('mainScreen').classList.contains('hidden')) loadRecent(); }, 10000);
 </script>
