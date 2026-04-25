@@ -131,8 +131,8 @@ function formatAmount(d: Deal): string {
   if (!d.qty_grams || !d.rate_usd_per_oz) return "—";
   const fineOz = d.qty_grams / GRAMS_PER_TROY_OZ;
   return "$" + (fineOz * d.rate_usd_per_oz).toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 
