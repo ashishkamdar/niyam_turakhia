@@ -378,7 +378,7 @@ export async function POST(req: NextRequest) {
         ok: true,
         dry_run: true,
         validated: mappedPayloads.length,
-        payloads: mappedPayloads.map((p) => ({ id: p.id, accountCode: p.payload.accountCode, cmdtyPair: p.payload.cmdtyPair })),
+        payloads: mappedPayloads.map((p) => ({ id: p.id, ...p.payload })),
       });
     }
 

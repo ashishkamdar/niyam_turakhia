@@ -779,6 +779,8 @@ function DestinationPanel({
   // that Niyam isn't tapping his foot.
   const [stage, setStage] = useState(0);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [devPayloads, setDevPayloads] = useState<Record<string, unknown>[] | null>(null);
+  const [devOpen, setDevOpen] = useState(false);
   const stageTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -794,6 +796,7 @@ function DestinationPanel({
     setPhase("sending");
     setLastBatch(null);
     setSyncMsg(null);
+    setDevPayloads(null);
     const dealIds = queue.map((d) => d.id);
 
     // ── Step 1: Authenticate ────────────────────────────────
@@ -821,6 +824,7 @@ function DestinationPanel({
         body: JSON.stringify({ target, ids: dealIds, dry_run: true }),
       });
       const valJson = await valRes.json();
+      if (valJson.payloads) setDevPayloads(valJson.payloads as Record<string, unknown>[]);
       if (!valRes.ok || !valJson.ok) {
         // Check if it's a party-not-found error — the actual dispatch will auto-sync
         const isPartyError = valJson.failures?.some((f: { errors?: string[] }) =>
@@ -1072,6 +1076,55 @@ function DestinationPanel({
               </>
             )}
           </button>
+        </div>
+      )}
+
+      {/* ── Developer Info (collapsible JSON payload preview) ────────── */}
+      {target === "orosoft" && queue.length > 0 && (
+        <div className="border-t border-white/5">
+          <button
+            onClick={() => setDevOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-5 py-3 text-left text-xs font-semibold text-gray-500 hover:text-gray-300 transition"
+          >
+            <span>Developer Info</span>
+            <svg
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+              className={`size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+          {devOpen && (
+            <div className="border-t border-white/5 bg-gray-950/60 px-5 py-3">
+              {devPayloads && devPayloads.length > 0 ? (
+                <>
+                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+                    OroSoft API Payload ({devPayloads.length} trade{devPayloads.length === 1 ? "" : "s"})
+                  </div>
+                  <pre className="overflow-x-auto rounded-lg bg-[#1e293b] p-3 text-[11px] leading-relaxed text-gray-400">
+                    {JSON.stringify(devPayloads, null, 2)}
+                  </pre>
+                </>
+              ) : (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/dispatch", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ target, ids: queue.map((d) => d.id), dry_run: true }),
+                      });
+                      const json = await res.json();
+                      if (json.payloads) setDevPayloads(json.payloads as Record<string, unknown>[]);
+                    } catch {}
+                  }}
+                  className="rounded-md bg-white/5 px-3 py-2 text-xs text-gray-400 hover:bg-white/10 hover:text-gray-300 transition"
+                >
+                  Load payload preview…
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
