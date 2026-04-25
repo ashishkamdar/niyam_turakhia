@@ -842,9 +842,10 @@ function updateDePreview() {
     var pv2 = parseFloat(premRate);
     premStr = (pv2 > 0 ? '+' : '') + pv2;
   }
+  var typeTag = deState.docType === 'FBT' ? ' [FBT]' : '';
   var line = '#NTP ' + dir + ' ' + qty + unitLabel + ' ' + metalName + ' ' + purity + ' @' + price;
   if (premStr) line += ' ' + premStr;
-  line += ' ' + party;
+  line += ' ' + party + typeTag;
   pg.style.display = '';
   pv.textContent = line.replace(/\s+/g, ' ').trim();
 }
