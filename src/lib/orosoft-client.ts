@@ -135,18 +135,19 @@ async function oroFetch<T>(
 
 // ── FixingTrade ─────────────────────────────────────────────────────
 
+// Field order matches OroSoft FixingTradeRequest spec
 export type FixingTradePayload = {
+  documentType?: string;    // "FCT" | "FBT" (default FCT)
+  docDate?: string;         // YYYYMMDD
   accountCode: string;
+  valueDate?: string;       // YYYYMMDD
+  referenceNo?: string;
   cmdtyPair: string;        // e.g. "XAUUSD"
   deal: number;             // 1=BUY, 0=SELL
   piecesQty: number;        // max 3 decimals
+  stockCode: string;        // e.g. "OZ", "GMS", "KG4X9", "KG995", "LBS"
   price: number;            // max 7 decimals
-  stockCode: string;        // e.g. "OZ", "GMS", "KG 4X9", "KG 995"
-  documentType?: string;    // "FCT" | "FBT"
-  docDate?: string;         // YYYYMMDD
-  valueDate?: string;       // YYYYMMDD
-  referenceNo?: string;
-  priceType?: string;       // "OZ" | "GMS" | "KG"
+  priceType?: string;       // "OZ" | "GMS" | "KG" (default OZ)
   prmRateType?: string;     // "OZ" | "GMS" | "KG"
   prmRate?: number;
   location?: string;

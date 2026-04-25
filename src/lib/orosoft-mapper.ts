@@ -188,18 +188,19 @@ export function mapDealToFixingTrade(
   const vd = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
   const valueDate = `${vd.getFullYear()}${String(vd.getMonth() + 1).padStart(2, "0")}${String(vd.getDate()).padStart(2, "0")}`;
 
+  // Field order matches OroSoft FixingTradeRequest spec exactly
   const payload: FixingTradePayload = {
+    documentType: "FCT",
+    docDate,
     accountCode,
+    valueDate,
+    referenceNo: `PX-${deal.id.slice(0, 8).toUpperCase()}`,
     cmdtyPair: cmdtyPair!,
     deal: dealFlag,
     piecesQty,
-    price: Math.round(deal.rate_usd_per_oz * 10000000) / 10000000, // max 7 decimals
     stockCode,
-    documentType: "FCT",
-    docDate,
-    valueDate,
+    price: Math.round(deal.rate_usd_per_oz * 10000000) / 10000000, // max 7 decimals
     priceType: "OZ",
-    referenceNo: `PX-${deal.id.slice(0, 8).toUpperCase()}`,
     remarks: `PrismX deal ${deal.id}`,
   };
 

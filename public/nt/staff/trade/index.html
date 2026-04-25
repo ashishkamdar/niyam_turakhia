@@ -469,6 +469,15 @@
           <div id="dePreview" style="background:#f5f1ec;border:1px solid #d1cac0;border-radius:8px;padding:10px 14px;font-family:'SF Mono','Fira Code','Courier New',monospace;font-size:13px;color:#334155;line-height:1.6;word-break:break-all"></div>
         </div>
 
+        <!-- Developer Info (raw JSON preview) -->
+        <button class="de-optional-toggle" onclick="toggleDeDevInfo()">
+          <span id="deDevArrow">▸</span> Developer Info
+        </button>
+        <div id="deDevInfo" class="hidden">
+          <div class="de-label">OroSoft API Payload (raw JSON)</div>
+          <pre id="deJsonPreview" style="background:#1e293b;color:#94a3b8;border-radius:8px;padding:12px 14px;font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-bottom:16px"></pre>
+        </div>
+
         <!-- Submit -->
         <button class="de-submit" id="deSubmitBtn" onclick="submitDirectEntry()" disabled>Submit Trade</button>
         <div id="deResultArea"></div>
@@ -821,6 +830,7 @@ function deValidateForm() {
     && $('dePrice').value && parseFloat($('dePrice').value) > 0;
   $('deSubmitBtn').disabled = !valid;
   updateDePreview();
+  if (!$('deDevInfo').classList.contains('hidden')) updateDeJsonPreview();
 }
 
 function updateDePreview() {
@@ -861,6 +871,53 @@ function toggleDeOptional() {
   var c = $('deOptionalFields');
   c.classList.toggle('hidden');
   $('deOptArrow').textContent = c.classList.contains('hidden') ? '\u25B8' : '\u25BE';
+}
+
+function toggleDeDevInfo() {
+  var c = $('deDevInfo');
+  c.classList.toggle('hidden');
+  $('deDevArrow').textContent = c.classList.contains('hidden') ? '\u25B8' : '\u25BE';
+  if (!c.classList.contains('hidden')) updateDeJsonPreview();
+}
+
+function buildOroSoftPayload() {
+  if (!deState.metal || !deState.direction) return null;
+  var cmdtyPair = METAL_CMDTY[deState.metal] || 'XAUUSD';
+  var deal = deState.direction === 'buy' ? 1 : 0;
+  var qty = $('deQty').value ? parseFloat($('deQty').value) : 0;
+  var price = $('dePrice').value ? parseFloat($('dePrice').value) : 0;
+  var premRate = $('dePremRate').value ? parseFloat($('dePremRate').value) : undefined;
+  var docDate = $('deDocDate').value ? $('deDocDate').value.replace(/-/g,'') : undefined;
+  var valueDate = $('deValueDate').value ? $('deValueDate').value.replace(/-/g,'') : undefined;
+
+  // Build in exact OroSoft FixingTradeRequest field order
+  var payload = {};
+  payload.documentType = deState.docType;
+  if (docDate) payload.docDate = docDate;
+  payload.accountCode = $('deAccount').value || '';
+  if (valueDate) payload.valueDate = valueDate;
+  if ($('deRefNo').value) payload.referenceNo = $('deRefNo').value;
+  payload.cmdtyPair = cmdtyPair;
+  payload.deal = deal;
+  payload.piecesQty = qty;
+  payload.stockCode = deState.unit;
+  payload.price = price;
+  payload.priceType = deState.priceType;
+  if (premRate !== undefined) {
+    payload.prmRateType = deState.premType;
+    payload.prmRate = premRate;
+  }
+  if ($('deLocation').value) payload.location = $('deLocation').value;
+  if ($('deSalesman').value) payload.salesman = $('deSalesman').value;
+  if ($('deRemarks').value) payload.remarks = $('deRemarks').value;
+  return payload;
+}
+
+function updateDeJsonPreview() {
+  var pre = $('deJsonPreview');
+  if (!pre) return;
+  var payload = buildOroSoftPayload();
+  pre.textContent = payload ? JSON.stringify(payload, null, 2) : '// Fill in the form fields above';
 }
 
 function setDefaultDates() {
