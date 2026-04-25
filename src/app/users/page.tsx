@@ -380,7 +380,7 @@ export default function UsersPage() {
           <div className="flex items-center justify-between rounded-lg border border-white/5 bg-gray-900 px-4 py-3">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                Cloudflare Access
+                Secure Access
                 <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase ${
                   cfEnforced
                     ? "bg-emerald-500/15 text-emerald-300"
@@ -467,7 +467,7 @@ export default function UsersPage() {
             return (
               <div className="mt-3 rounded-lg border border-white/5 bg-gray-950/50 px-4 py-3">
                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                  Synced to Cloudflare ({withEmail.length})
+                  Synced to Secure Access ({withEmail.length})
                 </div>
                 {withEmail.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
@@ -491,7 +491,7 @@ export default function UsersPage() {
                 )}
                 {noEmail.length > 0 && (
                   <p className="mt-2 text-[11px] text-gray-600">
-                    No email set: {noEmail.map((p) => p.label).join(", ")} — edit these users to add an email for Cloudflare access
+                    No email set: {noEmail.map((p) => p.label).join(", ")} — edit these users to add an email for secure access
                   </p>
                 )}
               </div>
@@ -843,7 +843,7 @@ function PinManager({
           </div>
           <div className="flex-1 min-w-[160px]">
             <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">
-              Email (for Cloudflare)
+              Email (for Secure Access)
             </label>
             <input
               value={newEmail}

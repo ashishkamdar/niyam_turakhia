@@ -98,7 +98,7 @@ export async function PUT(req: NextRequest) {
     if (emails.length === 0) {
       return NextResponse.json({
         ok: false,
-        error: "No users have email addresses. Add emails to users before enabling Cloudflare Access.",
+        error: "No users have email addresses. Add emails to users before enabling Secure Access.",
       }, { status: 400 });
     }
 

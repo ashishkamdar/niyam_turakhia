@@ -314,7 +314,7 @@ export default function SettingsPage() {
       "These will be KEPT:\n" +
       "✓ Users & sessions\n" +
       "✓ Parties & OroSoft mappings\n" +
-      "✓ API credentials (OroSoft, WhatsApp, Cloudflare)\n" +
+      "✓ API credentials (OroSoft, WhatsApp, Secure Access)\n" +
       "✓ Prices\n\n" +
       "This cannot be undone. Continue?"
     );
