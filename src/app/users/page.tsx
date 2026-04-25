@@ -180,6 +180,7 @@ export default function UsersPage() {
   const [currentRole, setCurrentRole] = useState<Role>("staff");
   const [cfEnforced, setCfEnforced] = useState(false);
   const [cfConfigured, setCfConfigured] = useState(false);
+  const [cfEmails, setCfEmails] = useState<string[]>([]);
   const [cfToggling, setCfToggling] = useState(false);
   const [cfSessionDuration, setCfSessionDuration] = useState("24h");
 
@@ -197,6 +198,7 @@ export default function UsersPage() {
       if (json.ok) {
         setCfConfigured(json.configured);
         setCfEnforced(json.enforced);
+        if (json.emails) setCfEmails(json.emails);
         if (json.sessionDuration) setCfSessionDuration(json.sessionDuration);
       }
     } catch {}
@@ -437,6 +439,7 @@ export default function UsersPage() {
                   const json = await res.json();
                   if (json.ok) {
                     setCfEnforced(json.enforced ?? !cfEnforced);
+                    if (json.emails) setCfEmails(json.emails);
                   } else {
                     alert(json.error || "Failed to toggle");
                   }
@@ -457,6 +460,92 @@ export default function UsersPage() {
                 }`}
               />
             </button>
+          </div>
+
+          {/* Email allowlist */}
+          <div className="mt-3 rounded-lg border border-white/5 bg-gray-950/50 px-4 py-3">
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              Allowed Emails ({cfEmails.length})
+            </div>
+            {cfEmails.length === 0 ? (
+              <p className="text-xs text-gray-600">
+                {cfEnforced
+                  ? "No emails in Cloudflare policy. Toggle enforce to sync from user emails."
+                  : "Emails will be synced when you enable enforce mode."}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {cfEmails.map((email) => (
+                  <span key={email} className="group inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
+                    {email}
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Remove ${email} from Cloudflare Access?`)) return;
+                        setCfToggling(true);
+                        try {
+                          const res = await fetch("/api/cloudflare-access", {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ removeEmail: email }),
+                          });
+                          const json = await res.json();
+                          if (json.ok && json.emails) setCfEmails(json.emails);
+                          else alert(json.error || "Failed");
+                        } catch { alert("Network error"); }
+                        finally { setCfToggling(false); }
+                      }}
+                      disabled={cfToggling}
+                      className="ml-0.5 rounded-full p-0.5 text-emerald-400/50 hover:bg-emerald-500/20 hover:text-emerald-300 transition"
+                      title="Remove"
+                    >
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="size-3">
+                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <form
+              className="mt-2 flex gap-2"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const input = (e.currentTarget.elements.namedItem("cfNewEmail") as HTMLInputElement);
+                const email = input.value.trim();
+                if (!email) return;
+                setCfToggling(true);
+                try {
+                  const res = await fetch("/api/cloudflare-access", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ addEmail: email }),
+                  });
+                  const json = await res.json();
+                  if (json.ok && json.emails) {
+                    setCfEmails(json.emails);
+                    input.value = "";
+                  } else {
+                    alert(json.error || "Failed");
+                  }
+                } catch { alert("Network error"); }
+                finally { setCfToggling(false); }
+              }}
+            >
+              <input
+                name="cfNewEmail"
+                type="email"
+                placeholder="Add email…"
+                disabled={cfToggling}
+                className="flex-1 rounded-md border border-white/10 bg-gray-900 px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+              />
+              <button
+                type="submit"
+                disabled={cfToggling}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition"
+              >
+                Add
+              </button>
+            </form>
           </div>
         </section>
       )}

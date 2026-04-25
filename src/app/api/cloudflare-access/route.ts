@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth-context";
-import { getAccessPolicy, setAccessEnforced, setSessionDuration } from "@/lib/cloudflare-access";
+import { getAccessPolicy, setAccessEnforced, setSessionDuration, addAccessEmail, removeAccessEmail } from "@/lib/cloudflare-access";
 
 /**
  * GET /api/cloudflare-access
@@ -48,7 +48,12 @@ export async function PUT(req: NextRequest) {
 
   const db = getDb();
   const body = await req.json();
-  const { enforced, sessionDuration } = body as { enforced?: boolean; sessionDuration?: string };
+  const { enforced, sessionDuration, addEmail, removeEmail } = body as {
+    enforced?: boolean;
+    sessionDuration?: string;
+    addEmail?: string;
+    removeEmail?: string;
+  };
 
   // Handle session duration change
   if (sessionDuration !== undefined) {
@@ -63,6 +68,20 @@ export async function PUT(req: NextRequest) {
     if (enforced === undefined) {
       return NextResponse.json({ ok: true, sessionDuration });
     }
+  }
+
+  // Handle individual email add/remove
+  if (addEmail) {
+    const result = await addAccessEmail(db, addEmail);
+    if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
+    const state = await getAccessPolicy(db);
+    return NextResponse.json({ ok: true, emails: state?.emails ?? [] });
+  }
+  if (removeEmail) {
+    const result = await removeAccessEmail(db, removeEmail);
+    if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
+    const state = await getAccessPolicy(db);
+    return NextResponse.json({ ok: true, emails: state?.emails ?? [] });
   }
 
   if (typeof enforced !== "boolean") {
