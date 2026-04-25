@@ -110,7 +110,7 @@ export function SidebarNav() {
               // working through it. Deals/Chats badges hide on their own active tab
               // to avoid redundant clutter.
               const showBadge =
-                count > 0 && (item.badge === "review" || !isActive);
+                count > 0 && (item.badge === "review" || item.badge === "outbox" || !isActive);
               return (
                 <li key={item.name}>
                   <Link

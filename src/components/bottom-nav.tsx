@@ -133,7 +133,7 @@ export function BottomNav() {
             // reviewer can see the remaining count while working through the queue.
             // Deals/Chats badges hide on their own active tab as before.
             const showBadge =
-              count > 0 && (item.badge === "review" || !isActive);
+              count > 0 && (item.badge === "review" || item.badge === "outbox" || !isActive);
             return (
               <Link key={item.name} href={item.href} className={`relative flex flex-col items-center gap-0.5 pb-1 pt-2 text-[10px] font-medium ${isActive ? "text-amber-400" : "text-gray-500"}`}>
                 <div className="relative">
