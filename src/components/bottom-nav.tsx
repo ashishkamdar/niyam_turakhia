@@ -9,7 +9,7 @@ import { initialsFromLabel, roleAccentClass, roleLabel } from "@/lib/user-displa
 const NAV_ITEMS = [
   { name: "Home", href: "/", icon: "M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25", badge: "" },
   { name: "Review", href: "/review", icon: "M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z", badge: "review" },
-  { name: "Outbox", href: "/outbox", icon: "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5", badge: "" },
+  { name: "Outbox", href: "/outbox", icon: "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5", badge: "outbox" },
   { name: "Users", href: "/users", icon: "M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z", badge: "" },
   { name: "Settings", href: "/settings", icon: "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28zM15 12a3 3 0 11-6 0 3 3 0 016 0z", badge: "" },
 ];
@@ -33,6 +33,8 @@ export function BottomNav() {
   const [whatsappCount, setWhatsappCount] = useState(0);
   const [lockedCount, setLockedCount] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
+  const [outboxPakka, setOutboxPakka] = useState(0);
+  const [outboxKachha, setOutboxKachha] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
   // Current user card in the More sheet header. Fetched once on mount
   // via /api/auth — same source as the desktop sidebar card.
@@ -95,6 +97,10 @@ export function BottomNav() {
       fetch("/api/review?status=pending&limit=1").then((r) => r.json()).then((res: { counts?: { pending?: number } }) => {
         setReviewCount(res?.counts?.pending ?? 0);
       }).catch(() => {});
+      fetch("/api/dispatch").then((r) => r.json()).then((d: { pakka_outbox?: unknown[]; kachha_outbox?: unknown[] }) => {
+        setOutboxPakka(d.pakka_outbox?.length ?? 0);
+        setOutboxKachha(d.kachha_outbox?.length ?? 0);
+      }).catch(() => {});
     }
     fetchCounts();
     const poll = setInterval(fetchCounts, 3000);
@@ -109,6 +115,7 @@ export function BottomNav() {
     if (badge === "deals" && effectiveLocked > 0) return effectiveLocked;
     if (badge === "chats" && effectiveChats > 0) return effectiveChats;
     if (badge === "review" && reviewCount > 0) return reviewCount;
+    if (badge === "outbox") return outboxPakka + outboxKachha;
     return 0;
   }
 
@@ -133,7 +140,20 @@ export function BottomNav() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="size-5">
                     <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
                   </svg>
-                  {showBadge && (
+                  {showBadge && item.badge === "outbox" ? (
+                    <span className="absolute -right-3 -top-1.5 flex items-center gap-0.5">
+                      {outboxPakka > 0 && (
+                        <span className="flex size-4 items-center justify-center rounded-full bg-emerald-600 text-[8px] font-bold text-white">
+                          {outboxPakka > 9 ? "9+" : outboxPakka}
+                        </span>
+                      )}
+                      {outboxKachha > 0 && (
+                        <span className="flex size-4 items-center justify-center rounded-full bg-sky-600 text-[8px] font-bold text-white">
+                          {outboxKachha > 9 ? "9+" : outboxKachha}
+                        </span>
+                      )}
+                    </span>
+                  ) : showBadge ? (
                     <span
                       className={`absolute -right-2 -top-1.5 flex size-4 items-center justify-center rounded-full text-[8px] font-bold ${
                         item.badge === "review"
@@ -143,7 +163,7 @@ export function BottomNav() {
                     >
                       {count > 9 ? "9+" : count}
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 {item.name}
               </Link>

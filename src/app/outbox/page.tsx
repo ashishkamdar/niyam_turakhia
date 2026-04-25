@@ -234,7 +234,7 @@ export default function OutboxPage() {
             Nothing has been dispatched yet. Approved trades will appear here once sent.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-white/5 bg-gray-900">
+          <div className="rounded-lg border border-white/5 bg-gray-900">
             <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400">
                 <tr>
@@ -295,7 +295,7 @@ export default function OutboxPage() {
             No syncs yet. Each &quot;Send all&quot; creates a numbered sync entry here.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-white/5 bg-gray-900">
+          <div className="rounded-lg border border-white/5 bg-gray-900">
             <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-white/5 text-xs uppercase tracking-wider text-gray-400">
                 <tr>
@@ -1114,7 +1114,7 @@ function DispatchedLog({ deals, target }: { deals: Deal[]; target: Target }) {
         </svg>
       </button>
       {open && (
-        <div className="overflow-x-auto border-t border-white/5 bg-gray-950/40">
+        <div className="border-t border-white/5 bg-gray-950/40">
           {deals.length === 0 ? (
             <div className="px-5 py-6 text-center text-xs text-gray-600">
               No trades dispatched to {TARGET_META[target].title} yet.

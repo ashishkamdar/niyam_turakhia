@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { name: "Review", href: "/review", icon: "M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z", badge: "review" },
   { name: "Stock", href: "/stock", icon: "M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125", badge: "" },
   { name: "Deals", href: "/deals", icon: "M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5", badge: "deals" },
-  { name: "Outbox", href: "/outbox", icon: "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5", badge: "" },
+  { name: "Outbox", href: "/outbox", icon: "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5", badge: "outbox" },
   { name: "WhatsApp", href: "/whatsapp", icon: "M8.625 9.75a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z", badge: "chats" },
   { name: "Bot", href: "/bot", icon: "M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z", badge: "" },
   { name: "Money Flow", href: "/money-flow", icon: "M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z", badge: "" },
@@ -26,6 +26,8 @@ export function SidebarNav() {
   const [reviewCount, setReviewCount] = useState(0);
   const [dealsCount, setDealsCount] = useState(0);
   const [chatsCount, setChatsCount] = useState(0);
+  const [outboxPakka, setOutboxPakka] = useState(0);
+  const [outboxKachha, setOutboxKachha] = useState(0);
   // Current user card state — populated from /api/auth. The same
   // endpoint already returns label + role so there's no extra query.
   const [currentUser, setCurrentUser] = useState<{
@@ -66,6 +68,13 @@ export function SidebarNav() {
           setChatsCount(contacts.length);
         })
         .catch(() => {});
+      fetch("/api/dispatch")
+        .then((r) => r.json())
+        .then((d: { pakka_outbox?: unknown[]; kachha_outbox?: unknown[] }) => {
+          setOutboxPakka(d.pakka_outbox?.length ?? 0);
+          setOutboxKachha(d.kachha_outbox?.length ?? 0);
+        })
+        .catch(() => {});
     }
     fetchCounts();
     const poll = setInterval(fetchCounts, 3000);
@@ -76,6 +85,7 @@ export function SidebarNav() {
     if (badge === "review") return reviewCount;
     if (badge === "deals") return dealsCount;
     if (badge === "chats") return chatsCount;
+    if (badge === "outbox") return outboxPakka + outboxKachha;
     return 0;
   }
 
@@ -113,7 +123,20 @@ export function SidebarNav() {
                       <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
                     </svg>
                     <span className="flex-1">{item.name}</span>
-                    {showBadge && (
+                    {showBadge && item.badge === "outbox" ? (
+                      <span className="flex items-center gap-1">
+                        {outboxPakka > 0 && (
+                          <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                            {outboxPakka > 99 ? "99+" : outboxPakka}
+                          </span>
+                        )}
+                        {outboxKachha > 0 && (
+                          <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-sky-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                            {outboxKachha > 99 ? "99+" : outboxKachha}
+                          </span>
+                        )}
+                      </span>
+                    ) : showBadge ? (
                       <span
                         className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                           item.badge === "review"
@@ -123,7 +146,7 @@ export function SidebarNav() {
                       >
                         {count > 99 ? "99+" : count}
                       </span>
-                    )}
+                    ) : null}
                   </Link>
                 </li>
               );
